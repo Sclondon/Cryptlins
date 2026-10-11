@@ -27,6 +27,8 @@ func _ready() -> void:
 	sounds["boing"] = _voice(0.15, PackedFloat32Array([340.0, 180.0]), 0.6)
 	sounds["snore"] = _voice(0.9, PackedFloat32Array([75.0, 95.0, 70.0]), 0.3, 0.0, 0.35)
 	sounds["click"] = _voice(0.035, PackedFloat32Array([1700.0, 700.0]), 0.45, 0.0, 0.5)
+	sounds["knock"] = _voice(0.06, PackedFloat32Array([330.0, 150.0]), 0.75, 0.0, 0.3)
+	sounds["crack"] = _voice(0.14, PackedFloat32Array([1400.0, 380.0]), 0.7, 0.0, 0.85)
 	for i in 6:
 		var p := AudioStreamPlayer.new()
 		add_child(p)

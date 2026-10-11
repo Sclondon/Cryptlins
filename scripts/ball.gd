@@ -21,15 +21,12 @@ func _init() -> void:
 			if y < 4 or y > 27:
 				c = Color(0.95, 0.9, 0.75)
 			img.set_pixel(x, y, c)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = ImageTexture.create_from_image(img)
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	mat.roughness = 0.45
+	var mat := Ps1.mat(Color.WHITE, 0.0, 0.0, ImageTexture.create_from_image(img))
 	var sphere := SphereMesh.new()
 	sphere.radius = R
 	sphere.height = R * 2.0
-	sphere.radial_segments = 24
-	sphere.rings = 12
+	sphere.radial_segments = 10
+	sphere.rings = 5
 	mesh = MeshInstance3D.new()
 	mesh.mesh = sphere
 	mesh.material_override = mat

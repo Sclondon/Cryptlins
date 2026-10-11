@@ -28,6 +28,8 @@ func _init(which: int = Kind.BONE) -> void:
 			var shaft := CapsuleMesh.new()
 			shaft.radius = 0.035
 			shaft.height = 0.32
+			shaft.radial_segments = 6
+			shaft.rings = 2
 			_add(shaft, colour, Vector3(0, 0.06, 0), Vector3(0, 0, PI * 0.5))
 			for x in [-0.15, 0.15]:
 				for z in [-0.035, 0.035]:
@@ -38,6 +40,7 @@ func _init(which: int = Kind.BONE) -> void:
 			stem.top_radius = 0.035
 			stem.bottom_radius = 0.05
 			stem.height = 0.14
+			stem.radial_segments = 6
 			_add(stem, Color(0.88, 0.84, 0.74), Vector3(0, 0.07, 0))
 			var cap := _add(_ball(1.0), colour, Vector3(0, 0.15, 0))
 			cap.scale = Vector3(0.14, 0.08, 0.14)
@@ -53,7 +56,7 @@ func _init(which: int = Kind.BONE) -> void:
 				band.bottom_radius = radii[i]
 				band.top_radius = radii[i + 1]
 				band.height = 0.075
-				band.radial_segments = 16
+				band.radial_segments = 6
 				_add(band, bands[i], Vector3(0, 0.0375 + 0.075 * i, 0))
 
 
@@ -61,15 +64,13 @@ func _ball(radius: float) -> SphereMesh:
 	var m := SphereMesh.new()
 	m.radius = radius
 	m.height = radius * 2.0
-	m.radial_segments = 12
-	m.rings = 6
+	m.radial_segments = 8
+	m.rings = 4
 	return m
 
 
 func _add(mesh: Mesh, c: Color, at: Vector3, turn := Vector3.ZERO) -> MeshInstance3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = c
-	mat.roughness = 0.8
+	var mat := Ps1.mat(c)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = mat

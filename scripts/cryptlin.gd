@@ -1,12 +1,26 @@
 class_name Cryptlin
 extends Node3D
-## One cryptlin: its body (built from primitives, shaped by a seed), its needs, its small brain,
-## and its animation, which is all done here in code. It faces +Z.
+## One cryptlin: its body (built from primitives, shaped by its kind and a seed), its needs, its
+## small brain, and its animation, which is all done here in code. It faces +Z.
+
+signal left
 
 enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
-	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP,
+	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE,
 }
+# Gremlin: big ears and a tail. Bogle: squat, one eye, greedy. Spook: floats, glows a little, shy.
+# Flit: a small bat that can't sit still.
+enum Kind { GREMLIN, BOGLE, SPOOK, FLIT }
+
+# What sets the kinds apart besides their looks: pace on the ground, appetite, how fast they tire,
+# the spring in their hop, the pitch of their voice, and what they like to do with a free moment
+const KINDS: Array[Dictionary] = [
+	{"title": "gremlin", "pace": 1.0, "hunger": 1.0, "tire": 1.0, "spring": 1.0, "voice": 1.0, "lurk": 1.0, "zoom": 1.0, "dance": 1.0, "stare": 1.0},
+	{"title": "bogle", "pace": 0.78, "hunger": 1.4, "tire": 0.9, "spring": 0.85, "voice": 0.68, "lurk": 0.5, "zoom": 0.4, "dance": 1.6, "stare": 1.8},
+	{"title": "spook", "pace": 0.9, "hunger": 0.65, "tire": 0.8, "spring": 1.0, "voice": 1.4, "lurk": 2.6, "zoom": 0.8, "dance": 0.7, "stare": 1.3},
+	{"title": "flit", "pace": 1.3, "hunger": 1.1, "tire": 1.35, "spring": 1.35, "voice": 1.7, "lurk": 0.8, "zoom": 2.6, "dance": 1.2, "stare": 0.6},
+]
 
 const WALK := 1.0
 const RUN := 2.6
@@ -18,16 +32,45 @@ const BELLY_ARM := Vector3(-0.9, 0.0, -0.35)
 const INTERRUPTIBLE: Array[int] = [
 	State.IDLE, State.WANDER, State.STARE, State.LURK, State.COME, State.BEG, State.ZOOMIES, State.DANCE,
 ]
-const FURS: Array[Color] = [
-	Color(0.36, 0.5, 0.3), Color(0.44, 0.36, 0.56), Color(0.26, 0.47, 0.48),
-	Color(0.46, 0.46, 0.5), Color(0.58, 0.36, 0.26), Color(0.52, 0.52, 0.3),
+# Fur and eye colours to draw from, by kind
+const FURS: Array[Array] = [
+	[Color(0.36, 0.5, 0.3), Color(0.44, 0.36, 0.56), Color(0.26, 0.47, 0.48), Color(0.46, 0.46, 0.5), Color(0.58, 0.36, 0.26), Color(0.52, 0.52, 0.3)],
+	[Color(0.5, 0.3, 0.55), Color(0.62, 0.34, 0.24), Color(0.24, 0.44, 0.52), Color(0.56, 0.48, 0.24)],
+	[Color(0.56, 0.62, 0.76), Color(0.56, 0.72, 0.62), Color(0.74, 0.58, 0.68), Color(0.7, 0.7, 0.54)],
+	[Color(0.36, 0.28, 0.36), Color(0.44, 0.32, 0.26), Color(0.28, 0.33, 0.44), Color(0.46, 0.42, 0.4)],
 ]
-const EYES: Array[Color] = [
-	Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.3), Color(1.0, 0.45, 0.7), Color(0.4, 0.95, 1.0),
+const EYES: Array[Array] = [
+	[Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.3), Color(1.0, 0.45, 0.7), Color(0.4, 0.95, 1.0)],
+	[Color(1.0, 0.85, 0.2), Color(1.0, 0.35, 0.25), Color(0.6, 1.0, 0.3)],
+	[Color(0.4, 0.95, 1.0), Color(0.6, 1.0, 0.5), Color(1.0, 0.5, 0.8), Color(1.0, 0.95, 0.6)],
+	[Color(1.0, 0.3, 0.25), Color(1.0, 0.75, 0.2), Color(0.85, 0.5, 1.0)],
 ]
 
 var world: Crypt
+var kind: int = Kind.GREMLIN
 var look_seed := 1
+
+# Set from KINDS and the body that was built
+var pace := 1.0
+var hunger := 1.0
+var tire := 1.0
+var spring := 1.0
+var voice := 1.0
+var likes := {}
+var gravity := 12.0
+var hover := 0.0
+var neck_y := 0.64
+var centre_y := 0.55
+var top_y := 1.15
+var ear_splay := 1.0
+var wings := false
+var fur: ShaderMaterial
+var pale: ShaderMaterial
+var dark: ShaderMaterial
+var bone: ShaderMaterial
+var black: ShaderMaterial
+var maw: ShaderMaterial
+var eye_mat: ShaderMaterial
 
 # Needs, 0 (bad) to 100 (good)
 var belly := 70.0
@@ -112,33 +155,72 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- body
 
+# The fur and eye colour a kind and seed give (the egg shows the eye before it hatches)
+static func colours(k: int, s: int) -> Array[Color]:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = s
+	var furs: Array = FURS[k]
+	var eye_set: Array = EYES[k]
+	var fur_colour: Color = furs[rng.randi() % furs.size()]
+	var eye_colour: Color = eye_set[rng.randi() % eye_set.size()]
+	return [fur_colour, eye_colour]
+
+
 func _build() -> void:
+	var traits: Dictionary = KINDS[kind]
+	pace = traits["pace"]
+	hunger = traits["hunger"]
+	tire = traits["tire"]
+	spring = traits["spring"]
+	voice = traits["voice"]
+	likes = traits
 	var rng := RandomNumberGenerator.new()
 	rng.seed = look_seed
-	var fur_colour: Color = FURS[rng.randi() % FURS.size()]
-	var eye_colour: Color = EYES[rng.randi() % EYES.size()]
+	var picked := colours(kind, look_seed)
+	rng.randi()
+	rng.randi()
+	var fur_colour := picked[0]
+	var eye_colour := picked[1]
 	var ear_len := rng.randf_range(0.34, 0.52)
 	var chub := rng.randf_range(0.94, 1.14)
 	var horns := rng.randf() < 0.45
 	var odd_eyes := rng.randf() < 0.35
-	var fur := _fur(fur_colour * 0.82)
-	var pale := _fur(fur_colour.lightened(0.25))
-	var dark := _fur(fur_colour.darkened(0.5))
-	var bone := _fur(Color(0.92, 0.89, 0.78))
-	var black := StandardMaterial3D.new()
-	black.albedo_color = Color(0.02, 0.01, 0.02)
-	black.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var maw := StandardMaterial3D.new()
-	maw.albedo_color = Color(0.16, 0.03, 0.06)
-	maw.roughness = 0.6
+	# A spook gives off a little light of its own, enough to make it out in the dark
+	var shine := 0.22 if kind == Kind.SPOOK else 0.0
+	fur = Ps1.mat(fur_colour * 0.76, shine, 0.35)
+	pale = Ps1.mat(fur_colour.lightened(0.2) * 0.9, shine, 0.35)
+	dark = Ps1.mat(fur_colour.darkened(0.5), 0.0, 0.35)
+	bone = Ps1.mat(Color(0.92, 0.89, 0.78), 0.0, 0.35)
+	black = Ps1.flat(Color(0.02, 0.01, 0.02))
+	maw = Ps1.mat(Color(0.16, 0.03, 0.06))
 	# The eyes give off their own light, so they are all you see of it in the dark
-	var eye_mat := StandardMaterial3D.new()
-	eye_mat.albedo_color = eye_colour
-	eye_mat.roughness = 0.2
-	eye_mat.emission_enabled = true
-	eye_mat.emission = eye_colour
-	eye_mat.emission_energy_multiplier = 0.85
+	eye_mat = Ps1.mat(eye_colour, 0.85)
+	match kind:
+		Kind.BOGLE:
+			_build_bogle(chub, ear_len)
+		Kind.SPOOK:
+			_build_spook(chub)
+		Kind.FLIT:
+			_build_flit(chub, ear_len, odd_eyes)
+		_:
+			_build_gremlin(chub, ear_len, horns, odd_eyes)
 
+	_build_bubble()
+	_build_hearts()
+	for i in 3:
+		var z := Label3D.new()
+		z.text = "z"
+		z.font_size = 96
+		z.pixel_size = 0.0022 + 0.0008 * i
+		z.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		z.modulate = Color(0.8, 0.85, 1.0, 0.0)
+		z.outline_size = 0
+		z.visible = false
+		add_child(z)
+		zzz.append(z)
+
+
+func _build_gremlin(chub: float, ear_len: float, horns: bool, odd_eyes: bool) -> void:
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.13 * side, 0.2, 0))
 		_part(leg, _capsule(0.07, 0.2), fur, Vector3(0, -0.08, 0))
@@ -158,7 +240,7 @@ func _build() -> void:
 		_part(a, _sphere(), dark, Vector3(0, -0.23, 0), Vector3.ONE * 0.065)
 		arms.append(a)
 
-	neck = _pivot(torso, Vector3(0, 0.64, 0.02))
+	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
 	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.34, 0.285, 0.3))
 	for side: float in [-1.0, 1.0]:
 		var ear := _pivot(neck, Vector3(0.27 * side, 0.3, -0.02))
@@ -168,11 +250,7 @@ func _build() -> void:
 		var size := 0.1
 		if odd_eyes:
 			size = 0.112 if side < 0.0 else 0.088
-		var eye := _pivot(neck, Vector3(0.135 * side, 0.25, 0.215))
-		_part(eye, _sphere(), eye_mat, Vector3.ZERO, Vector3.ONE * size)
-		var pupil := _part(eye, _sphere(), black, Vector3(0, 0, size * 0.68), Vector3.ONE * size * 0.5)
-		eyes.append(eye)
-		pupils.append(pupil)
+		_eye(Vector3(0.135 * side, 0.25, 0.215), size)
 		_part(neck, _cone(), bone, Vector3(0.055 * side, 0.112, 0.283), Vector3(0.022, 0.05, 0.022))
 		if horns:
 			_part(neck, _cone(), bone, Vector3(0.12 * side, 0.5, 0.03), Vector3(0.04, 0.14, 0.04), Vector3(0, 0, -0.35 * side))
@@ -180,53 +258,142 @@ func _build() -> void:
 	mouth_node = _pivot(neck, Vector3(0, 0.085, 0.262))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.15, 0.07, 0.06))
 
-	_build_bubble()
-	_build_hearts()
-	for i in 3:
-		var z := Label3D.new()
-		z.text = "z"
-		z.font_size = 96
-		z.pixel_size = 0.0022 + 0.0008 * i
-		z.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		z.modulate = Color(0.8, 0.85, 1.0, 0.0)
-		z.outline_size = 0
-		z.visible = false
-		add_child(z)
-		zzz.append(z)
+
+# Squat and wide, one great eye, an underbite and a pair of horns
+func _build_bogle(chub: float, ear_len: float) -> void:
+	neck_y = 0.5
+	centre_y = 0.52
+	top_y = 1.05
+	ear_splay = 1.25
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.17 * side, 0.17, 0))
+		_part(leg, _capsule(0.085, 0.18), fur, Vector3(0, -0.06, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.14, 0.07), Vector3(0.12, 0.05, 0.17))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.4, 0), Vector3(0.37 * chub, 0.31, 0.33 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.34, 0.2 * chub), Vector3(0.26 * chub, 0.2, 0.15))
+	tail = _pivot(torso, Vector3(0, 0.26, -0.3 * chub))
+	_part(tail, _sphere(), dark, Vector3(0, 0.02, -0.04), Vector3.ONE * 0.075)
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.35 * chub * side, 0.5, 0.05))
+		_part(a, _capsule(0.06, 0.24), fur, Vector3(0, -0.09, 0))
+		_part(a, _sphere(), dark, Vector3(0, -0.21, 0), Vector3.ONE * 0.08)
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.36, 0.3, 0.32))
+	_eye(Vector3(0, 0.27, 0.25), 0.17)
+	# A heavy brow over it
+	_part(neck, _sphere(), dark, Vector3(0, 0.44, 0.22), Vector3(0.22, 0.045, 0.1), Vector3(0.35, 0, 0))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.3 * side, 0.26, -0.04))
+		_part(ear, _sphere(), fur, Vector3(0, ear_len * 0.22, 0), Vector3(0.09, ear_len * 0.3, 0.035))
+		ears.append(ear)
+		_part(neck, _cone(), bone, Vector3(0.17 * side, 0.52, 0.02), Vector3(0.06, 0.2, 0.06), Vector3(0, 0, -0.55 * side))
+		# Tusks from the bottom jaw
+		_part(neck, _cone(), bone, Vector3(0.1 * side, 0.075, 0.3), Vector3(0.03, 0.085, 0.03))
+	mouth_node = _pivot(neck, Vector3(0, 0.03, 0.275))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.21, 0.07, 0.07))
 
 
-func _fur(c: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = c
-	m.roughness = 1.0
-	m.rim_enabled = true
-	m.rim = 0.35
-	m.rim_tint = 0.7
-	return m
+# No legs: a pale shape that hangs in the air, with hollow eyes and a light in each
+func _build_spook(chub: float) -> void:
+	neck_y = 0.58
+	centre_y = 0.7
+	top_y = 1.3
+	hover = 0.2
+	gravity = 7.0
+	for side: float in [-1.0, 1.0]:
+		legs.append(_pivot(self, Vector3(0.1 * side, 0.2, 0)))
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.42, 0), Vector3(0.26 * chub, 0.28, 0.24 * chub))
+	tail = _pivot(torso, Vector3(0, 0.34, 0))
+	_part(tail, _cone(), fur, Vector3(0, -0.2, -0.05), Vector3(0.22 * chub, 0.42, 0.2 * chub), Vector3(PI + 0.3, 0, 0))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.25 * chub * side, 0.52, 0.05))
+		_part(a, _capsule(0.05, 0.22), fur, Vector3(0, -0.08, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.31, 0.3, 0.29))
+	# A wisp on top
+	_part(neck, _cone(), fur, Vector3(0.03, 0.52, -0.04), Vector3(0.09, 0.2, 0.09), Vector3(-0.5, 0, -0.3))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.125 * side, 0.24, 0.225), 0.105, true)
+	mouth_node = _pivot(neck, Vector3(0, 0.08, 0.27))
+	_part(mouth_node, _sphere(), black, Vector3.ZERO, Vector3(0.075, 0.07, 0.05))
 
 
-func _flat(c: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = c
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	return m
+# A small bat: tall ears, beady eyes, and wings for arms
+func _build_flit(chub: float, ear_len: float, odd_eyes: bool) -> void:
+	neck_y = 0.46
+	centre_y = 0.42
+	top_y = 0.95
+	ear_splay = 0.35
+	gravity = 8.0
+	wings = true
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.09 * side, 0.15, 0))
+		_part(leg, _capsule(0.04, 0.15), dark, Vector3(0, -0.06, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.13, 0.04), Vector3(0.06, 0.03, 0.1))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.32, 0), Vector3(0.22 * chub, 0.23, 0.2 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.31, 0.12 * chub), Vector3(0.15 * chub, 0.16, 0.1))
+	tail = _pivot(torso, Vector3(0, 0.22, -0.18 * chub))
+	_part(tail, _sphere(), fur, Vector3(0, 0, -0.03), Vector3.ONE * 0.05)
+
+	var skin := Ps1.mat(Color(0.34, 0.14, 0.18), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.2 * chub * side, 0.42, 0))
+		_part(a, _capsule(0.03, 0.34), dark, Vector3(0, -0.15, 0))
+		# The skin of the wing hangs behind the arm, and opens out when the arm lifts
+		_part(a, _cone(), skin, Vector3(-0.09 * side, -0.17, -0.03), Vector3(0.14, 0.33, 0.012))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
+	_part(neck, _sphere(), fur, Vector3(0, 0.18, 0), Vector3(0.26, 0.23, 0.24))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.15 * side, 0.3, -0.02))
+		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.55, 0), Vector3(0.12, ear_len * 1.1, 0.04))
+		_part(ear, _cone(), skin, Vector3(0, ear_len * 0.46, 0.025), Vector3(0.075, ear_len * 0.85, 0.02))
+		ears.append(ear)
+		var size := 0.068
+		if odd_eyes:
+			size = 0.076 if side < 0.0 else 0.06
+		_eye(Vector3(0.1 * side, 0.22, 0.19), size)
+		_part(neck, _cone(), bone, Vector3(0.04 * side, 0.085, 0.215), Vector3(0.018, 0.05, 0.018), Vector3(PI, 0, 0))
+	# A turned-up snout
+	_part(neck, _sphere(), pale, Vector3(0, 0.15, 0.235), Vector3(0.05, 0.04, 0.04))
+	mouth_node = _pivot(neck, Vector3(0, 0.09, 0.2))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.1, 0.05, 0.05))
+
+
+# An eye on the head. Hollow ones are dark with the light in the pupil.
+func _eye(at: Vector3, size: float, hollow := false) -> void:
+	var eye := _pivot(neck, at)
+	_part(eye, _sphere(), black if hollow else eye_mat, Vector3.ZERO, Vector3.ONE * size)
+	var pupil := _part(eye, _sphere(), eye_mat if hollow else black, Vector3(0, 0, size * 0.68), Vector3.ONE * size * 0.5)
+	eyes.append(eye)
+	pupils.append(pupil)
 
 
 func _sphere() -> SphereMesh:
-	var m := SphereMesh.new()
-	m.radius = 1.0
-	m.height = 2.0
-	m.radial_segments = 24
-	m.rings = 12
-	return m
+	return Ps1.ball()
 
 
 func _capsule(radius: float, height: float) -> CapsuleMesh:
 	var m := CapsuleMesh.new()
 	m.radius = radius
 	m.height = height
-	m.radial_segments = 12
-	m.rings = 4
+	m.radial_segments = 6
+	m.rings = 2
 	return m
 
 
@@ -235,7 +402,8 @@ func _cone() -> CylinderMesh:
 	m.top_radius = 0.0
 	m.bottom_radius = 1.0
 	m.height = 1.0
-	m.radial_segments = 12
+	m.radial_segments = 6
+	m.rings = 1
 	return m
 
 
@@ -259,8 +427,8 @@ func _part(parent: Node3D, mesh: Mesh, mat: Material, at: Vector3, size := Vecto
 
 # A thought bubble that shows what it is asking for
 func _build_bubble() -> void:
-	bubble = _pivot(self, Vector3(0.35, 1.5, 0))
-	var white := _flat(Color(0.95, 0.95, 0.9))
+	bubble = _pivot(self, Vector3(0.35, top_y + 0.35, 0))
+	var white := Ps1.flat(Color(0.95, 0.95, 0.9))
 	for p: MeshInstance3D in [
 		_part(bubble, _sphere(), white, Vector3.ZERO, Vector3(0.24, 0.2, 0.01)),
 		_part(bubble, _sphere(), white, Vector3(-0.2, -0.22, 0), Vector3(0.06, 0.06, 0.01)),
@@ -268,15 +436,15 @@ func _build_bubble() -> void:
 	]:
 		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	bubble_food = _pivot(bubble, Vector3(0, 0, 0.02))
-	var sandy := _flat(Color(0.62, 0.5, 0.34))
+	var sandy := Ps1.flat(Color(0.62, 0.5, 0.34))
 	_part(bubble_food, _capsule(0.03, 0.26), sandy, Vector3.ZERO, Vector3(1, 1, 0.2), Vector3(0, 0, 1.0))
 	for end: float in [-1.0, 1.0]:
 		for off: float in [-1.0, 1.0]:
 			var at := Vector3(-sin(1.0), cos(1.0), 0) * 0.11 * end + Vector3(cos(1.0), sin(1.0), 0) * 0.035 * off
 			_part(bubble_food, _sphere(), sandy, at, Vector3(0.045, 0.045, 0.01))
 	bubble_ball = _pivot(bubble, Vector3(0, 0, 0.02))
-	_part(bubble_ball, _sphere(), _flat(Color(0.95, 0.45, 0.08)), Vector3.ZERO, Vector3(0.11, 0.11, 0.01))
-	_part(bubble_ball, _sphere(), _flat(Color(0.36, 0.16, 0.5)), Vector3(0, 0, 0.004), Vector3(0.035, 0.11, 0.01))
+	_part(bubble_ball, _sphere(), Ps1.flat(Color(0.95, 0.45, 0.08)), Vector3.ZERO, Vector3(0.11, 0.11, 0.01))
+	_part(bubble_ball, _sphere(), Ps1.flat(Color(0.36, 0.16, 0.5)), Vector3(0, 0, 0.004), Vector3(0.035, 0.11, 0.01))
 	bubble.visible = false
 
 
@@ -314,7 +482,7 @@ func _build_hearts() -> void:
 	hearts.scale_amount_min = 0.6
 	hearts.scale_amount_max = 1.1
 	hearts.color_ramp = fade
-	hearts.position = Vector3(0, 1.05, 0)
+	hearts.position = Vector3(0, top_y - 0.1, 0)
 	hearts.emitting = false
 	hearts.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(hearts)
@@ -340,12 +508,12 @@ func set_needs(d: Dictionary) -> void:
 func _tick_needs(delta: float) -> void:
 	var asleep := state == State.SLEEP
 	var speed := velocity.length()
-	belly -= delta / (16.0 if asleep else 7.0)
+	belly -= delta * hunger / (16.0 if asleep else 7.0)
 	fun -= delta / (30.0 if asleep else 5.5)
 	if asleep:
 		energy += delta * 3.2
 	else:
-		energy -= delta * (0.1 + speed * 0.12) * (1.0 if world.light_on else 1.8)
+		energy -= delta * tire * (0.1 + speed * 0.12) * (1.0 if world.light_on else 1.8)
 	if belly < 15.0:
 		love -= delta / 40.0
 	elif mood() > 60.0:
@@ -359,26 +527,30 @@ func _tick_needs(delta: float) -> void:
 # ---------------------------------------------------------------- what you can do to it
 
 func body_centre() -> Vector3:
-	return global_position + Vector3(0, 0.55 - curl * 0.2, 0)
+	return global_position + Vector3(0, centre_y - curl * 0.2, 0)
 
 
 # A quick tap
 func boop() -> void:
+	if state == State.LEAVE:
+		return
 	if state == State.SLEEP:
 		energy = maxf(energy, 35.0)
-		world.sfx.play("grumble")
+		_cry("grumble")
 		_enter(State.STARTLED, 1.4)
 		roll_goal = 0.3
 		eye_goal = 0.6
 		droop_goal = 0.9
 		return
 	love = minf(love + 1.0, 100.0)
-	world.sfx.play("squeak")
+	_cry("squeak")
 	_enter(State.STARTLED, 0.6)
 
 
 # A finger rubbed over it
 func stroke() -> void:
+	if state == State.LEAVE:
+		return
 	last_stroke = anim_t
 	if state == State.SLEEP:
 		hearts.emitting = true
@@ -388,7 +560,7 @@ func stroke() -> void:
 
 
 func call_to(point: Vector3) -> void:
-	if state in [State.SLEEP, State.GO_SLEEP, State.EAT, State.PETTED, State.STARTLED]:
+	if state in [State.SLEEP, State.GO_SLEEP, State.EAT, State.PETTED, State.STARTLED, State.LEAVE]:
 		return
 	target = point
 	_enter(State.COME)
@@ -403,8 +575,22 @@ func hop(power := 2.6) -> void:
 	if airborne:
 		return
 	airborne = true
-	jump_v = power
+	jump_v = power * spring
 	squash_v = -1.5
+
+
+# Sent off to make room for a new egg: a wave, then away into the dark. Emits `left` once gone.
+func leave() -> void:
+	_enter(State.LEAVE)
+
+
+func kind_name() -> String:
+	return KINDS[kind]["title"]
+
+
+# Its voice: each kind pitches the same few sounds differently
+func _cry(sound: String, pitch := 1.0, volume_db := 0.0) -> void:
+	world.sfx.play(sound, pitch * voice, volume_db)
 
 
 # ---------------------------------------------------------------- brain
@@ -468,7 +654,7 @@ func _enter(s: int, length := 0.0) -> void:
 			var a := randf_range(PI * 0.95, PI * 2.05)
 			target = world.light_point + Vector3(cos(a), 0, sin(a)) * randf_range(3.3, 3.9)
 		State.COME:
-			world.sfx.play("chirp")
+			_cry("chirp")
 		State.GO_FOOD:
 			snack = null
 			wag = 9.0
@@ -485,7 +671,7 @@ func _enter(s: int, length := 0.0) -> void:
 			target = world.light_point + Vector3(randf_range(-0.6, 0.6), 0, 1.5)
 		State.ZOOMIES:
 			state_len = randf_range(0.0, TAU)
-			world.sfx.play("chirp", 1.2)
+			_cry("chirp", 1.2)
 		State.DANCE:
 			arm_goal = UP_ARM
 			wag = 10.0
@@ -500,10 +686,15 @@ func _enter(s: int, length := 0.0) -> void:
 			eye_goal = 1.25
 			arm_goal = UP_ARM
 		State.GO_SLEEP:
-			world.sfx.play("yawn")
+			_cry("yawn")
 			target = world.nest_pos
 			droop_goal = 0.8
 			eye_goal = 0.6
+		State.LEAVE:
+			_cry("coo", 0.85)
+			arm_goal = UP_ARM
+			arm_wave = 0.5
+			target = Vector3(4.4 if position.x > 0.0 else -4.4, 0, -0.6)
 		State.SLEEP:
 			curl_goal = 1.0
 			eye_goal = 0.0
@@ -537,15 +728,15 @@ func _decide() -> void:
 	if world.ball != null and fun < 35.0 and energy > 20.0:
 		_enter(State.CHASE_BALL)
 		return
-	var options := {State.WANDER: 34.0, State.STARE: 20.0, State.IDLE: 8.0}
+	var options := {State.WANDER: 34.0, State.STARE: 20.0 * float(likes["stare"]), State.IDLE: 8.0}
 	if world.light_on:
-		options[State.LURK] = 11.0
+		options[State.LURK] = 11.0 * float(likes["lurk"])
 	if world.ball != null and energy > 30.0:
 		options[State.CHASE_BALL] = 16.0
 	if fun > 65.0 and energy > 45.0:
-		options[State.ZOOMIES] = 8.0
+		options[State.ZOOMIES] = 8.0 * float(likes["zoom"])
 	if mood() > 62.0:
-		options[State.DANCE] = 8.0
+		options[State.DANCE] = 8.0 * float(likes["dance"])
 	var total := 0.0
 	for w: float in options.values():
 		total += w
@@ -572,7 +763,7 @@ func _think(delta: float) -> void:
 				var a := randf() * TAU
 				glance_point = position + Vector3(cos(a) * 2.0, randf_range(0.0, 1.2), sin(a) * 2.0)
 			if energy < 30.0 and randf() < delta * 0.12:
-				world.sfx.play("yawn")
+				_cry("yawn")
 				mouth_goal = 1.0
 				eye_goal = 0.3
 			if state_time > state_len:
@@ -623,14 +814,14 @@ func _think(delta: float) -> void:
 				pounce_cooldown = 0.9
 				hop(2.3)
 				fun = minf(fun + 3.0, 100.0)
-				world.sfx.play("chirp", 1.1)
+				_cry("chirp", 1.1)
 		State.BEG:
 			gaze = world.camera.global_position
 			if step == 0:
 				if _steer(target, WALK * 1.4, delta) or state_time > 5.0:
 					step = 1
 					state_time = 0.0
-					world.sfx.play("whimper")
+					_cry("whimper")
 			else:
 				_halt(delta)
 				_face(gaze, delta)
@@ -654,7 +845,7 @@ func _think(delta: float) -> void:
 				step += 1
 				if step >= 7:
 					hop(2.2)
-					world.sfx.play("coo")
+					_cry("coo")
 					_enter(State.IDLE, 1.8)
 					mouth_goal = 0.7
 		State.DANCE:
@@ -666,7 +857,7 @@ func _think(delta: float) -> void:
 				hop(1.9)
 				step += 1
 				if step % 2 == 0:
-					world.sfx.play("chirp", 0.9 + 0.1 * (step % 4))
+					_cry("chirp", 0.9 + 0.1 * (step % 4))
 			if step > 7:
 				_enter(State.IDLE, 1.0)
 		State.PETTED:
@@ -677,7 +868,7 @@ func _think(delta: float) -> void:
 			love = minf(love + delta * 5.0, 100.0)
 			fun = minf(fun + delta * 3.0, 100.0)
 			if anim_t - last_stroke > 0.7:
-				world.sfx.play("coo")
+				_cry("coo")
 				hop(2.0)
 				_enter(State.IDLE, 1.5)
 		State.STARTLED:
@@ -691,15 +882,30 @@ func _think(delta: float) -> void:
 				_halt(delta)
 			elif _steer(target, WALK * 0.85, delta, 0.12) or state_time > 12.0:
 				_enter(State.SLEEP)
+		State.LEAVE:
+			if step == 0:
+				_halt(delta)
+				gaze = world.camera.global_position
+				_face(gaze, delta)
+				if state_time > 1.5:
+					step = 1
+					state_time = 0.0
+					arm_goal = REST_ARM
+					arm_wave = 0.0
+			else:
+				gaze = target + Vector3(0, 0.3, 0)
+				if _steer(target, WALK * 1.6, delta, 0.3) or state_time > 9.0:
+					set_process(false)
+					left.emit()
 		State.SLEEP:
 			_halt(delta)
 			_face(world.camera.global_position + Vector3(4.0, 0, 0), delta)
 			hearts.emitting = anim_t - last_stroke < 0.5
 			if int(state_time / 3.4) > step:
 				step = int(state_time / 3.4)
-				world.sfx.play("snore", 1.0, -8.0)
+				_cry("snore", 1.0, -8.0)
 			if energy >= 98.0 or (world.light_on and energy > 55.0 and state_len < 0.0):
-				world.sfx.play("coo", 0.9)
+				_cry("coo", 0.9)
 				_enter(State.STARTLED, 0.8)
 				eye_goal = 1.0
 			# Sent to bed by the dark: remember, so that the lamp coming back on wakes it
@@ -736,14 +942,14 @@ func _eat(delta: float) -> void:
 	mouth_goal = 0.2 + 0.8 * absf(sin(cycle * PI))
 	if int(state_time / 0.5) > step:
 		step = int(state_time / 0.5)
-		world.sfx.play("chomp")
+		_cry("chomp")
 		world.crumbs(snack.global_position + Vector3(0, 0.1, 0), snack.colour)
 		if snack.bite():
 			world.remove_snack(snack)
 			snack = null
 			belly = minf(belly + Snack.VALUE, 100.0)
 			love = minf(love + 2.0, 100.0)
-			world.sfx.play("coo")
+			_cry("coo")
 			hop(2.0)
 			_enter(State.IDLE, 1.2)
 			arm_goal = BELLY_ARM
@@ -791,7 +997,7 @@ func _kick(b: Ball) -> void:
 	fun = minf(fun + 10.0, 100.0)
 	if kicks >= kick_limit:
 		ball_cooldown = 4.0
-		world.sfx.play("coo")
+		_cry("coo")
 		_enter(State.IDLE, 1.6)
 	else:
 		step = 1
@@ -821,7 +1027,7 @@ func _steer(point: Vector3, speed: float, delta: float, arrive := 0.18) -> bool:
 	var ahead := Vector3(sin(yaw), 0, cos(yaw))
 	var aligned := maxf(ahead.dot(to / away), 0.0)
 	# Slow into the stop so it doesn't overshoot and circle
-	var want := speed * aligned * clampf(away / 0.5, 0.35, 1.0)
+	var want := speed * pace * aligned * clampf(away / 0.5, 0.35, 1.0)
 	velocity = velocity.move_toward(ahead * want, delta * 10.0)
 	return false
 
@@ -839,7 +1045,7 @@ func _move(delta: float) -> void:
 	position.x = flat.x
 	position.z = flat.y
 	if airborne:
-		jump_v -= 12.0 * delta
+		jump_v -= gravity * delta
 		jump_y += jump_v * delta
 		if jump_y <= 0.0:
 			jump_y = 0.0
@@ -865,7 +1071,7 @@ func _animate(delta: float) -> void:
 	squash_v += (-squash * 140.0 - squash_v * 11.0) * delta
 	squash = clampf(squash + squash_v * delta, -0.3, 0.4)
 	var breath := sin(anim_t * (1.3 if curl > 0.5 else 2.6)) * (0.03 if curl > 0.5 else 0.012)
-	torso.position.y = absf(sin(phase)) * 0.05 * gait - sit * 0.1 - curl * 0.15
+	torso.position.y = absf(sin(phase)) * 0.05 * gait - sit * 0.1 - curl * 0.15 + hover * (1.0 - curl) * (1.0 + sin(anim_t * 2.2) * 0.22)
 	torso.rotation.x = gait * minf(speed, 3.5) * 0.07 + curl * 0.12
 	torso.rotation.z = wiggle
 	torso.scale = Vector3(1.0 + squash * 0.6 + breath, 1.0 - squash + breath, 1.0 + squash * 0.6 + breath)
@@ -877,8 +1083,10 @@ func _animate(delta: float) -> void:
 	arm = arm.lerp(arm_goal, ease_fast)
 	var wave := sin(anim_t * 9.0) * arm_wave
 	var tuck := curl * 0.8
-	arms[1].rotation = Vector3(arm.x - swing * 0.7 * (1.0 - curl) + wave - tuck, arm.y, arm.z)
-	arms[0].rotation = Vector3(arm.x + swing * 0.7 * (1.0 - curl) - wave - tuck, -arm.y, -arm.z)
+	# Wings beat while it is off the ground
+	var lift := (1.2 + sin(anim_t * 30.0) * 0.7) if wings and airborne else 0.0
+	arms[1].rotation = Vector3(arm.x - swing * 0.7 * (1.0 - curl) + wave - tuck, arm.y, arm.z + lift)
+	arms[0].rotation = Vector3(arm.x + swing * 0.7 * (1.0 - curl) - wave - tuck, -arm.y, -arm.z - lift)
 
 	# Head turns to whatever it is looking at; the pupils go the rest of the way
 	var seen := torso.global_transform.affine_inverse() * gaze - neck.position - Vector3(0, 0.2, 0)
@@ -891,14 +1099,14 @@ func _animate(delta: float) -> void:
 	head_pitch = lerpf(head_pitch, want_pitch, ease_slow * 1.6)
 	head_roll = lerpf(head_roll, roll_goal, ease_slow)
 	neck.rotation = Vector3(head_pitch + nod, head_yaw, head_roll)
-	neck.position.y = 0.64 - curl * 0.1
+	neck.position.y = neck_y - curl * 0.1
 
 	blink -= delta
 	if blink < -0.12:
 		blink = randf_range(1.5, 5.0)
 	eye_open = lerpf(eye_open, eye_goal if blink > 0.0 else 0.0, 1.0 - exp(-delta * 30.0))
 	var to_head := neck.global_transform.affine_inverse()
-	for i in 2:
+	for i in eyes.size():
 		eyes[i].scale = Vector3(1.0, maxf(eye_open, 0.07), 1.0)
 		var d := (to_head * gaze - eyes[i].position).normalized()
 		var off := Vector2(d.x, d.y).limit_length(0.55)
@@ -917,20 +1125,21 @@ func _animate(delta: float) -> void:
 		twitch = 1.0
 		twitch_side = randi() % 2
 	var flop := sin(phase * 2.0) * 0.1 * gait
-	for i in 2:
+	for i in ears.size():
 		var side := -1.0 if i == 0 else 1.0
 		var jerk := sin(twitch * PI * 3.0) * 0.25 if twitch_side == i else 0.0
-		ears[i].rotation = Vector3(-gait * 0.35, 0, -side * (1.0 + droop * 0.75 + flop + jerk))
+		ears[i].rotation = Vector3(-gait * 0.35, 0, -side * (ear_splay + droop * 0.75 + flop + jerk))
 
 	tail.rotation.y = sin(anim_t * wag) * 0.55
-	tail.rotation.x = sin(anim_t * 1.3) * 0.12 - curl * 0.4
+	tail.rotation.x = sin(anim_t * 1.3) * 0.12 - curl * 0.4 - hover * minf(speed, 2.0) * 1.2
+	tail.rotation.z = sin(anim_t * wag * 0.5) * hover
 
 	if bubble.visible:
 		bubble.global_basis = world.camera.global_basis
-		bubble.position.y = 1.5 + sin(anim_t * 2.0) * 0.03
+		bubble.position.y = top_y + 0.35 + sin(anim_t * 2.0) * 0.03
 	if zzz[0].visible:
 		var cam_right := world.camera.global_basis.x
 		for i in 3:
 			var u := fmod(anim_t * 0.4 + i / 3.0, 1.0)
-			zzz[i].global_position = global_position + Vector3(0, 0.75 + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
+			zzz[i].global_position = global_position + Vector3(0, top_y - 0.4 + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
 			zzz[i].modulate.a = sin(u * PI) * 0.9

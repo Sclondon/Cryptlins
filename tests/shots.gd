@@ -1,6 +1,7 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..3] [--egg]
+## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 
 const SAVE := "user://shots_test.json"
 
@@ -8,6 +9,8 @@ var main: Crypt
 var out := "user://shots"
 var portrait := false
 var look := 0
+var kind := 0
+var egg_only := false
 
 
 func _initialize() -> void:
@@ -16,24 +19,32 @@ func _initialize() -> void:
 			out = arg.trim_prefix("--shots=")
 		if arg.begins_with("--seed="):
 			look = int(arg.trim_prefix("--seed="))
+		if arg.begins_with("--kind="):
+			kind = int(arg.trim_prefix("--kind="))
+		if arg == "--egg":
+			egg_only = true
 		if arg == "--portrait":
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
 	DisplayServer.window_set_size(Vector2i(540, 1170) if portrait else Vector2i(1280, 720))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
-	if look > 0:
+	if not egg_only:
 		var f := FileAccess.open(SAVE, FileAccess.WRITE)
-		f.store_string(JSON.stringify({"name": "Seed %d" % look, "seed": look, "needs": {}, "time": Time.get_unix_time_from_system()}))
+		f.store_string(JSON.stringify({"name": "Seed %d" % look, "kind": kind, "seed": maxi(look, 1), "hatched": true, "needs": {}, "time": Time.get_unix_time_from_system()}))
 		f.close()
 	main = load("res://main.tscn").instantiate()
 	main.save_path = SAVE
+	main.first_kind = kind
 	root.add_child(main)
-	_run.call_deferred()
+	if egg_only:
+		_run_egg.call_deferred()
+	else:
+		_run.call_deferred()
 
 
 func _snap(name: String) -> void:
 	await RenderingServer.frame_post_draw
-	root.get_texture().get_image().save_png("%s/%s%s.png" % [out, name, "_p" if portrait else ""])
+	root.get_texture().get_image().save_png("%s/k%d_%s%s.png" % [out, kind, name, "_p" if portrait else ""])
 
 
 func _wait(seconds: float) -> void:
@@ -45,6 +56,37 @@ func _until(done: Callable, seconds: float) -> void:
 	while left > 0.0 and not done.call():
 		await process_frame
 		left -= 1.0 / 60.0
+
+
+func _run_egg() -> void:
+	await _wait(0.4)
+	await _snap("e0_drop")
+	await _until(func() -> bool: return main.egg.landed, 4.0)
+	await _wait(1.0)
+	await _snap("e1_egg")
+	main.egg.warmth = 33.5
+	await _wait(1.2)
+	await _snap("e2_crack")
+	main.egg.warmth = 67.5
+	await _wait(1.2)
+	await _snap("e3_peek")
+	main.toggle_lamp()
+	await _wait(1.0)
+	await _snap("e4_dark")
+	main.toggle_lamp()
+	main.egg.warmth = 99.9
+	await _until(func() -> bool: return main.pet != null, 6.0)
+	await _wait(0.12)
+	await _snap("e5_hatch")
+	await _wait(1.6)
+	await _snap("e6_hatched")
+	main.ask_new_egg()
+	await _wait(0.3)
+	await _snap("e7_ask")
+	main._answer(true)
+	await _wait(1.0)
+	await _snap("e8_wave")
+	quit()
 
 
 func _run() -> void:
