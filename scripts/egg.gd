@@ -12,11 +12,20 @@ const CENTRE := Vector3(0, 0.34, 0)
 const RADII := Vector3(WIDTH, HEIGHT, WIDTH)
 const SIZE := 1.25
 # One for each kind of cryptlin (Cryptlin.Kind)
-const SHELLS: Array[Color] = [Color(0.42, 0.52, 0.3), Color(0.47, 0.32, 0.58), Color(0.58, 0.64, 0.74), Color(0.34, 0.26, 0.25)]
-const MARKS: Array[Color] = [Color(0.2, 0.3, 0.15), Color(0.95, 0.8, 0.25), Color(0.5, 0.7, 0.95), Color(0.6, 0.3, 0.28)]
-const TITLES: Array[String] = ["A mossy egg", "A staring egg", "A pale egg", "A leathery egg"]
+const SHELLS: Array[Color] = [
+	Color(0.42, 0.52, 0.3), Color(0.34, 0.28, 0.21), Color(0.56, 0.5, 0.4), Color(0.4, 0.4, 0.44), Color(0.3, 0.36, 0.3),
+	Color(0.26, 0.44, 0.24), Color(0.22, 0.36, 0.44), Color(0.36, 0.36, 0.38), Color(0.2, 0.2, 0.24),
+]
+const MARKS: Array[Color] = [
+	Color(0.2, 0.3, 0.15), Color(0.2, 0.16, 0.12), Color(0.5, 0.18, 0.1), Color(0.6, 0.58, 0.56), Color(0.45, 0.14, 0.1),
+	Color(0.5, 0.6, 0.3), Color(0.5, 0.66, 0.7), Color(0.2, 0.2, 0.22), Color(0.85, 0.82, 0.72),
+]
+const TITLES: Array[String] = [
+	"A mossy egg", "A hairy egg", "A speckled egg", "A silk-wound egg", "A spiny egg",
+	"A slimy egg", "A cold, wet egg", "A stone egg", "An antlered egg",
+]
 
-var world: Crypt
+var world: Den
 var kind := 0
 var look_seed := 1
 var warmth := 0.0
@@ -41,33 +50,69 @@ func _ready() -> void:
 	scale = Vector3.ONE * SIZE
 	shell = Node3D.new()
 	add_child(shell)
-	var base := Ps1.mat(SHELLS[kind], 0.18 if kind == Cryptlin.Kind.SPOOK else 0.0)
+	var base := Ps1.mat(SHELLS[kind])
 	var mark := Ps1.mat(MARKS[kind])
 	_part(Ps1.ball(), base, CENTRE, RADII)
+	var point := CylinderMesh.new()
+	point.top_radius = 0.0
+	point.bottom_radius = 1.0
+	point.height = 1.0
+	point.radial_segments = 5
 	match kind:
 		Cryptlin.Kind.GREMLIN:
 			# Warts
 			for i in 8:
 				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.9, 1.1))
 				_part(Ps1.ball(), mark, at, Vector3.ONE * rng.randf_range(0.035, 0.07))
-		Cryptlin.Kind.BOGLE:
-			# A marking like one big eye
-			_part(Ps1.ball(), mark, _on(0.0, -0.25), Vector3(0.11, 0.12, 0.03))
-			_part(Ps1.ball(), Ps1.mat(Color(0.12, 0.06, 0.16)), _on(0.0, -0.25) + Vector3(0, 0, 0.012), Vector3(0.05, 0.065, 0.03))
-		Cryptlin.Kind.SPOOK:
-			for i in 4:
-				var at := _on(rng.randf_range(-1.3, 1.3), rng.randf_range(-0.7, 0.9))
-				_part(Ps1.ball(), mark, at, Vector3.ONE * rng.randf_range(0.05, 0.08))
-		Cryptlin.Kind.FLIT:
-			# Two little points on top, like ears
-			var point := CylinderMesh.new()
-			point.top_radius = 0.0
-			point.bottom_radius = 1.0
-			point.height = 1.0
-			point.radial_segments = 5
+		Cryptlin.Kind.SQUATCH:
+			# Hanks of hair all over, lying downwards
+			for i in 16:
+				var around := TAU * i / 16.0 + rng.randf_range(-0.15, 0.15)
+				var hair := _part(point, mark if i % 2 == 0 else base, _on(around, rng.randf_range(-0.7, 1.0)))
+				hair.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, 2.5) * Basis.from_scale(Vector3(0.05, rng.randf_range(0.1, 0.16), 0.03))
+		Cryptlin.Kind.COCKATRICE:
+			# Speckles
+			for i in 14:
+				var at := _on(rng.randf_range(-1.6, 1.6), rng.randf_range(-0.9, 1.2))
+				_spot(mark, at, rng.randf_range(0.02, 0.045))
+		Cryptlin.Kind.MOTHMAN:
+			# Wound round with silk
+			for i in 5:
+				var band := _part(Ps1.ball(), mark, CENTRE + Vector3(0, -0.22 + i * 0.11, 0), Vector3.ONE)
+				var wide := cos(asin((-0.22 + i * 0.11) / HEIGHT)) * WIDTH + 0.006
+				band.basis = Basis.from_euler(Vector3(rng.randf_range(-0.25, 0.25), 0, rng.randf_range(-0.25, 0.25))) * Basis.from_scale(Vector3(wide, 0.016, wide))
+		Cryptlin.Kind.CHUPACABRA:
+			# Spines all round, thickest at the top
+			for i in 9:
+				var around := TAU * i / 9.0
+				var up := 0.15 + (i % 3) * 0.4
+				var root := _on(around, up)
+				var spike := _part(point, mark, root + _normal(root) * 0.07)
+				spike.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, PI * 0.5 - up) * Basis.from_scale(Vector3(0.045, 0.2, 0.045))
+		Cryptlin.Kind.FROGMAN:
+			# Wet blotches
+			for i in 7:
+				_spot(mark, _on(rng.randf_range(-1.5, 1.5), rng.randf_range(-0.8, 1.1)), rng.randf_range(0.04, 0.075))
+		Cryptlin.Kind.NESSIE:
+			# Ripples
+			for i in 3:
+				var band := _part(Ps1.ball(), mark, CENTRE + Vector3(0, -0.12 + i * 0.12, 0), Vector3.ONE)
+				var wide := cos(asin((-0.12 + i * 0.12) / HEIGHT)) * WIDTH + 0.005
+				band.basis = Basis.from_scale(Vector3(wide, 0.012 + i * 0.004, wide))
+		Cryptlin.Kind.BOLTER:
+			# Chips of rock stuck in it
+			var chip := BoxMesh.new()
+			for i in 9:
+				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.8, 1.1))
+				_part(chip, mark if i % 2 == 0 else base, at, Vector3(0.09, 0.06, 0.08) * rng.randf_range(0.7, 1.3), Vector3(rng.randf(), rng.randf(), rng.randf()) * 2.0)
+		Cryptlin.Kind.WENDIGO:
+			# Two prongs of bone on top, and frost
 			for side: float in [-1.0, 1.0]:
-				var ear := _part(point, mark, CENTRE + Vector3(0.11 * side, 0.36, 0), Vector3(0.06, 0.16, 0.035))
-				ear.rotation.z = -0.4 * side
+				_part(point, mark, CENTRE + Vector3(0.1 * side, 0.4, 0), Vector3(0.03, 0.26, 0.03), Vector3(0, 0, -0.45 * side))
+				_part(point, mark, CENTRE + Vector3(0.17 * side, 0.4, 0), Vector3(0.02, 0.12, 0.02), Vector3(0, 0, -1.2 * side))
+			var frost := Ps1.mat(Color(0.5, 0.6, 0.68))
+			for i in 6:
+				_spot(frost, _on(rng.randf_range(-1.5, 1.5), rng.randf_range(-0.9, 0.2)), rng.randf_range(0.03, 0.06))
 
 	# The cracks, made ahead of time and shown as it warms
 	var black := Ps1.flat(Color(0.02, 0.01, 0.02))
@@ -116,6 +161,12 @@ func _part(mesh: Mesh, mat: Material, at: Vector3, size := Vector3.ONE, turn := 
 	mi.rotation = turn
 	(shell if parent == null else parent).add_child(mi)
 	return mi
+
+
+# A flat mark lying on the shell
+func _spot(mat: Material, at: Vector3, size: float) -> void:
+	var spot := _part(Ps1.ball(), mat, at)
+	spot.basis = Basis.looking_at(-_normal(at)).scaled_local(Vector3(size, size * 1.2, 0.008))
 
 
 # A point on the shell: `around` is the angle from the front, `up` the angle above the middle

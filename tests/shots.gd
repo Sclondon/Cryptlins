@@ -1,11 +1,11 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..3] [--egg]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..8] [--egg]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 
 const SAVE := "user://shots_test.json"
 
-var main: Crypt
+var main: Den
 var out := "user://shots"
 var portrait := false
 var look := 0
@@ -30,7 +30,7 @@ func _initialize() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 	if not egg_only:
 		var f := FileAccess.open(SAVE, FileAccess.WRITE)
-		f.store_string(JSON.stringify({"name": "Seed %d" % look, "kind": kind, "seed": maxi(look, 1), "hatched": true, "needs": {}, "time": Time.get_unix_time_from_system()}))
+		f.store_string(JSON.stringify({"name": "Seed %d" % look, "kind": Cryptlin.KINDS[kind]["title"], "seed": maxi(look, 1), "hatched": true, "needs": {}, "time": Time.get_unix_time_from_system()}))
 		f.close()
 	main = load("res://main.tscn").instantiate()
 	main.save_path = SAVE

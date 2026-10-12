@@ -9,18 +9,24 @@ enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
 	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE,
 }
-# Gremlin: big ears and a tail. Bogle: squat, one eye, greedy. Spook: floats, glows a little, shy.
-# Flit: a small bat that can't sit still.
-enum Kind { GREMLIN, BOGLE, SPOOK, FLIT }
+# The cryptids they are the young of
+enum Kind { GREMLIN, SQUATCH, COCKATRICE, MOTHMAN, CHUPACABRA, FROGMAN, NESSIE, BOLTER, WENDIGO }
 
 # What sets the kinds apart besides their looks: pace on the ground, appetite, how fast they tire,
 # the spring in their hop, the pitch of their voice, and what they like to do with a free moment
 const KINDS: Array[Dictionary] = [
 	{"title": "gremlin", "pace": 1.0, "hunger": 1.0, "tire": 1.0, "spring": 1.0, "voice": 1.0, "lurk": 1.0, "zoom": 1.0, "dance": 1.0, "stare": 1.0},
-	{"title": "bogle", "pace": 0.78, "hunger": 1.4, "tire": 0.9, "spring": 0.85, "voice": 0.68, "lurk": 0.5, "zoom": 0.4, "dance": 1.6, "stare": 1.8},
-	{"title": "spook", "pace": 0.9, "hunger": 0.65, "tire": 0.8, "spring": 1.0, "voice": 1.4, "lurk": 2.6, "zoom": 0.8, "dance": 0.7, "stare": 1.3},
-	{"title": "flit", "pace": 1.3, "hunger": 1.1, "tire": 1.35, "spring": 1.35, "voice": 1.7, "lurk": 0.8, "zoom": 2.6, "dance": 1.2, "stare": 0.6},
+	{"title": "squatchling", "pace": 0.85, "hunger": 1.25, "tire": 1.1, "spring": 0.7, "voice": 0.55, "lurk": 2.2, "zoom": 0.5, "dance": 1.1, "stare": 1.4},
+	{"title": "cockatrice", "pace": 1.1, "hunger": 1.0, "tire": 1.0, "spring": 1.2, "voice": 1.45, "lurk": 0.5, "zoom": 1.2, "dance": 1.5, "stare": 2.4},
+	{"title": "mothman", "pace": 1.2, "hunger": 0.8, "tire": 1.2, "spring": 1.4, "voice": 1.6, "lurk": 1.2, "zoom": 2.2, "dance": 1.0, "stare": 1.5},
+	{"title": "chupacabra", "pace": 1.25, "hunger": 1.6, "tire": 1.0, "spring": 1.2, "voice": 0.85, "lurk": 1.8, "zoom": 1.6, "dance": 0.6, "stare": 1.0},
+	{"title": "Loveland frogman", "pace": 0.9, "hunger": 1.1, "tire": 0.9, "spring": 1.7, "voice": 0.75, "lurk": 0.6, "zoom": 1.0, "dance": 1.8, "stare": 1.2},
+	{"title": "Loch Ness monster", "pace": 0.75, "hunger": 1.2, "tire": 0.8, "spring": 0.6, "voice": 0.9, "lurk": 2.2, "zoom": 0.4, "dance": 1.0, "stare": 1.6},
+	{"title": "slide-rock bolter", "pace": 0.8, "hunger": 1.8, "tire": 1.2, "spring": 0.6, "voice": 0.5, "lurk": 0.6, "zoom": 3.0, "dance": 0.6, "stare": 0.9},
+	{"title": "wendigo", "pace": 1.0, "hunger": 2.0, "tire": 0.7, "spring": 0.9, "voice": 0.6, "lurk": 2.6, "zoom": 0.5, "dance": 0.5, "stare": 1.8},
 ]
+# What the numbers in saves from before this list stood for (gremlin, bogle, spook, flit)
+const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MOTHMAN]
 
 const WALK := 1.0
 const RUN := 2.6
@@ -35,18 +41,28 @@ const INTERRUPTIBLE: Array[int] = [
 # Fur and eye colours to draw from, by kind
 const FURS: Array[Array] = [
 	[Color(0.36, 0.5, 0.3), Color(0.44, 0.36, 0.56), Color(0.26, 0.47, 0.48), Color(0.46, 0.46, 0.5), Color(0.58, 0.36, 0.26), Color(0.52, 0.52, 0.3)],
-	[Color(0.5, 0.3, 0.55), Color(0.62, 0.34, 0.24), Color(0.24, 0.44, 0.52), Color(0.56, 0.48, 0.24)],
-	[Color(0.56, 0.62, 0.76), Color(0.56, 0.72, 0.62), Color(0.74, 0.58, 0.68), Color(0.7, 0.7, 0.54)],
-	[Color(0.36, 0.28, 0.36), Color(0.44, 0.32, 0.26), Color(0.28, 0.33, 0.44), Color(0.46, 0.42, 0.4)],
+	[Color(0.33, 0.27, 0.21), Color(0.26, 0.22, 0.18), Color(0.4, 0.34, 0.26), Color(0.29, 0.27, 0.25), Color(0.36, 0.26, 0.19)],
+	[Color(0.5, 0.46, 0.38), Color(0.42, 0.26, 0.16), Color(0.3, 0.3, 0.34), Color(0.46, 0.38, 0.2)],
+	[Color(0.24, 0.24, 0.29), Color(0.3, 0.26, 0.24), Color(0.34, 0.34, 0.37), Color(0.26, 0.21, 0.31)],
+	[Color(0.3, 0.36, 0.3), Color(0.36, 0.31, 0.33), Color(0.27, 0.32, 0.37), Color(0.38, 0.35, 0.27)],
+	[Color(0.24, 0.42, 0.2), Color(0.36, 0.42, 0.18), Color(0.2, 0.38, 0.32), Color(0.4, 0.36, 0.2)],
+	[Color(0.2, 0.34, 0.4), Color(0.24, 0.38, 0.3), Color(0.27, 0.3, 0.44), Color(0.32, 0.33, 0.34)],
+	[Color(0.34, 0.34, 0.37), Color(0.38, 0.34, 0.3), Color(0.3, 0.34, 0.4), Color(0.4, 0.38, 0.33)],
+	[Color(0.19, 0.18, 0.21), Color(0.24, 0.2, 0.18), Color(0.17, 0.21, 0.24), Color(0.27, 0.27, 0.3)],
 ]
 const EYES: Array[Array] = [
 	[Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.3), Color(1.0, 0.45, 0.7), Color(0.4, 0.95, 1.0)],
-	[Color(1.0, 0.85, 0.2), Color(1.0, 0.35, 0.25), Color(0.6, 1.0, 0.3)],
-	[Color(0.4, 0.95, 1.0), Color(0.6, 1.0, 0.5), Color(1.0, 0.5, 0.8), Color(1.0, 0.95, 0.6)],
-	[Color(1.0, 0.3, 0.25), Color(1.0, 0.75, 0.2), Color(0.85, 0.5, 1.0)],
+	[Color(1.0, 0.8, 0.3), Color(0.7, 1.0, 0.5), Color(1.0, 0.45, 0.25), Color(0.6, 0.9, 1.0)],
+	[Color(1.0, 0.3, 0.2), Color(1.0, 0.6, 0.15), Color(1.0, 0.9, 0.3), Color(0.6, 1.0, 0.4)],
+	[Color(1.0, 0.15, 0.1), Color(1.0, 0.3, 0.1), Color(1.0, 0.1, 0.3)],
+	[Color(1.0, 0.2, 0.15), Color(1.0, 0.5, 0.1), Color(0.8, 1.0, 0.2)],
+	[Color(1.0, 0.8, 0.2), Color(1.0, 0.5, 0.15), Color(0.9, 1.0, 0.4)],
+	[Color(1.0, 0.9, 0.4), Color(0.5, 1.0, 0.9), Color(1.0, 0.6, 0.3)],
+	[Color(1.0, 0.85, 0.3), Color(0.6, 0.9, 1.0), Color(1.0, 0.5, 0.3)],
+	[Color(0.5, 0.9, 1.0), Color(1.0, 0.3, 0.2), Color(0.8, 1.0, 0.5), Color(1.0, 1.0, 0.8)],
 ]
 
-var world: Crypt
+var world: Den
 var kind: int = Kind.GREMLIN
 var look_seed := 1
 
@@ -60,6 +76,8 @@ var likes := {}
 var gravity := 12.0
 var hover := 0.0
 var neck_y := 0.64
+# How far above the neck the middle of the head is
+var head_y := 0.2
 var centre_y := 0.55
 var top_y := 1.15
 var ear_splay := 1.0
@@ -185,10 +203,8 @@ func _build() -> void:
 	var chub := rng.randf_range(0.94, 1.14)
 	var horns := rng.randf() < 0.45
 	var odd_eyes := rng.randf() < 0.35
-	# A spook gives off a little light of its own, enough to make it out in the dark
-	var shine := 0.22 if kind == Kind.SPOOK else 0.0
-	fur = Ps1.mat(fur_colour * 0.76, shine, 0.35)
-	pale = Ps1.mat(fur_colour.lightened(0.2) * 0.9, shine, 0.35)
+	fur = Ps1.mat(fur_colour * 0.76, 0.0, 0.35)
+	pale = Ps1.mat(fur_colour.lightened(0.2) * 0.9, 0.0, 0.35)
 	dark = Ps1.mat(fur_colour.darkened(0.5), 0.0, 0.35)
 	bone = Ps1.mat(Color(0.92, 0.89, 0.78), 0.0, 0.35)
 	black = Ps1.flat(Color(0.02, 0.01, 0.02))
@@ -196,12 +212,22 @@ func _build() -> void:
 	# The eyes give off their own light, so they are all you see of it in the dark
 	eye_mat = Ps1.mat(eye_colour, 0.85)
 	match kind:
-		Kind.BOGLE:
-			_build_bogle(chub, ear_len)
-		Kind.SPOOK:
-			_build_spook(chub)
-		Kind.FLIT:
-			_build_flit(chub, ear_len, odd_eyes)
+		Kind.SQUATCH:
+			_build_squatch(chub, rng)
+		Kind.COCKATRICE:
+			_build_cockatrice(chub)
+		Kind.MOTHMAN:
+			_build_mothman(chub, ear_len)
+		Kind.CHUPACABRA:
+			_build_chupacabra(chub, ear_len)
+		Kind.FROGMAN:
+			_build_frogman(chub)
+		Kind.NESSIE:
+			_build_nessie(chub)
+		Kind.BOLTER:
+			_build_bolter(chub, rng)
+		Kind.WENDIGO:
+			_build_wendigo(chub)
 		_:
 			_build_gremlin(chub, ear_len, horns, odd_eyes)
 
@@ -259,120 +285,342 @@ func _build_gremlin(chub: float, ear_len: float, horns: bool, odd_eyes: bool) ->
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.15, 0.07, 0.06))
 
 
-# Squat and wide, one great eye, an underbite and a pair of horns
-func _build_bogle(chub: float, ear_len: float) -> void:
-	neck_y = 0.5
-	centre_y = 0.52
-	top_y = 1.05
-	ear_splay = 1.25
+# A young sasquatch: no head and no arms yet, just a shaggy mound of hair with two tall eyes,
+# on feet it has not grown into
+func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.24
+	centre_y = 0.5
+	top_y = 0.95
+	gravity = 15.0
 	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(self, Vector3(0.17 * side, 0.17, 0))
-		_part(leg, _capsule(0.085, 0.18), fur, Vector3(0, -0.06, 0))
-		_part(leg, _sphere(), dark, Vector3(0, -0.14, 0.07), Vector3(0.12, 0.05, 0.17))
+		var leg := _pivot(self, Vector3(0.18 * side, 0.24, 0.02))
+		_part(leg, _capsule(0.07, 0.24), dark, Vector3(0, -0.1, 0))
+		# Big flat feet, toes out
+		var foot := _pivot(leg, Vector3(0, -0.185, 0))
+		foot.rotation.y = 1.0 * side
+		_part(foot, _sphere(), dark, Vector3(0, 0, 0.14), Vector3(0.13, 0.065, 0.27))
 		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
-	_part(torso, _sphere(), fur, Vector3(0, 0.4, 0), Vector3(0.37 * chub, 0.31, 0.33 * chub))
-	_part(torso, _sphere(), pale, Vector3(0, 0.34, 0.2 * chub), Vector3(0.26 * chub, 0.2, 0.15))
-	tail = _pivot(torso, Vector3(0, 0.26, -0.3 * chub))
-	_part(tail, _sphere(), dark, Vector3(0, 0.02, -0.04), Vector3.ONE * 0.075)
-
+	tail = _pivot(torso, Vector3(0, 0.3, -0.2))
 	for side: float in [-1.0, 1.0]:
-		var a := _pivot(torso, Vector3(0.35 * chub * side, 0.5, 0.05))
-		_part(a, _capsule(0.06, 0.24), fur, Vector3(0, -0.09, 0))
-		_part(a, _sphere(), dark, Vector3(0, -0.21, 0), Vector3.ONE * 0.08)
-		arms.append(a)
+		arms.append(_pivot(torso, Vector3(0.3 * side, 0.4, 0)))
 
+	# The whole body turns to look, so it hangs from the neck
 	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
-	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.36, 0.3, 0.32))
-	_eye(Vector3(0, 0.27, 0.25), 0.17)
-	# A heavy brow over it
-	_part(neck, _sphere(), dark, Vector3(0, 0.44, 0.22), Vector3(0.22, 0.045, 0.1), Vector3(0.35, 0, 0))
+	var body := _pivot(neck, Vector3.ZERO)
+	body.scale = Vector3(chub, 1.0, 0.8 * chub)
+	# One smooth mound, wider than it is tall, flaring out to the hem
+	var shape: Array[Vector2] = [
+		Vector2(0.5, 0.0), Vector2(0.58, 0.03), Vector2(0.56, 0.1), Vector2(0.47, 0.19), Vector2(0.4, 0.28),
+		Vector2(0.35, 0.37), Vector2(0.28, 0.45), Vector2(0.17, 0.51), Vector2(0.0, 0.53),
+	]
+	_part(body, _lathe(shape, 10), fur, Vector3.ZERO)
+	var shag := Ps1.mat(fur.get_shader_parameter("tint") * 0.62, 0.0, 0.35)
+	# Hair hangs off the hem in a row of round hanks, light and dark
+	for i in 12:
+		var around := TAU * (i + 0.5) / 12.0
+		var out := Vector3(sin(around), 0, cos(around))
+		var hank := rng.randf_range(0.08, 0.13)
+		_part(body, _sphere(), pale if i % 2 == 0 else shag, out * 0.52 + Vector3(0, 0.0, 0), Vector3(0.14, hank, 0.09), Vector3(0, around, 0))
+	# And lies in long locks down the rest of it
+	for i in 22:
+		var around := TAU * i / 22.0 + rng.randf_range(-0.12, 0.12)
+		if absf(wrapf(around, -PI, PI)) < 0.5:
+			continue
+		var up := rng.randf_range(0.12, 0.44)
+		var wide := lerpf(0.53, 0.3, (up - 0.1) / 0.34)
+		var out := Vector3(sin(around), 0, cos(around))
+		var lock := _part(body, _cone(), shag if i % 2 == 0 else pale, out * wide + Vector3(0, up, 0))
+		lock.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, 2.35) * Basis.from_scale(Vector3(0.035, rng.randf_range(0.14, 0.22), 0.02))
+
+	# Two tall dark eyes, wide at the bottom and drawn up to a point, with a light in each
 	for side: float in [-1.0, 1.0]:
-		var ear := _pivot(neck, Vector3(0.3 * side, 0.26, -0.04))
-		_part(ear, _sphere(), fur, Vector3(0, ear_len * 0.22, 0), Vector3(0.09, ear_len * 0.3, 0.035))
-		ears.append(ear)
-		_part(neck, _cone(), bone, Vector3(0.17 * side, 0.52, 0.02), Vector3(0.06, 0.2, 0.06), Vector3(0, 0, -0.55 * side))
-		# Tusks from the bottom jaw
-		_part(neck, _cone(), bone, Vector3(0.1 * side, 0.075, 0.3), Vector3(0.03, 0.085, 0.03))
-	mouth_node = _pivot(neck, Vector3(0, 0.03, 0.275))
-	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.21, 0.07, 0.07))
+		var eye := _pivot(neck, Vector3(0.12 * chub * side, 0.2, 0.385 * chub))
+		eye.rotation.x = -0.62
+		_part(eye, _sphere(), black, Vector3.ZERO, Vector3(0.068, 0.078, 0.03))
+		_part(eye, _cone(), black, Vector3(0, 0.16, 0), Vector3(0.06, 0.28, 0.026))
+		var pupil := _part(eye, _sphere(), eye_mat, Vector3(0, 0, 0.03), Vector3(0.036, 0.046, 0.03))
+		eyes.append(eye)
+		pupils.append(pupil)
+	# Its mouth is somewhere under the hair, and only shows when it opens
+	mouth_node = _pivot(neck, Vector3(0, 0.07, 0.47 * chub))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.11, 0.06, 0.04))
 
 
-# No legs: a pale shape that hangs in the air, with hollow eyes and a light in each
-func _build_spook(chub: float) -> void:
-	neck_y = 0.58
-	centre_y = 0.7
-	top_y = 1.3
-	hover = 0.2
-	gravity = 7.0
+# A rooster hatched wrong: feathers in front, a serpent's tail behind, and a stare it is proud of
+func _build_cockatrice(chub: float) -> void:
+	neck_y = 0.5
+	centre_y = 0.45
+	top_y = 1.02
+	gravity = 9.0
+	wings = true
+	var yellow := Ps1.mat(Color(0.62, 0.46, 0.12), 0.0, 0.35)
+	var red := Ps1.mat(Color(0.6, 0.1, 0.08), 0.0, 0.35)
+	var scales := Ps1.mat(Color(0.18, 0.34, 0.2), 0.0, 0.35)
 	for side: float in [-1.0, 1.0]:
-		legs.append(_pivot(self, Vector3(0.1 * side, 0.2, 0)))
+		var leg := _pivot(self, Vector3(0.1 * side, 0.2, 0))
+		_part(leg, _capsule(0.025, 0.2), yellow, Vector3(0, -0.08, 0))
+		_part(leg, _sphere(), yellow, Vector3(0, -0.175, 0.04), Vector3(0.075, 0.022, 0.11))
+		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
-	_part(torso, _sphere(), fur, Vector3(0, 0.42, 0), Vector3(0.26 * chub, 0.28, 0.24 * chub))
-	tail = _pivot(torso, Vector3(0, 0.34, 0))
-	_part(tail, _cone(), fur, Vector3(0, -0.2, -0.05), Vector3(0.22 * chub, 0.42, 0.2 * chub), Vector3(PI + 0.3, 0, 0))
+	_part(torso, _sphere(), fur, Vector3(0, 0.38, -0.02), Vector3(0.24 * chub, 0.24, 0.28 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.38, 0.14 * chub), Vector3(0.17 * chub, 0.18, 0.12))
+	tail = _pivot(torso, Vector3(0, 0.34, -0.24 * chub))
+	_part(tail, _capsule(0.05, 0.42), scales, Vector3(0, 0.1, -0.16), Vector3.ONE, Vector3(-1.1, 0, 0))
+	_part(tail, _cone(), scales, Vector3(0, 0.22, -0.4), Vector3(0.09, 0.14, 0.03), Vector3(-1.1, 0, 0))
 
 	for side: float in [-1.0, 1.0]:
-		var a := _pivot(torso, Vector3(0.25 * chub * side, 0.52, 0.05))
-		_part(a, _capsule(0.05, 0.22), fur, Vector3(0, -0.08, 0))
+		var a := _pivot(torso, Vector3(0.22 * chub * side, 0.48, -0.02))
+		_part(a, _sphere(), fur, Vector3(0, -0.12, -0.02), Vector3(0.04, 0.16, 0.13))
+		_part(a, _cone(), pale, Vector3(0, -0.28, -0.05), Vector3(0.03, 0.14, 0.09), Vector3(PI, 0, 0))
 		arms.append(a)
 
-	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
-	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.31, 0.3, 0.29))
-	# A wisp on top
-	_part(neck, _cone(), fur, Vector3(0.03, 0.52, -0.04), Vector3(0.09, 0.2, 0.09), Vector3(-0.5, 0, -0.3))
+	neck = _pivot(torso, Vector3(0, neck_y, 0.07))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.2, 0.2, 0.2))
+	_part(neck, _cone(), yellow, Vector3(0, 0.19, 0.24), Vector3(0.065, 0.16, 0.045), Vector3(PI * 0.5, 0, 0))
+	for i in 3:
+		_part(neck, _cone(), red, Vector3(0, 0.43 - i * 0.02, 0.09 - i * 0.09), Vector3(0.035, 0.13 - i * 0.02, 0.06), Vector3(-0.2 - i * 0.2, 0, 0))
+	_part(neck, _sphere(), red, Vector3(0, 0.06, 0.17), Vector3(0.03, 0.06, 0.03))
 	for side: float in [-1.0, 1.0]:
-		_eye(Vector3(0.125 * side, 0.24, 0.225), 0.105, true)
-	mouth_node = _pivot(neck, Vector3(0, 0.08, 0.27))
-	_part(mouth_node, _sphere(), black, Vector3.ZERO, Vector3(0.075, 0.07, 0.05))
+		_eye(Vector3(0.12 * side, 0.25, 0.13), 0.065)
+	mouth_node = _pivot(neck, Vector3(0, 0.15, 0.18))
+	_part(mouth_node, _cone(), yellow, Vector3(0, -0.02, 0.05), Vector3(0.05, 0.11, 0.06), Vector3(PI * 0.5, 0, 0))
 
 
-# A small bat: tall ears, beady eyes, and wings for arms
-func _build_flit(chub: float, ear_len: float, odd_eyes: bool) -> void:
-	neck_y = 0.46
-	centre_y = 0.42
-	top_y = 0.95
-	ear_splay = 0.35
-	gravity = 8.0
+# Small, dark and furry, with great red eyes, feathered feelers and wings it is still growing into
+func _build_mothman(chub: float, ear_len: float) -> void:
+	neck_y = 0.5
+	centre_y = 0.5
+	top_y = 1.1
+	ear_splay = 0.45
+	gravity = 7.0
 	wings = true
 	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(self, Vector3(0.09 * side, 0.15, 0))
-		_part(leg, _capsule(0.04, 0.15), dark, Vector3(0, -0.06, 0))
-		_part(leg, _sphere(), dark, Vector3(0, -0.13, 0.04), Vector3(0.06, 0.03, 0.1))
+		var leg := _pivot(self, Vector3(0.09 * side, 0.2, 0))
+		_part(leg, _capsule(0.035, 0.2), dark, Vector3(0, -0.08, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.17, 0.04), Vector3(0.06, 0.03, 0.1))
 		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
-	_part(torso, _sphere(), fur, Vector3(0, 0.32, 0), Vector3(0.22 * chub, 0.23, 0.2 * chub))
-	_part(torso, _sphere(), pale, Vector3(0, 0.31, 0.12 * chub), Vector3(0.15 * chub, 0.16, 0.1))
+	_part(torso, _sphere(), fur, Vector3(0, 0.38, 0), Vector3(0.22 * chub, 0.26, 0.2 * chub))
+	# A ruff of fluff at the neck
+	_part(torso, _sphere(), pale, Vector3(0, 0.56, 0.02), Vector3(0.26, 0.1, 0.23))
 	tail = _pivot(torso, Vector3(0, 0.22, -0.18 * chub))
 	_part(tail, _sphere(), fur, Vector3(0, 0, -0.03), Vector3.ONE * 0.05)
 
-	var skin := Ps1.mat(Color(0.34, 0.14, 0.18), 0.0, 0.35)
+	var skin := Ps1.mat(fur.get_shader_parameter("tint") * 0.6, 0.0, 0.35)
 	for side: float in [-1.0, 1.0]:
-		var a := _pivot(torso, Vector3(0.2 * chub * side, 0.42, 0))
-		_part(a, _capsule(0.03, 0.34), dark, Vector3(0, -0.15, 0))
-		# The skin of the wing hangs behind the arm, and opens out when the arm lifts
-		_part(a, _cone(), skin, Vector3(-0.09 * side, -0.17, -0.03), Vector3(0.14, 0.33, 0.012))
+		var a := _pivot(torso, Vector3(0.2 * chub * side, 0.52, -0.04))
+		_part(a, _capsule(0.025, 0.42), dark, Vector3(0, -0.19, 0))
+		# The wing hangs behind the arm, and opens out when the arm lifts; an eye looks out of it
+		_part(a, _cone(), skin, Vector3(0.1 * side, -0.17, -0.03), Vector3(0.2, 0.38, 0.012))
+		_part(a, _sphere(), skin, Vector3(0.1 * side, -0.36, -0.03), Vector3(0.15, 0.12, 0.012))
+		_part(a, _sphere(), eye_mat, Vector3(0.1 * side, -0.34, -0.015), Vector3(0.045, 0.045, 0.008))
 		arms.append(a)
 
 	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
-	_part(neck, _sphere(), fur, Vector3(0, 0.18, 0), Vector3(0.26, 0.23, 0.24))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.24, 0.22, 0.22))
 	for side: float in [-1.0, 1.0]:
-		var ear := _pivot(neck, Vector3(0.15 * side, 0.3, -0.02))
-		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.55, 0), Vector3(0.12, ear_len * 1.1, 0.04))
-		_part(ear, _cone(), skin, Vector3(0, ear_len * 0.46, 0.025), Vector3(0.075, ear_len * 0.85, 0.02))
+		var ear := _pivot(neck, Vector3(0.08 * side, 0.38, 0.02))
+		_part(ear, _cone(), dark, Vector3(0, ear_len * 0.5, 0), Vector3(0.02, ear_len, 0.02))
+		_part(ear, _cone(), pale, Vector3(0, ear_len * 0.55, 0), Vector3(0.075, ear_len * 0.8, 0.012))
 		ears.append(ear)
-		var size := 0.068
-		if odd_eyes:
-			size = 0.076 if side < 0.0 else 0.06
-		_eye(Vector3(0.1 * side, 0.22, 0.19), size)
-		_part(neck, _cone(), bone, Vector3(0.04 * side, 0.085, 0.215), Vector3(0.018, 0.05, 0.018), Vector3(PI, 0, 0))
-	# A turned-up snout
-	_part(neck, _sphere(), pale, Vector3(0, 0.15, 0.235), Vector3(0.05, 0.04, 0.04))
-	mouth_node = _pivot(neck, Vector3(0, 0.09, 0.2))
+		_eye(Vector3(0.115 * side, 0.22, 0.155), 0.105)
+	mouth_node = _pivot(neck, Vector3(0, 0.07, 0.2))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.04, 0.04))
+
+
+# Lean and hunched, with spines down its back, fangs, and an eye on anything that bleeds
+func _build_chupacabra(chub: float, ear_len: float) -> void:
+	neck_y = 0.52
+	centre_y = 0.45
+	top_y = 1.02
+	ear_splay = 0.9
+	var spine := Ps1.mat(Color(0.42, 0.13, 0.1), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.11 * side, 0.22, -0.03))
+		_part(leg, _capsule(0.05, 0.22), fur, Vector3(0, -0.08, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.185, 0.07), Vector3(0.07, 0.035, 0.16))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.39, -0.03), Vector3(0.21 * chub, 0.25, 0.27 * chub), Vector3(0.35, 0, 0))
+	_part(torso, _sphere(), pale, Vector3(0, 0.36, 0.1 * chub), Vector3(0.15 * chub, 0.17, 0.12))
+	for i in 4:
+		_part(torso, _cone(), spine, Vector3(0, 0.63 - i * 0.085, -0.13 - i * 0.055), Vector3(0.03, 0.15 - i * 0.015, 0.045), Vector3(-0.7 - i * 0.3, 0, 0))
+	tail = _pivot(torso, Vector3(0, 0.26, -0.27 * chub))
+	_part(tail, _capsule(0.022, 0.4), fur, Vector3(0, 0.04, -0.17), Vector3.ONE, Vector3(-1.3, 0, 0))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.2 * chub * side, 0.52, 0.06))
+		_part(a, _capsule(0.035, 0.3), fur, Vector3(0, -0.12, 0))
+		for claw: float in [-1.0, 0.0, 1.0]:
+			_part(a, _cone(), bone, Vector3(0.025 * claw, -0.31, 0.01), Vector3(0.013, 0.08, 0.013), Vector3(PI, 0, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.11))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.25, 0.21, 0.25))
+	_part(neck, _sphere(), fur, Vector3(0, 0.13, 0.2), Vector3(0.12, 0.09, 0.12))
+	for i in 2:
+		_part(neck, _cone(), spine, Vector3(0, 0.43 - i * 0.07, -0.02 - i * 0.12), Vector3(0.03, 0.14, 0.045), Vector3(-0.25 - i * 0.6, 0, 0))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.2 * side, 0.3, -0.03))
+		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.25, 0), Vector3(0.06, ear_len * 0.5, 0.03))
+		ears.append(ear)
+		_eye(Vector3(0.125 * side, 0.25, 0.165), 0.095)
+		_part(neck, _cone(), bone, Vector3(0.05 * side, 0.045, 0.285), Vector3(0.02, 0.1, 0.02), Vector3(PI, 0, 0))
+	mouth_node = _pivot(neck, Vector3(0, 0.08, 0.28))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.1, 0.05, 0.05))
+
+
+# A frog that stands up: wide mouth, eyes on top of its head, and legs made for jumping
+func _build_frogman(chub: float) -> void:
+	neck_y = 0.38
+	centre_y = 0.4
+	top_y = 0.88
+	head_y = 0.16
+	gravity = 9.0
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.2 * side, 0.2, -0.02))
+		_part(leg, _sphere(), fur, Vector3(0, -0.04, 0), Vector3(0.1, 0.13, 0.13))
+		_part(leg, _sphere(), dark, Vector3(0.02 * side, -0.175, 0.12), Vector3(0.14, 0.03, 0.2), Vector3(0, 0.45 * side, 0))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.32, 0), Vector3(0.32 * chub, 0.25, 0.29 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.28, 0.15 * chub), Vector3(0.25 * chub, 0.18, 0.15))
+	tail = _pivot(torso, Vector3(0, 0.26, -0.25))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.29 * chub * side, 0.4, 0.08))
+		_part(a, _capsule(0.04, 0.22), fur, Vector3(0, -0.08, 0))
+		_part(a, _sphere(), dark, Vector3(0, -0.2, 0.02), Vector3(0.075, 0.03, 0.075))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.03))
+	_part(neck, _sphere(), fur, Vector3(0, 0.16, 0), Vector3(0.36, 0.2, 0.3))
+	_part(neck, _sphere(), pale, Vector3(0, 0.1, 0.08), Vector3(0.31, 0.13, 0.22))
+	for side: float in [-1.0, 1.0]:
+		_part(neck, _sphere(), fur, Vector3(0.17 * side, 0.31, 0.07), Vector3.ONE * 0.105)
+		_eye(Vector3(0.17 * side, 0.335, 0.115), 0.085)
+	mouth_node = _pivot(neck, Vector3(0, 0.13, 0.27))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.26, 0.05, 0.06))
+
+
+# A hump, four flippers and a long neck with a small head on the end of it
+func _build_nessie(chub: float) -> void:
+	neck_y = 0.38
+	head_y = 0.62
+	centre_y = 0.4
+	top_y = 1.22
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.25 * chub * side, 0.13, -0.16))
+		_part(leg, _sphere(), dark, Vector3(0.07 * side, -0.08, -0.03), Vector3(0.16, 0.035, 0.11))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.28, 0), Vector3(0.32 * chub, 0.24, 0.42 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.22, 0.04), Vector3(0.28 * chub, 0.19, 0.38 * chub))
+	_part(torso, _sphere(), fur, Vector3(0, 0.47, -0.12), Vector3(0.16, 0.1, 0.17))
+	tail = _pivot(torso, Vector3(0, 0.26, -0.36 * chub))
+	_part(tail, _cone(), fur, Vector3(0, 0, -0.2), Vector3(0.11, 0.42, 0.09), Vector3(-PI * 0.5, 0, 0))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.29 * chub * side, 0.25, 0.17))
+		_part(a, _sphere(), dark, Vector3(0.1 * side, -0.14, 0.02), Vector3(0.17, 0.035, 0.1))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.24 * chub))
+	_part(neck, _capsule(0.075, 0.66), fur, Vector3(0, 0.3, 0.02), Vector3.ONE, Vector3(0.08, 0, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.62, 0.08), Vector3(0.14, 0.11, 0.19))
+	for side: float in [-1.0, 1.0]:
+		_part(neck, _sphere(), pale, Vector3(0.055 * side, 0.73, 0.02), Vector3.ONE * 0.028)
+		_eye(Vector3(0.09 * side, 0.67, 0.13), 0.05)
+	mouth_node = _pivot(neck, Vector3(0, 0.585, 0.23))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.08, 0.035, 0.05))
+
+
+# A whale of the high slopes: mostly mouth, grey as scree, with a hooked tail for hanging on to ridges
+func _build_bolter(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.2
+	centre_y = 0.42
+	top_y = 0.92
+	gravity = 15.0
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.17 * side, 0.15, 0.05))
+		_part(leg, _sphere(), dark, Vector3(0, -0.1, 0.04), Vector3(0.1, 0.05, 0.14))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	# All of it turns to look, tail and flippers too
+	neck = _pivot(torso, Vector3(0, neck_y, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.22, -0.02), Vector3(0.36 * chub, 0.31, 0.47 * chub))
+	_part(neck, _sphere(), pale, Vector3(0, 0.13, 0.05), Vector3(0.33 * chub, 0.24, 0.43 * chub))
+	var rock := BoxMesh.new()
+	for i in 4:
+		var at := Vector3(rng.randf_range(-0.16, 0.16), 0.5 - i * 0.02, 0.05 - i * 0.12)
+		_part(neck, rock, dark, at, Vector3(0.11, 0.07, 0.1) * rng.randf_range(0.7, 1.2), Vector3(rng.randf(), rng.randf(), rng.randf()))
+	tail = _pivot(neck, Vector3(0, 0.24, -0.42 * chub))
+	_part(tail, _capsule(0.07, 0.4), fur, Vector3(0, 0.1, -0.13), Vector3.ONE, Vector3(-0.9, 0, 0))
+	for side: float in [-1.0, 1.0]:
+		# The flukes curl over into hooks
+		_part(tail, _cone(), dark, Vector3(0.09 * side, 0.3, -0.27), Vector3(0.06, 0.22, 0.03), Vector3(0.5, 0, -1.9 * side))
+		var a := _pivot(neck, Vector3(0.35 * chub * side, 0.2, 0.08))
+		_part(a, _sphere(), dark, Vector3(0, -0.1, 0), Vector3(0.04, 0.13, 0.09))
+		arms.append(a)
+		_eye(Vector3(0.25 * chub * side, 0.37, 0.24 * chub), 0.05)
+	mouth_node = _pivot(neck, Vector3(0, 0.15, 0.4 * chub))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.3 * chub, 0.11, 0.09))
+	for i in 6:
+		var x := (i - 2.5) * 0.085 * chub
+		_part(neck, _cone(), bone, Vector3(x, 0.21, 0.455 * chub - x * x * 1.6), Vector3(0.028, 0.07, 0.022), Vector3(PI, 0, 0))
+
+
+# Thin as hunger: a deer's skull on a dark, long-armed body, and a light in the sockets
+func _build_wendigo(chub: float) -> void:
+	neck_y = 0.76
+	centre_y = 0.66
+	top_y = 1.6
+	ear_splay = 1.3
+	var skull := Ps1.mat(Color(0.64, 0.61, 0.52), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.09 * side, 0.32, 0))
+		_part(leg, _capsule(0.04, 0.34), fur, Vector3(0, -0.14, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.285, 0.03), Vector3(0.06, 0.04, 0.09))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.54, 0), Vector3(0.18 * chub, 0.27, 0.15 * chub))
+	for i in 3:
+		_part(torso, _sphere(), skull, Vector3(0, 0.5 + i * 0.065, 0.125 * chub), Vector3(0.13 - i * 0.012, 0.014, 0.04))
+	_part(torso, _sphere(), fur, Vector3(0, 0.74, -0.02), Vector3(0.26, 0.1, 0.18))
+	tail = _pivot(torso, Vector3(0, 0.36, -0.14))
+	_part(tail, _sphere(), fur, Vector3(0, 0, -0.03), Vector3.ONE * 0.045)
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.24 * side, 0.72, 0))
+		_part(a, _capsule(0.03, 0.52), fur, Vector3(0, -0.23, 0))
+		for claw: float in [-1.0, 0.0, 1.0]:
+			_part(a, _cone(), skull, Vector3(0.028 * claw, -0.53, 0), Vector3(0.012, 0.11, 0.012), Vector3(PI, 0, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.03))
+	_part(neck, _sphere(), skull, Vector3(0, 0.2, 0), Vector3(0.17, 0.17, 0.18))
+	_part(neck, _sphere(), skull, Vector3(0, 0.13, 0.17), Vector3(0.085, 0.075, 0.17))
+	_part(neck, _sphere(), black, Vector3(0, 0.15, 0.335), Vector3(0.035, 0.025, 0.012))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.15 * side, 0.24, -0.08))
+		_part(ear, _cone(), fur, Vector3(0, 0.06, 0), Vector3(0.04, 0.12, 0.02))
+		ears.append(ear)
+		_eye(Vector3(0.085 * side, 0.23, 0.125), 0.068, true)
+		# Antlers: a beam and two tines
+		_part(neck, _cone(), skull, Vector3(0.15 * side, 0.52, -0.04), Vector3(0.03, 0.44, 0.03), Vector3(0, 0, -0.5 * side))
+		_part(neck, _cone(), skull, Vector3(0.24 * side, 0.52, -0.04), Vector3(0.02, 0.2, 0.02), Vector3(0, 0, -1.15 * side))
+		_part(neck, _cone(), skull, Vector3(0.13 * side, 0.5, 0.05), Vector3(0.02, 0.18, 0.02), Vector3(0.7, 0, -0.15 * side))
+	mouth_node = _pivot(neck, Vector3(0, 0.065, 0.2))
+	_part(mouth_node, _sphere(), black, Vector3.ZERO, Vector3(0.065, 0.035, 0.11))
 
 
 # An eye on the head. Hollow ones are dark with the light in the pupil.
@@ -395,6 +643,39 @@ func _capsule(radius: float, height: float) -> CapsuleMesh:
 	m.radial_segments = 6
 	m.rings = 2
 	return m
+
+
+func _drum(top: float, bottom: float, height: float) -> CylinderMesh:
+	var m := CylinderMesh.new()
+	m.top_radius = top
+	m.bottom_radius = bottom
+	m.height = height
+	m.radial_segments = 8
+	m.rings = 1
+	return m
+
+
+# A shape turned on a lathe: points of (radius, height) from the bottom up, spun round
+func _lathe(shape: Array[Vector2], sides: int) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in shape.size():
+		var before := shape[maxi(i - 1, 0)]
+		var after := shape[mini(i + 1, shape.size() - 1)]
+		var along := (after - before).normalized()
+		for j in sides + 1:
+			var around := TAU * j / sides
+			var out := Vector3(sin(around), 0, cos(around))
+			st.set_normal((out * along.y + Vector3.UP * -along.x).normalized())
+			st.set_uv(Vector2(float(j) / sides, float(i) / shape.size()))
+			st.add_vertex(out * shape[i].x + Vector3.UP * shape[i].y)
+	for i in shape.size() - 1:
+		for j in sides:
+			var a := i * (sides + 1) + j
+			var b := a + sides + 1
+			for index: int in [a, a + 1, b, a + 1, b + 1, b]:
+				st.add_index(index)
+	return st.commit()
 
 
 func _cone() -> CylinderMesh:
@@ -582,6 +863,16 @@ func hop(power := 2.6) -> void:
 # Sent off to make room for a new egg: a wave, then away into the dark. Emits `left` once gone.
 func leave() -> void:
 	_enter(State.LEAVE)
+
+
+# The kind a save holds: its title, or a number in the oldest saves
+static func kind_of(saved: Variant) -> int:
+	if saved is String:
+		for i in KINDS.size():
+			if KINDS[i]["title"] == saved:
+				return i
+		return Kind.GREMLIN
+	return OLD_KINDS[clampi(int(saved), 0, OLD_KINDS.size() - 1)]
 
 
 func kind_name() -> String:
@@ -1038,10 +1329,6 @@ func _move(delta: float) -> void:
 	var flat := Vector2(position.x, position.z)
 	if flat.length() > ROOM:
 		flat = flat.normalized() * ROOM
-	for o in world.obstacles:
-		var off := flat - Vector2(o.x, o.z)
-		if off.length() < 0.6 and off.length() > 0.001:
-			flat = Vector2(o.x, o.z) + off.normalized() * 0.6
 	position.x = flat.x
 	position.z = flat.y
 	if airborne:
@@ -1089,7 +1376,7 @@ func _animate(delta: float) -> void:
 	arms[0].rotation = Vector3(arm.x + swing * 0.7 * (1.0 - curl) - wave - tuck, -arm.y, -arm.z - lift)
 
 	# Head turns to whatever it is looking at; the pupils go the rest of the way
-	var seen := torso.global_transform.affine_inverse() * gaze - neck.position - Vector3(0, 0.2, 0)
+	var seen := torso.global_transform.affine_inverse() * gaze - neck.position - Vector3(0, head_y, 0)
 	var want_yaw := clampf(atan2(seen.x, seen.z), -1.25, 1.25)
 	var want_pitch := clampf(-atan2(seen.y, Vector2(seen.x, seen.z).length()), -0.7, 0.5)
 	if curl_goal > 0.5:

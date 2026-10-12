@@ -1,10 +1,10 @@
 class_name Ps1
-## Materials for the PlayStation-era look. Everything solid in the crypt uses one of these two
+## Materials for the PlayStation-era look. Everything solid in the room uses one of these two
 ## shaders, which snap corners to whole pixels and map textures without perspective.
 
 const LIT: Shader = preload("res://shaders/ps1.gdshader")
 const FLAT: Shader = preload("res://shaders/ps1_flat.gdshader")
-# The crypt is drawn this many pixels high (or wide, on an upright phone) and blown up
+# The room is drawn this many pixels high (or wide, on an upright phone) and blown up
 const LINES := 240.0
 
 

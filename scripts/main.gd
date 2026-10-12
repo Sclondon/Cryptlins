@@ -1,6 +1,6 @@
-class_name Crypt
+class_name Den
 extends Node
-## Cryptlins: a spotlight in a dark crypt and the little monster that lives in it.
+## Cryptlins: a spotlight in a dark room and the little monster that lives in it.
 ## This builds the room, the lamp and the few buttons, reads the touches and keeps the save.
 ## A cryptlin starts as an egg (scripts/egg.gd); `pet` is null until it hatches.
 
@@ -39,7 +39,6 @@ var egg: Egg
 var leaving := false
 var ball: Ball
 var snacks: Array[Snack] = []
-var obstacles: Array[Vector3] = []
 var nest_pos := Vector3(-1.7, 0, -1.05)
 
 var pet_name := ""
@@ -233,7 +232,7 @@ func _build_room() -> void:
 	we.environment = env
 	add_child(we)
 
-	# The crypt is drawn small into its own picture and blown up with hard pixels (the buttons
+	# The room is drawn small into its own picture and blown up with hard pixels (the buttons
 	# and words on top stay sharp, so they can be read on a phone)
 	view = SubViewport.new()
 	view.size = Vector2i(320, 240)
@@ -269,11 +268,6 @@ func _build_room() -> void:
 	# On its own layer, so the fill light can leave the floor outside the beam black
 	floor_mesh.layers = 2
 	add_child(floor_mesh)
-
-	var stone := Ps1.mat(Color(0.3, 0.3, 0.33))
-	_grave(stone, Vector3(1.9, 0, -2.3), -0.35, 0.08)
-	_grave(stone, Vector3(-0.5, 0, -3.0), 0.15, -0.12)
-	_grave(stone, Vector3(-2.9, 0, -2.0), 0.6, 0.05)
 
 	# Its nest: a ring of rags at the edge of the light
 	var rag := Ps1.mat(Color(0.2, 0.14, 0.12))
@@ -332,25 +326,6 @@ func _mesh(mesh: Mesh, mat: Material, at: Vector3) -> MeshInstance3D:
 	mi.position = at
 	add_child(mi)
 	return mi
-
-
-func _grave(mat: Material, at: Vector3, turn: float, lean: float) -> void:
-	var slab := BoxMesh.new()
-	slab.size = Vector3(0.7, 0.9, 0.16)
-	var top := CylinderMesh.new()
-	top.top_radius = 0.35
-	top.bottom_radius = 0.35
-	top.height = 0.16
-	top.radial_segments = 8
-	var stone := _mesh(slab, mat, at + Vector3(0, 0.42, 0))
-	stone.rotation = Vector3(lean, turn, lean * 0.6)
-	var arch := MeshInstance3D.new()
-	arch.mesh = top
-	arch.material_override = mat
-	arch.position = Vector3(0, 0.45, 0)
-	arch.rotation.x = PI * 0.5
-	stone.add_child(arch)
-	obstacles.append(at)
 
 
 func _build_lamp() -> void:
@@ -708,12 +683,12 @@ func _over_ui(p: Vector2) -> bool:
 	return ask.visible or buttons.get_global_rect().has_point(p) or corner.get_global_rect().has_point(p)
 
 
-# The crypt is drawn smaller than the screen, so touches are scaled down to it and back
+# The room is drawn smaller than the screen, so touches are scaled down to it and back
 func _in_view(at: Vector2) -> Vector2:
 	return at * Vector2(view.size) / get_viewport().get_visible_rect().size
 
 
-# Where a point in the crypt is on the screen
+# Where a point in the room is on the screen
 func screen_of(world: Vector3) -> Vector2:
 	return camera.unproject_position(world) * get_viewport().get_visible_rect().size / Vector2(view.size)
 
@@ -831,7 +806,7 @@ func save_game() -> void:
 		return
 	file.store_string(JSON.stringify({
 		"name": pet_name,
-		"kind": pet_kind,
+		"kind": Cryptlin.KINDS[pet_kind]["title"],
 		"seed": pet_seed,
 		"hatched": hatched,
 		"warmth": egg.warmth if egg != null else 0.0,
@@ -853,7 +828,7 @@ func _load_game() -> bool:
 	pet_name = str(d.get("name", "Grubnik"))
 	pet_seed = int(d.get("seed", 1))
 	# Saves from before there were eggs hold a hatched gremlin
-	pet_kind = clampi(int(d.get("kind", 0)), 0, Cryptlin.KINDS.size() - 1)
+	pet_kind = Cryptlin.kind_of(d.get("kind", 0))
 	hatched = bool(d.get("hatched", true))
 	saved_warmth = clampf(float(d.get("warmth", 0.0)), 0.0, 99.0)
 	saved_needs = d.get("needs", {})

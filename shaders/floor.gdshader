@@ -1,5 +1,5 @@
 shader_type spatial;
-// Crypt flagstones, laid out from world position so the floor needs no UVs or textures.
+// Flagstones, laid out from world position so the floor needs no UVs or textures.
 
 varying vec3 world_pos;
 

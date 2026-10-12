@@ -1,5 +1,5 @@
 shader_type canvas_item;
-// The picture the crypt is drawn into, blown up with hard pixels and cut down to 15-bit colour
+// The picture the room is drawn into, blown up with hard pixels and cut down to 15-bit colour
 // with the PlayStation's own 4x4 dither pattern.
 
 const float DITHER[16] = float[](-4.0, 0.0, -3.0, 1.0, 2.0, -2.0, 3.0, -1.0, -3.0, 1.0, -4.0, 0.0, 3.0, -1.0, 2.0, -2.0);

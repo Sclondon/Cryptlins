@@ -1,12 +1,12 @@
 extends SceneTree
 ## Smoke test: the egg and hatching, feeding, the ball, petting, calling, the lamp, sleep, a save/load
 ## round trip and sending it off for a new egg.
-## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..3]
+## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..8]
 ## (touches are sent as window pixels, like a real finger)
 
 const SAVE := "user://smoke_test.json"
 
-var main: Crypt
+var main: Den
 var failures := 0
 var kind := 0
 
@@ -20,8 +20,8 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 
-func _start() -> Crypt:
-	var m: Crypt = load("res://main.tscn").instantiate()
+func _start() -> Den:
+	var m: Den = load("res://main.tscn").instantiate()
 	m.save_path = SAVE
 	m.first_kind = kind
 	root.add_child(m)

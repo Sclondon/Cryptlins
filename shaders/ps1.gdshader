@@ -1,5 +1,5 @@
 shader_type spatial;
-// Every lit surface in the crypt (see scripts/ps1.gd).
+// Every lit surface in the room (see scripts/ps1.gd).
 
 #include "res://shaders/ps1_snap.gdshaderinc"
 

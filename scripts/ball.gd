@@ -54,7 +54,7 @@ func _process(delta: float) -> void:
 		flat = flat.move_toward(Vector3.ZERO, delta * 1.1)
 		vel.x = flat.x
 		vel.z = flat.z
-	# The unseen walls of the crypt
+	# The unseen walls of the room
 	var out := Vector2(position.x, position.z)
 	if out.length() > LIMIT:
 		var n := out.normalized()
