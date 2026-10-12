@@ -10,6 +10,7 @@ var out := "user://shots"
 var portrait := false
 var look := 0
 var kind := 0
+var ui_only := false
 var egg_only := false
 
 
@@ -23,6 +24,8 @@ func _initialize() -> void:
 			kind = int(arg.trim_prefix("--kind="))
 		if arg == "--egg":
 			egg_only = true
+		if arg == "--ui":
+			ui_only = true
 		if arg == "--portrait":
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
@@ -36,7 +39,9 @@ func _initialize() -> void:
 	main.save_path = SAVE
 	main.first_kind = kind
 	root.add_child(main)
-	if egg_only:
+	if ui_only:
+		_run_ui.call_deferred()
+	elif egg_only:
 		_run_egg.call_deferred()
 	else:
 		_run.call_deferred()
@@ -56,6 +61,45 @@ func _until(done: Callable, seconds: float) -> void:
 	while left > 0.0 and not done.call():
 		await process_frame
 		left -= 1.0 / 60.0
+
+
+# The trays, the menu, each floor and nest, a baby, and one being carried
+func _run_ui() -> void:
+	await _wait(1.0)
+	main.pet.position = Vector3(0.3, 0, 0.5)
+	main.open_tray(true)
+	await _wait(0.3)
+	await _snap("u1_food")
+	main.learned("food")
+	main.learned("yuck")
+	main.open_tray(false)
+	await _wait(0.3)
+	await _snap("u2_toys")
+	main.open_tray(false)
+	main.open_menu()
+	await _wait(0.3)
+	await _snap("u3_menu")
+	main.close_menu()
+	for i in 3:
+		main._floor_step(1)
+		main._nest_step(1)
+		main.play_ball(i + 1)
+		main.pet.position = Vector3(0.3 - i * 0.5, 0, 0.5)
+		main.pet._enter(Cryptlin.State.STARE)
+		await _wait(1.4)
+		await _snap("u%d_room" % (4 + i))
+	main._dev_age()
+	main.pet._enter(Cryptlin.State.STARE)
+	await _wait(3.0)
+	await _snap("u7_baby")
+	main.pet.pick_up()
+	main.pet.carry(Vector3(0.2, 0.9, 0.6))
+	await _wait(1.0)
+	await _snap("u8_held")
+	main.dev_toggle()
+	await _wait(0.3)
+	await _snap("u9_dev")
+	quit()
 
 
 func _run_egg() -> void:

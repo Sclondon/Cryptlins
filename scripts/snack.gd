@@ -1,11 +1,14 @@
 class_name Snack
 extends Node3D
-## Something dropped into the light for the cryptlin to eat: a bone, a toadstool or a candy corn.
+## Something dropped into the light for the cryptlin to eat. What it makes of each is up to it.
 
 signal thud(strength: float)
 
-enum Kind { BONE, TOADSTOOL, CANDY }
+enum Kind { BONE, TOADSTOOL, CANDY, FISH, BEETLE, BERRIES }
 
+const NAMES: Array[String] = ["Bone", "Toadstool", "Candy corn", "Fish", "Beetle", "Berries"]
+# As in "it loves ..."
+const PLURALS: Array[String] = ["bones", "toadstools", "candy corn", "fish", "beetles", "berries"]
 const BITES := 3
 const VALUE := 34.0
 
@@ -58,6 +61,43 @@ func _init(which: int = Kind.BONE) -> void:
 				band.height = 0.075
 				band.radial_segments = 6
 				_add(band, bands[i], Vector3(0, 0.0375 + 0.075 * i, 0))
+		Kind.FISH:
+			colour = Color(0.45, 0.6, 0.7)
+			var body := _add(_ball(1.0), colour, Vector3(0, 0.06, 0))
+			body.scale = Vector3(0.17, 0.065, 0.04)
+			var belly := _add(_ball(1.0), Color(0.8, 0.82, 0.78), Vector3(0, 0.045, 0))
+			belly.scale = Vector3(0.14, 0.045, 0.035)
+			var fin := CylinderMesh.new()
+			fin.top_radius = 0.0
+			fin.bottom_radius = 0.07
+			fin.height = 0.1
+			fin.radial_segments = 4
+			var tail := _add(fin, Color(0.3, 0.42, 0.52), Vector3(-0.2, 0.06, 0), Vector3(0, 0, -PI * 0.5))
+			tail.scale = Vector3(1, 1, 0.25)
+			_add(_ball(0.014), Color(0.05, 0.05, 0.05), Vector3(0.11, 0.075, 0.03))
+			_add(_ball(0.014), Color(0.05, 0.05, 0.05), Vector3(0.11, 0.075, -0.03))
+		Kind.BEETLE:
+			colour = Color(0.12, 0.34, 0.26)
+			var shell := _add(_ball(1.0), colour, Vector3(0, 0.05, -0.01))
+			shell.scale = Vector3(0.09, 0.06, 0.11)
+			_add(_ball(0.04), Color(0.06, 0.07, 0.08), Vector3(0, 0.04, 0.1))
+			var leg := BoxMesh.new()
+			leg.size = Vector3(0.24, 0.012, 0.014)
+			for i in 3:
+				_add(leg, Color(0.06, 0.07, 0.08), Vector3(0, 0.02, -0.07 + i * 0.06), Vector3(0, (i - 1) * 0.4, 0))
+			var feeler := BoxMesh.new()
+			feeler.size = Vector3(0.01, 0.01, 0.08)
+			for side: float in [-1.0, 1.0]:
+				_add(feeler, Color(0.06, 0.07, 0.08), Vector3(0.03 * side, 0.06, 0.16), Vector3(-0.4, 0.4 * side, 0))
+		Kind.BERRIES:
+			colour = Color(0.5, 0.1, 0.4)
+			for i in 5:
+				var a := TAU * i / 5.0
+				var up := 0.05 if i < 3 else 0.12
+				var out := 0.06 if i < 3 else 0.02
+				_add(_ball(0.055), colour if i % 2 == 0 else Color(0.62, 0.12, 0.3), Vector3(cos(a) * out, up, sin(a) * out))
+			var leaf := _add(_ball(1.0), Color(0.2, 0.45, 0.18), Vector3(0.03, 0.18, 0), Vector3(0, 0.6, 0.3))
+			leaf.scale = Vector3(0.07, 0.012, 0.04)
 
 
 func _ball(radius: float) -> SphereMesh:

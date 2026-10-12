@@ -118,7 +118,7 @@ func _run() -> void:
 	# Feeding
 	pet.belly = 30.0
 	pet.energy = 90.0
-	main.feed()
+	main.feed((pet.yuck_food + 1) % Snack.NAMES.size())  # anything but the one it will not eat
 	check(main.snacks.size() == 1, "feeding drops a snack")
 	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500), "it finds the snack and eats it")
 	check(pet.belly > 55.0, "eating fills its belly (%.0f)" % pet.belly)
@@ -228,5 +228,97 @@ func _run() -> void:
 	check(await _until(func() -> bool: return main.egg != null, 1200), "and a new egg comes")
 	check(main.pet == null and main.ball == null and main.pet_kind != kind, "holding a different kind (%s)" % main.egg.title())
 
+	# The test panel: five taps on the name open it, and it can put any kind in the room
+	var corner_tap := root.get_final_transform() * (main.needs_panel.position + Vector2(40, 12))
+	for i in 5:
+		_touch(corner_tap, true)
+		await _frames(2)
+		_touch(corner_tap, false)
+		await _frames(2)
+	check(main.dev.visible, "five taps on the name open the test panel")
+	for k in Cryptlin.KINDS.size():
+		main.dev_show(k)
+		await _frames(20)
+		check(main.pet != null and main.pet.kind == k and main.egg == null, "the panel shows a %s" % main.pet.kind_name())
+	main._dev_egg()
+	await _frames(20)
+	check(main.pet == null and main.egg != null, "and its egg")
+	main._dev_egg()
+	await _frames(170)
+	check(main.pet != null and main.egg == null, "which hatches when told to")
+	# Tastes: its favourite food, the one it cannot stand, and its favourite toy
+	main.dev_toggle()
+	main.dev_show(kind)
+	await _frames(10)
+	pet = main.pet
+	check(not pet.is_baby() and is_equal_approx(pet.grow, pet.adult_size) and pet.adult_size >= 0.8 and pet.adult_size <= 1.3, "a grown %s %s, %.2f times the usual size" % [pet.nature_name(), pet.kind_name(), pet.adult_size])
+	pet.belly = 40.0
+	main.feed(pet.yuck_food)
+	check(await _until(func() -> bool: return main.known.get("yuck", false), 1500), "it spits out %s" % Snack.PLURALS[pet.yuck_food])
+	check(pet.feeling == Cryptlin.Feeling.DISGUSTED and main.snacks.is_empty(), "and is disgusted")
+	pet.belly = 40.0
+	pet.flash_time = 0.0
+	main.feed(pet.fav_food)
+	check(await _until(func() -> bool: return main.known.get("food", false), 1500), "it loves %s" % Snack.PLURALS[pet.fav_food])
+	check(pet.feeling == Cryptlin.Feeling.LOVING, "and shows it")
+	await _until(func() -> bool: return pet.state in Cryptlin.INTERRUPTIBLE, 600)
+	pet.energy = 90.0
+	main.play_ball(pet.fav_toy)
+	check(main.ball != null and main.ball.kind == pet.fav_toy, "the %s comes out" % Ball.PLAIN[pet.fav_toy])
+	check(await _until(func() -> bool: return main.known.get("toy", false), 2400), "and turns out to be its favourite")
+
+	# Handling: a finger left on it picks it up, a flick pushes it, too much poking annoys it
+	main._clear_toys()
+	await _until(func() -> bool: return pet.state in Cryptlin.INTERRUPTIBLE and not pet.airborne, 900)
+	pet.position = Vector3(0.3, 0, 0.4)
+	pet.velocity = Vector3.ZERO
+	await _frames(2)
+	var hold := _screen(pet.body_centre())
+	_touch(hold, true)
+	await _frames(45)
+	check(pet.state == Cryptlin.State.HELD and pet.lift > 0.3, "a finger left on it picks it up")
+	_drag(hold + Vector2(120, 0), Vector2(120, 0))
+	await _frames(30)
+	check(pet.position.x > 0.6, "and carries it about")
+	_touch(hold + Vector2(120, 0), false)
+	check(await _until(func() -> bool: return pet.state != Cryptlin.State.HELD and pet.lift == 0.0, 300), "and sets it down again")
+	await _until(func() -> bool: return pet.state in Cryptlin.INTERRUPTIBLE and not pet.airborne, 600)
+	pet.position = Vector3(0.0, 0, 0.4)
+	pet.velocity = Vector3.ZERO
+	await _frames(2)
+	hold = _screen(pet.body_centre())
+	_touch(hold, true)
+	for i in 6:
+		_drag(hold + Vector2(25 * (i + 1), 0), Vector2(25, 0))
+		await _frames(1)
+	_touch(hold + Vector2(150, 0), false)
+	await _frames(3)
+	check(pet.state == Cryptlin.State.SHOVED and pet.velocity.x > 0.5, "a flick pushes it")
+	await _until(func() -> bool: return pet.state in Cryptlin.INTERRUPTIBLE and not pet.airborne, 600)
+	for i in 4:
+		pet.boop()
+		await _frames(8)
+	check(pet.feeling == Cryptlin.Feeling.GRUMPY, "poked four times, it is grumpy")
+
+	# Growing up
+	pet.flash_time = 0.0
+	pet.age = Cryptlin.GROW_AGE - 0.5
+	pet.grow = Cryptlin.BABY_SIZE
+	if pet.state == Cryptlin.State.SLEEP:
+		pet._enter(Cryptlin.State.IDLE)
+	await _frames(5)
+	check(pet.is_baby() and pet.grow < 0.6, "a baby is small")
+	check(await _until(func() -> bool: return not pet.is_baby(), 200), "and grows up in time")
+	check(await _until(func() -> bool: return is_equal_approx(pet.grow, pet.adult_size), 600), "to its own size")
+
+	# The room
+	main._floor_step(1)
+	main._nest_step(1)
+	main.save_game()
+	main.queue_free()
+	await _frames(3)
+	main = _start()
+	await _frames(5)
+	check(main.floor_style == 1 and main.nest_style == 1 and main.known.get("food", false), "the floor, the nest and what you know of it are all kept")
 	print("smoke: %d failure(s)" % failures)
 	quit(failures)

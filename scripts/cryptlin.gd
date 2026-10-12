@@ -7,7 +7,7 @@ signal left
 
 enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
-	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE,
+	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED,
 }
 # The cryptids they are the young of
 enum Kind { GREMLIN, SQUATCH, COCKATRICE, MOTHMAN, CHUPACABRA, FROGMAN, NESSIE, BOLTER, WENDIGO }
@@ -27,6 +27,48 @@ const KINDS: Array[Dictionary] = [
 ]
 # What the numbers in saves from before this list stood for (gremlin, bogle, spook, flit)
 const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MOTHMAN]
+
+# How it is feeling just now, which shows in its eyes, its ears and how it holds its head
+enum Feeling { CONTENT, HAPPY, EXCITED, LOVING, HUNGRY, BORED, SLEEPY, GRUMPY, SCARED, SAD, DISGUSTED }
+const FEELINGS: Array[Dictionary] = [
+	{"title": "content", "eye": 1.0, "droop": 0.0, "hang": 0.0, "shake": 0.0},
+	{"title": "happy", "eye": 1.05, "droop": -0.05, "hang": -0.06, "shake": 0.0},
+	{"title": "excited", "eye": 1.2, "droop": -0.1, "hang": -0.1, "shake": 0.03},
+	{"title": "loving", "eye": 0.7, "droop": 0.25, "hang": 0.0, "shake": 0.0},
+	{"title": "hungry", "eye": 0.9, "droop": 0.3, "hang": 0.12, "shake": 0.0},
+	{"title": "bored", "eye": 0.6, "droop": 0.35, "hang": 0.18, "shake": 0.0},
+	{"title": "sleepy", "eye": 0.45, "droop": 0.6, "hang": 0.25, "shake": 0.0},
+	{"title": "grumpy", "eye": 0.55, "droop": 0.5, "hang": 0.14, "shake": 0.0},
+	{"title": "scared", "eye": 1.3, "droop": 0.8, "hang": 0.1, "shake": 0.07},
+	{"title": "sad", "eye": 0.7, "droop": 0.8, "hang": 0.32, "shake": 0.0},
+	{"title": "disgusted", "eye": 0.5, "droop": 0.45, "hang": -0.1, "shake": 0.03},
+]
+# Each cryptlin has a nature of its own on top of what its kind is like: how that changes its
+# needs and habits, and how it takes being picked up ("carry") or pushed about ("push")
+const NATURES: Array[Dictionary] = [
+	{"title": "greedy", "hunger": 1.35, "carry": Feeling.CONTENT, "push": Feeling.GRUMPY},
+	{"title": "playful", "bore": 1.4, "zoom": 1.8, "dance": 1.3, "carry": Feeling.EXCITED, "push": Feeling.EXCITED},
+	{"title": "shy", "lurk": 2.2, "stare": 0.7, "cuddle": 0.8, "carry": Feeling.SCARED, "push": Feeling.SCARED},
+	{"title": "sleepy", "tire": 1.45, "pace": 0.9, "zoom": 0.5, "carry": Feeling.CONTENT, "push": Feeling.GRUMPY},
+	{"title": "cuddly", "cuddle": 1.7, "stare": 1.4, "lurk": 0.5, "carry": Feeling.LOVING, "push": Feeling.SAD},
+	{"title": "bold", "lurk": 0.3, "pace": 1.1, "stare": 1.5, "carry": Feeling.EXCITED, "push": Feeling.GRUMPY},
+	{"title": "grumpy", "cuddle": 0.7, "dance": 0.5, "lurk": 1.3, "carry": Feeling.GRUMPY, "push": Feeling.GRUMPY},
+	{"title": "restless", "zoom": 2.0, "tire": 1.2, "pace": 1.15, "bore": 1.2, "carry": Feeling.GRUMPY, "push": Feeling.EXCITED},
+]
+# The two foods and two toys each kind leans towards (Snack.Kind, Ball.Kind); one of each is its favourite
+const FOOD_LIKES: Array[Array] = [
+	[Snack.Kind.CANDY, Snack.Kind.BONE], [Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.BEETLE, Snack.Kind.BERRIES],
+	[Snack.Kind.CANDY, Snack.Kind.BERRIES], [Snack.Kind.BONE, Snack.Kind.FISH], [Snack.Kind.BEETLE, Snack.Kind.FISH],
+	[Snack.Kind.FISH, Snack.Kind.TOADSTOOL], [Snack.Kind.BONE, Snack.Kind.TOADSTOOL], [Snack.Kind.BONE, Snack.Kind.FISH],
+]
+const TOY_LIKES: Array[Array] = [
+	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL], [Ball.Kind.BELL, Ball.Kind.STONE],
+	[Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.BALL, Ball.Kind.GLOW], [Ball.Kind.BALL, Ball.Kind.GLOW],
+	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.STONE, Ball.Kind.BELL], [Ball.Kind.GLOW, Ball.Kind.STONE],
+]
+# It hatches a baby, and is grown after this many seconds awake
+const GROW_AGE := 420.0
+const BABY_SIZE := 0.55
 
 const WALK := 1.0
 const RUN := 2.6
@@ -95,6 +137,26 @@ var belly := 70.0
 var fun := 60.0
 var energy := 80.0
 var love := 20.0
+
+# Who it is (see profile()), how old, how big, and how it feels
+var nature := 0
+var fav_food := 0
+var yuck_food := 0
+var fav_toy := 0
+var cuddle := 1.0
+var bore := 1.0
+var age := GROW_AGE
+var adult_size := 1.0
+var grow := 1.0
+var feeling: int = Feeling.CONTENT
+var flash_feeling: int = Feeling.CONTENT
+var flash_time := 0.0
+var hang := 0.0
+var pokes := 0
+var poke_time := -10.0
+var carry_point := Vector3.ZERO
+var lift := 0.0
+var fall_v := 0.0
 
 var state: int = State.IDLE
 var state_time := 0.0
@@ -173,6 +235,26 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- body
 
+# What a kind and seed make of it besides its looks: its nature, its favourite food and toy, the
+# food it cannot stand, and the size it grows to
+static func profile(k: int, s: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = s * 7919 + k * 104729 + 17
+	var foods: Array = FOOD_LIKES[k]
+	var toys: Array = TOY_LIKES[k]
+	var others: Array[int] = []
+	for i in Snack.NAMES.size():
+		if not i in foods:
+			others.append(i)
+	return {
+		"nature": rng.randi() % NATURES.size(),
+		"food": foods[rng.randi() % foods.size()],
+		"yuck": others[rng.randi() % others.size()],
+		"toy": toys[rng.randi() % toys.size()],
+		"size": rng.randf_range(0.8, 1.3),
+	}
+
+
 # The fur and eye colour a kind and seed give (the egg shows the eye before it hatches)
 static func colours(k: int, s: int) -> Array[Color]:
 	var rng := RandomNumberGenerator.new()
@@ -191,7 +273,23 @@ func _build() -> void:
 	tire = traits["tire"]
 	spring = traits["spring"]
 	voice = traits["voice"]
-	likes = traits
+	likes = traits.duplicate()
+	var me := profile(kind, look_seed)
+	nature = me["nature"]
+	fav_food = me["food"]
+	yuck_food = me["yuck"]
+	fav_toy = me["toy"]
+	adult_size = me["size"]
+	var mine: Dictionary = NATURES[nature]
+	hunger *= float(mine.get("hunger", 1.0))
+	tire *= float(mine.get("tire", 1.0))
+	pace *= float(mine.get("pace", 1.0))
+	bore = mine.get("bore", 1.0)
+	cuddle = mine.get("cuddle", 1.0)
+	for habit: String in ["lurk", "zoom", "dance", "stare"]:
+		likes[habit] = float(likes[habit]) * float(mine.get(habit, 1.0))
+	grow = size_goal()
+	scale = Vector3.ONE * grow
 	var rng := RandomNumberGenerator.new()
 	rng.seed = look_seed
 	var picked := colours(kind, look_seed)
@@ -776,7 +874,7 @@ func mood() -> float:
 
 
 func get_needs() -> Dictionary:
-	return {"belly": belly, "fun": fun, "energy": energy, "love": love}
+	return {"belly": belly, "fun": fun, "energy": energy, "love": love, "age": age}
 
 
 func set_needs(d: Dictionary) -> void:
@@ -784,13 +882,17 @@ func set_needs(d: Dictionary) -> void:
 	fun = clampf(float(d.get("fun", fun)), 0.0, 100.0)
 	energy = clampf(float(d.get("energy", energy)), 0.0, 100.0)
 	love = clampf(float(d.get("love", love)), 0.0, 100.0)
+	# Saves from before there were babies hold a grown one
+	age = float(d.get("age", GROW_AGE))
+	grow = size_goal()
+	scale = Vector3.ONE * grow
 
 
 func _tick_needs(delta: float) -> void:
 	var asleep := state == State.SLEEP
 	var speed := velocity.length()
 	belly -= delta * hunger / (16.0 if asleep else 7.0)
-	fun -= delta / (30.0 if asleep else 5.5)
+	fun -= delta * bore / (30.0 if asleep else 5.5)
 	if asleep:
 		energy += delta * 3.2
 	else:
@@ -799,6 +901,14 @@ func _tick_needs(delta: float) -> void:
 		love -= delta / 40.0
 	elif mood() > 60.0:
 		love += delta / 45.0
+	if not asleep and is_baby():
+		age += delta
+		if not is_baby():
+			hop(3.0)
+			_cry("coo", 0.8)
+			hearts.emitting = true
+			feel(Feeling.HAPPY, 6.0)
+			world.grew_up()
 	belly = clampf(belly, 0.0, 100.0)
 	fun = clampf(fun, 0.0, 100.0)
 	energy = clampf(energy, 0.0, 100.0)
@@ -808,12 +918,112 @@ func _tick_needs(delta: float) -> void:
 # ---------------------------------------------------------------- what you can do to it
 
 func body_centre() -> Vector3:
-	return global_position + Vector3(0, centre_y - curl * 0.2, 0)
+	return global_position + Vector3(0, (centre_y - curl * 0.2) * grow, 0)
+
+
+func is_baby() -> bool:
+	return age < GROW_AGE
+
+
+func size_goal() -> float:
+	return BABY_SIZE if is_baby() else adult_size
+
+
+func nature_name() -> String:
+	return NATURES[nature]["title"]
+
+
+func feeling_name() -> String:
+	return FEELINGS[feeling]["title"]
+
+
+# Something has just made it feel this way, for a while
+func feel(how: int, seconds: float) -> void:
+	flash_feeling = how
+	feeling = how
+	flash_time = seconds
+
+
+func _feel(delta: float) -> void:
+	flash_time -= delta
+	if flash_time > 0.0:
+		feeling = flash_feeling
+	elif state == State.SLEEP or energy < 20.0:
+		feeling = Feeling.SLEEPY
+	elif belly < 20.0:
+		feeling = Feeling.HUNGRY
+	elif love < 8.0 and mood() < 40.0:
+		feeling = Feeling.SAD
+	elif fun < 18.0:
+		feeling = Feeling.BORED
+	elif state == State.PETTED:
+		feeling = Feeling.LOVING
+	elif state in [State.ZOOMIES, State.DANCE, State.CHASE_BALL]:
+		feeling = Feeling.EXCITED
+	elif mood() > 62.0:
+		feeling = Feeling.HAPPY
+	else:
+		feeling = Feeling.CONTENT
+
+
+# Lifted off the floor by a finger that stayed on it
+func pick_up() -> void:
+	if state == State.LEAVE:
+		return
+	if state == State.SLEEP:
+		energy = maxf(energy, 35.0)
+	_enter(State.HELD)
+	var how: int = NATURES[nature]["carry"]
+	feel(how, 60.0)
+	_cry("squeak" if how in [Feeling.SCARED, Feeling.GRUMPY] else "chirp")
+
+
+func carry(point: Vector3) -> void:
+	carry_point = point
+
+
+func put_down() -> void:
+	if state == State.HELD and step == 0:
+		step = 1
+		fall_v = 0.0
+		flash_time = minf(flash_time, 3.0)
+
+
+# A quick flick across it sends it skidding
+func push(dir: Vector3) -> void:
+	if state in [State.LEAVE, State.HELD]:
+		return
+	if state == State.SLEEP:
+		energy = maxf(energy, 35.0)
+	_enter(State.SHOVED, 0.7)
+	velocity = Vector3(dir.x, 0, dir.z).normalized() * 3.6
+	hop(1.6)
+	var how: int = NATURES[nature]["push"]
+	feel(how, 5.0)
+	_cry("squeak", 0.9)
+	if how == Feeling.EXCITED:
+		fun = minf(fun + 6.0, 100.0)
+	else:
+		love = maxf(love - 1.0, 0.0)
 
 
 # A quick tap
 func boop() -> void:
-	if state == State.LEAVE:
+	if state in [State.LEAVE, State.HELD]:
+		return
+	# Poked again and again, it has had enough
+	if anim_t - poke_time > 2.5:
+		pokes = 0
+	pokes += 1
+	poke_time = anim_t
+	if pokes >= 4 and state != State.SLEEP:
+		pokes = 0
+		love = maxf(love - 2.0, 0.0)
+		_cry("grumble")
+		_enter(State.STARTLED, 1.2)
+		roll_goal = 0.3
+		feel(Feeling.GRUMPY, 7.0)
+		world.fed_up()
 		return
 	if state == State.SLEEP:
 		energy = maxf(energy, 35.0)
@@ -830,7 +1040,7 @@ func boop() -> void:
 
 # A finger rubbed over it
 func stroke() -> void:
-	if state == State.LEAVE:
+	if state in [State.LEAVE, State.HELD, State.SHOVED]:
 		return
 	last_stroke = anim_t
 	if state == State.SLEEP:
@@ -841,7 +1051,7 @@ func stroke() -> void:
 
 
 func call_to(point: Vector3) -> void:
-	if state in [State.SLEEP, State.GO_SLEEP, State.EAT, State.PETTED, State.STARTLED, State.LEAVE]:
+	if state in [State.SLEEP, State.GO_SLEEP, State.EAT, State.PETTED, State.STARTLED, State.LEAVE, State.HELD, State.SHOVED]:
 		return
 	target = point
 	_enter(State.COME)
@@ -881,7 +1091,7 @@ func kind_name() -> String:
 
 # Its voice: each kind pitches the same few sounds differently
 func _cry(sound: String, pitch := 1.0, volume_db := 0.0) -> void:
-	world.sfx.play(sound, pitch * voice, volume_db)
+	world.sfx.play(sound, pitch * voice * (1.3 if is_baby() else 1.0), volume_db)
 
 
 # ---------------------------------------------------------------- brain
@@ -896,6 +1106,7 @@ func _process(delta: float) -> void:
 	pounce_cooldown -= delta
 	glance_time -= delta
 	_tick_needs(delta)
+	_feel(delta)
 	gaze = _default_gaze()
 	_think(delta)
 	_move(delta)
@@ -932,6 +1143,8 @@ func _enter(s: int, length := 0.0) -> void:
 	bubble.visible = false
 	for z in zzz:
 		z.visible = false
+	if s != State.HELD:
+		lift = 0.0
 	match s:
 		State.IDLE:
 			if length <= 0.0:
@@ -951,7 +1164,7 @@ func _enter(s: int, length := 0.0) -> void:
 			wag = 9.0
 		State.CHASE_BALL:
 			kicks = 0
-			kick_limit = randi_range(2, 4)
+			kick_limit = randi_range(2, 4) + (2 if world.ball != null and world.ball.kind == fav_toy else 0)
 			wag = 9.0
 		State.CHASE_LIGHT:
 			wag = 9.0
@@ -981,6 +1194,15 @@ func _enter(s: int, length := 0.0) -> void:
 			target = world.nest_pos
 			droop_goal = 0.8
 			eye_goal = 0.6
+		State.HELD:
+			carry_point = position + Vector3(0, 0.8, 0)
+			arm_goal = UP_ARM
+			eye_goal = 1.15
+			jump_y = 0.0
+			airborne = false
+		State.SHOVED:
+			eye_goal = 1.25
+			arm_goal = UP_ARM
 		State.LEAVE:
 			_cry("coo", 0.85)
 			arm_goal = UP_ARM
@@ -1023,7 +1245,7 @@ func _decide() -> void:
 	if world.light_on:
 		options[State.LURK] = 11.0 * float(likes["lurk"])
 	if world.ball != null and energy > 30.0:
-		options[State.CHASE_BALL] = 16.0
+		options[State.CHASE_BALL] = 30.0 if world.ball.kind == fav_toy else 16.0
 	if fun > 65.0 and energy > 45.0:
 		options[State.ZOOMIES] = 8.0 * float(likes["zoom"])
 	if mood() > 62.0:
@@ -1156,7 +1378,7 @@ func _think(delta: float) -> void:
 			gaze = world.camera.global_position
 			_face(gaze, delta)
 			wiggle = sin(anim_t * 10.0) * 0.07
-			love = minf(love + delta * 5.0, 100.0)
+			love = minf(love + delta * 5.0 * cuddle, 100.0)
 			fun = minf(fun + delta * 3.0, 100.0)
 			if anim_t - last_stroke > 0.7:
 				_cry("coo")
@@ -1164,6 +1386,30 @@ func _think(delta: float) -> void:
 				_enter(State.IDLE, 1.5)
 		State.STARTLED:
 			_halt(delta)
+			if state_time > state_len:
+				_enter(State.IDLE, 1.0)
+		State.HELD:
+			velocity = Vector3.ZERO
+			gaze = world.camera.global_position
+			_face(gaze, delta)
+			if step == 0:
+				# Dangling from the finger
+				var near := 1.0 - exp(-delta * 14.0)
+				position.x = lerpf(position.x, carry_point.x, near)
+				position.z = lerpf(position.z, carry_point.z, near)
+				lift = lerpf(lift, carry_point.y, near)
+				wiggle = sin(anim_t * 6.0) * 0.1
+			else:
+				fall_v -= 14.0 * delta
+				lift += fall_v * delta
+				if lift <= 0.0:
+					lift = 0.0
+					squash_v = 4.0
+					world.sfx.play("thud", 1.2, -8.0)
+					_enter(State.STARTLED, 0.5)
+		State.SHOVED:
+			velocity = velocity.move_toward(Vector3.ZERO, delta * 6.0)
+			wiggle = sin(state_time * 22.0) * 0.2 * (1.0 - state_time / state_len)
 			if state_time > state_len:
 				_enter(State.IDLE, 1.0)
 		State.GO_SLEEP:
@@ -1235,16 +1481,34 @@ func _eat(delta: float) -> void:
 		step = int(state_time / 0.5)
 		_cry("chomp")
 		world.crumbs(snack.global_position + Vector3(0, 0.1, 0), snack.colour)
+		var eaten := snack.kind
+		if eaten == yuck_food and belly >= 15.0:
+			# One taste is enough, unless it is starving
+			world.remove_snack(snack)
+			snack = null
+			love = maxf(love - 1.0, 0.0)
+			_cry("grumble", 1.3)
+			_enter(State.STARTLED, 1.0)
+			roll_goal = 0.35
+			feel(Feeling.DISGUSTED, 5.0)
+			world.learned("yuck")
+			return
 		if snack.bite():
 			world.remove_snack(snack)
 			snack = null
-			belly = minf(belly + Snack.VALUE, 100.0)
-			love = minf(love + 2.0, 100.0)
+			var loved := eaten == fav_food
+			belly = minf(belly + Snack.VALUE * (1.3 if loved else (0.5 if eaten == yuck_food else 1.0)), 100.0)
+			love = minf(love + (6.0 if loved else 2.0), 100.0)
 			_cry("coo")
 			hop(2.0)
 			_enter(State.IDLE, 1.2)
 			arm_goal = BELLY_ARM
 			eye_goal = 0.5
+			if loved:
+				fun = minf(fun + 8.0, 100.0)
+				hearts.emitting = true
+				feel(Feeling.LOVING, 5.0)
+				world.learned("food")
 
 
 func _chase_ball(delta: float) -> void:
@@ -1280,12 +1544,17 @@ func _kick(b: Ball) -> void:
 	home.y = 0.0
 	if home.length() > 1.5:
 		dir = (dir + home.normalized() * 1.6).normalized()
-	b.vel = dir * randf_range(2.4, 4.2) + Vector3.UP * randf_range(2.0, 3.8)
+	b.vel = (dir * randf_range(2.4, 4.2) + Vector3.UP * randf_range(2.0, 3.8)) * b.heft
 	hop(2.0)
-	world.sfx.play("boing", 1.2)
+	world.sfx.play(b.sound, b.pitch * 1.2)
 	kicks += 1
 	kicks_total += 1
-	fun = minf(fun + 10.0, 100.0)
+	var loved := b.kind == fav_toy
+	fun = minf(fun + (16.0 if loved else 10.0), 100.0)
+	if loved:
+		love = minf(love + 1.0, 100.0)
+		feel(Feeling.EXCITED, 4.0)
+		world.learned("toy")
 	if kicks >= kick_limit:
 		ball_cooldown = 4.0
 		_cry("coo")
@@ -1338,7 +1607,7 @@ func _move(delta: float) -> void:
 			jump_y = 0.0
 			airborne = false
 			squash_v = 3.2
-	position.y = jump_y
+	position.y = jump_y + lift
 	rotation.y = yaw
 
 
@@ -1360,12 +1629,21 @@ func _animate(delta: float) -> void:
 	var breath := sin(anim_t * (1.3 if curl > 0.5 else 2.6)) * (0.03 if curl > 0.5 else 0.012)
 	torso.position.y = absf(sin(phase)) * 0.05 * gait - sit * 0.1 - curl * 0.15 + hover * (1.0 - curl) * (1.0 + sin(anim_t * 2.2) * 0.22)
 	torso.rotation.x = gait * minf(speed, 3.5) * 0.07 + curl * 0.12
-	torso.rotation.z = wiggle
+	torso.rotation.z = wiggle + sin(anim_t * 42.0) * float(FEELINGS[feeling]["shake"])
 	torso.scale = Vector3(1.0 + squash * 0.6 + breath, 1.0 - squash + breath, 1.0 + squash * 0.6 + breath)
 
 	var fold := sit * 1.3 + curl * 1.35
 	legs[0].rotation.x = swing * 0.9 - fold
 	legs[1].rotation.x = -swing * 0.9 - fold
+	if lift > 0.05:
+		# Feet off the floor: they pedal
+		legs[0].rotation.x = sin(anim_t * 9.0) * 0.6
+		legs[1].rotation.x = -sin(anim_t * 9.0) * 0.6
+
+	# A baby is small with a big head, and grows into its size
+	grow = move_toward(grow, size_goal(), delta * 0.25)
+	scale = Vector3.ONE * grow
+	neck.scale = Vector3.ONE * lerpf(1.0, 1.28, clampf(inverse_lerp(adult_size, BABY_SIZE, grow), 0.0, 1.0))
 
 	arm = arm.lerp(arm_goal, ease_fast)
 	var wave := sin(anim_t * 9.0) * arm_wave
@@ -1385,13 +1663,14 @@ func _animate(delta: float) -> void:
 	head_yaw = lerpf(head_yaw, want_yaw, ease_slow * 1.6)
 	head_pitch = lerpf(head_pitch, want_pitch, ease_slow * 1.6)
 	head_roll = lerpf(head_roll, roll_goal, ease_slow)
-	neck.rotation = Vector3(head_pitch + nod, head_yaw, head_roll)
+	hang = lerpf(hang, float(FEELINGS[feeling]["hang"]), ease_slow)
+	neck.rotation = Vector3(head_pitch + nod + hang, head_yaw, head_roll)
 	neck.position.y = neck_y - curl * 0.1
 
 	blink -= delta
 	if blink < -0.12:
 		blink = randf_range(1.5, 5.0)
-	eye_open = lerpf(eye_open, eye_goal if blink > 0.0 else 0.0, 1.0 - exp(-delta * 30.0))
+	eye_open = lerpf(eye_open, eye_goal * float(FEELINGS[feeling]["eye"]) if blink > 0.0 else 0.0, 1.0 - exp(-delta * 30.0))
 	var to_head := neck.global_transform.affine_inverse()
 	for i in eyes.size():
 		eyes[i].scale = Vector3(1.0, maxf(eye_open, 0.07), 1.0)
@@ -1406,7 +1685,7 @@ func _animate(delta: float) -> void:
 	mouth_node.scale = Vector3(1.0 - 0.25 * mouth, maxf(mouth, 0.1), 1.0)
 
 	# Ears: perk, droop, flop with each step, and twitch now and then
-	droop = lerpf(droop, droop_goal, ease_slow)
+	droop = lerpf(droop, droop_goal + float(FEELINGS[feeling]["droop"]), ease_slow)
 	twitch = maxf(twitch - delta * 5.0, 0.0)
 	if twitch <= 0.0 and randf() < delta * 0.35:
 		twitch = 1.0
@@ -1428,5 +1707,5 @@ func _animate(delta: float) -> void:
 		var cam_right := world.camera.global_basis.x
 		for i in 3:
 			var u := fmod(anim_t * 0.4 + i / 3.0, 1.0)
-			zzz[i].global_position = global_position + Vector3(0, top_y - 0.4 + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
+			zzz[i].global_position = global_position + Vector3(0, (top_y - 0.4) * grow + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
 			zzz[i].modulate.a = sin(u * PI) * 0.9
