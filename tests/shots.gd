@@ -1,8 +1,9 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
-## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --faces:
+## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --scan: the
+## scanner on the wheel, on the finger, and pointed at a grown one, a baby and an egg. With --faces:
 ## each of the faces that go up over its head. With --many: three of different kinds sharing the room.
 ## With --variety: one sheet of twelve of the kind, each of another seed, stood in rows facing
 ## the front under an even light (or side on, as babies, in the dark, or as the scanner shows
@@ -19,6 +20,7 @@ var portrait := false
 var look := 0
 var kind := 0
 var ui_only := false
+var scan_only := false
 var egg_only := false
 var faces_only := false
 var baby := false
@@ -49,6 +51,8 @@ func _initialize() -> void:
 			faces_only = true
 		if arg == "--ui":
 			ui_only = true
+		if arg == "--scan":
+			scan_only = true
 		if arg == "--many":
 			many = true
 		if arg == "--variety":
@@ -98,6 +102,8 @@ func _initialize() -> void:
 		_run_many.call_deferred()
 	elif wheel:
 		_run_wheel.call_deferred()
+	elif scan_only:
+		_run_scan.call_deferred()
 	elif ui_only:
 		_run_ui.call_deferred()
 	elif faces_only:
@@ -247,6 +253,54 @@ func _run_wheel() -> void:
 	main.shelf.show_item("fish")
 	await _wait(0.5)
 	await _snap("w5_shop")
+	quit()
+
+
+# The scanner: on the wheel, on the end of a finger, pointed at a grown one in the middle of the
+# room, at the same one over on the left (when it is held on the right), at a baby and at an egg
+func _run_scan() -> void:
+	await _wait(1.0)
+	var pet := main.who().pet
+	pet.set_needs({"belly": 35.0, "fun": 70.0, "energy": 80.0, "love": 55.0, "age": Cryptlin.GROW_AGE})
+	pet.position = Vector3(0.2, 0, 0.7)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	main.shelf.show_item("scanner")
+	await _wait(1.0)
+	await _snap("s1_row")
+	main._pull("scanner", main.screen_of(Vector3(-0.9, 0, 0.9)))
+	await _wait(0.5)
+	await _snap("s2_finger")
+	main.grab = Den.Grab.NONE
+	main.start_scan()
+	await _wait(1.6)
+	await _snap("s3_scan")
+	await _wait(0.5)
+	await _snap("s3_scan2")
+	main.stop_scan()
+	pet.position = Vector3(-1.3, 0, 1.2)
+	await _wait(0.3)
+	main.start_scan()
+	await _wait(1.6)
+	await _snap("s4_left")
+	main.stop_scan()
+	pet.set_needs({"age": 0.0})
+	pet.position = Vector3(0.2, 0, 0.7)
+	await _wait(1.0)
+	main.start_scan()
+	await _wait(1.6)
+	await _snap("s5_baby")
+	main.stop_scan()
+	pet.position = Vector3(-1.2, 0, -0.6)
+	var egg := main.new_egg()
+	await _until(func() -> bool: return egg.egg.landed, 4.0)
+	main.start_scan(egg)
+	await _wait(1.6)
+	await _snap("s6_egg")
+	main.stop_scan()
+	main.set_lamp(Den.Lamp.OFF)
+	main.start_scan(pet.me)
+	await _wait(1.6)
+	await _snap("s7_dark")
 	quit()
 
 

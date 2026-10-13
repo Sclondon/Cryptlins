@@ -3,7 +3,7 @@ render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabl
 // A body under the scanner: nothing where you look straight through it, a glow where its
 // surface turns away, so it reads as an outline you can see inside. With `lines` it is drawn as
 // the scanner's raster: every other line of the picture brighter, and a bright band across it
-// at the height the scanner's sweep has got to.
+// at the height the bar on the scanner's readout has got to.
 
 #include "res://shaders/ps1_snap.gdshaderinc"
 

@@ -788,7 +788,14 @@ func _run() -> void:
 	# The scanner
 	await _until(func() -> bool: return _settled(pet), 900)
 	await _tap(_on_shelf("scanner"))
-	check(main.scanning and pet.xrayed and main.scanner.visible, "a tap on the scanner holds it up to the cryptlin")
+	check(main.scanning and pet.xrayed and main.scanner.visible, "a tap on the scanner points it at the cryptlin")
+	var screen_size := main.get_viewport().get_visible_rect().size
+	var gun := main.screen_of(main.scanner.to_global(Vector3(0, Items.BORE, 0)))
+	var mouth := main.screen_of(main.scanner.to_global(Items.MUZZLE))
+	var aimed_at := main.screen_of(pet.global_position + Vector3(0, pet.tall() * 0.5, 0))
+	check(gun.y > screen_size.y * 0.5 and gun.y < main.shelf.position.y and absf(gun.x - screen_size.x * 0.5) > screen_size.x * 0.2, "  from a lower corner of the view, above the shelf")
+	check((mouth - gun).normalized().dot((aimed_at - gun).normalized()) > 0.95 and mouth.distance_to(aimed_at) > minf(screen_size.x, screen_size.y) * 0.15, "  aimed at it, and well clear of it")
+	check(main.scan_ray.visible, "  with its light on it")
 	check(pet.state == Cryptlin.State.SCANNED, "which holds still for it")
 	pet.belly = 10.0
 	await _frames(5)
@@ -797,7 +804,7 @@ func _run() -> void:
 	await _frames(5)
 	check(pet.stomach_fill.scale.y > low * 3.0, "its stomach shows how full it is")
 	await _tap(_screen(Vector3(-1.5, 0, 1.0)))
-	check(not main.scanning and not pet.xrayed and pet.skin.is_empty(), "a tap anywhere puts the scanner down")
+	check(not main.scanning and not pet.xrayed and pet.skin.is_empty() and not main.scanner.visible and not main.scan_ray.visible, "a tap anywhere puts the scanner down")
 
 	# Handling: a finger left on it picks it up, a flick pushes it, too much poking annoys it
 	await _until(func() -> bool: return _settled(pet), 900)
@@ -962,7 +969,11 @@ func _run() -> void:
 	one.position = Vector3(0.1, 0, 0.2)
 	two.position = Vector3(1.6, 0, 1.0)
 	main.start_scan()
-	check(main.scanned == one.me, "or else to the one nearest the middle")
+	check(main.scanned == one.me and main.scan_side < 0.0, "or else to the one nearest the middle, held on the left")
+	main.stop_scan()
+	one.position = Vector3(-1.6, 0, 1.0)
+	main.start_scan(one.me)
+	check(main.scan_side > 0.0 and main.screen_of(main.scanner.global_position).x > main.screen_of(one.body_centre()).x, "and on the right for one that is over on the left")
 	main.stop_scan()
 
 	# One room, and each its own idea of it

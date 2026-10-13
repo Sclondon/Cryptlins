@@ -44,6 +44,13 @@ const SCAN_SECONDS := 9.0
 # The grounds a foot sinks into (moss, dirt, sand, gravel), and the most footprints there are at once
 const SOFT_GROUNDS: Array[int] = [2, 4, 5, 6]
 const MAX_TRACKS := 28
+# The scanner in use: how far in from the side of the screen and up from the shelf its body is
+# held and how long it is drawn, all as parts of the screen's short side; how far from the eye;
+# and the angle between its barrel and the line of sight to it
+const SCANNER_IN := Vector2(0.2, 0.23)
+const SCANNER_SIZE := 0.3
+const SCANNER_AWAY := 3.0
+const SCANNER_SLANT := 0.9
 # The colour of each ground, for what gets dug out of it
 const GROUND_TINTS: Array[Color] = [
 	Color(0.4, 0.4, 0.42), Color(0.4, 0.28, 0.16), Color(0.2, 0.34, 0.14), Color(0.5, 0.5, 0.5),
@@ -166,12 +173,16 @@ var snack_lying := false
 var held_pet: Cryptlin
 var held_egg: Egg
 
-# The scanner, and the one it is held up to
+# The scanner, the one it is pointed at, and which lower corner of the view it is held in (-1
+# for the left). On it, the bar that runs up and down its readout; from it, its cone of light.
 var scanned: Resident
 var scanning := false
 var scan_time := 0.0
+var scan_side := -1.0
 var scanner: Node3D
-var sweep: MeshInstance3D
+var scan_bar: MeshInstance3D
+var scan_ray: Node3D
+var ray_light: ShaderMaterial
 
 var shelf: Shelf
 var scan_notes: Control
@@ -1308,7 +1319,7 @@ func toggle_sound() -> void:
 
 # ---------------------------------------------------------------- the scanner
 
-# Holds the scanner up to one of them (or its egg) for a few seconds: its outline, its bones,
+# Points the scanner at one of them (or its egg) for a few seconds: its outline, its bones,
 # and how full, rested, amused and fond it is. To the one it is given; or else the one last
 # tapped; or else whichever is nearest the middle of the room.
 func start_scan(r: Resident = null) -> void:
@@ -1322,10 +1333,14 @@ func start_scan(r: Resident = null) -> void:
 	scanned = r
 	scanning = true
 	scan_time = 0.0
+	# Held on the left, unless that is where the one to be scanned is
+	scan_side = 1.0 if screen_of(r.body().global_position).x < get_viewport().get_visible_rect().size.x * 0.42 else -1.0
 	scanner.visible = true
+	scan_ray.visible = true
 	if r.pet != null:
 		r.pet.xray(true)
 		r.pet.hold_still()
+	_aim_scanner()
 	sfx.play("jingle", 0.6, -8.0)
 	_sync()
 
@@ -1335,6 +1350,7 @@ func stop_scan() -> void:
 		return
 	scanning = false
 	scanner.visible = false
+	scan_ray.visible = false
 	if scanned.pet != null:
 		scanned.pet.xray(false)
 	scanned = null
@@ -1353,19 +1369,47 @@ func _nearest_resident(to: Vector3) -> Resident:
 	return best
 
 
+# Holds the scanner in its lower corner of the view, just above the shelf and close to the eye,
+# pointed at the one being scanned, with its light reaching to it
 func _aim_scanner() -> void:
 	var pet := scanned.pet
+	var tall := 0.9 if pet == null else maxf(pet.tall(), 0.5)
 	var middle := scanned.egg.centre() if pet == null else pet.global_position + Vector3(0, pet.tall() * 0.5, 0)
-	var tall := 0.9 if pet == null else pet.tall()
-	var size := maxf(tall, 0.5) / 0.6
-	var toward := (camera.global_position - middle).normalized()
+	var screen_size := get_viewport().get_visible_rect().size
+	var short := minf(screen_size.x, screen_size.y)
+	var corner := Vector2(screen_size.x * 0.5 + scan_side * (screen_size.x * 0.5 - short * SCANNER_IN.x), shelf.position.y - short * SCANNER_IN.y)
+	var hand := camera.project_position(_in_view(corner), SCANNER_AWAY)
+	# (it bobs a little, as a thing in a hand does)
+	hand += camera.global_basis.y * sin(scan_time * 2.3) * 0.012
+	# The same size on the screen whatever the shape of the screen
+	var size := SCANNER_SIZE * Ps1.LINES * 2.0 * SCANNER_AWAY * tan(deg_to_rad(camera.fov * 0.5)) / view.size.y
+	# Seen from the eye it lies along the line to the one it is pointed at, but turned further
+	# side on than a straight aim from so close would be, so that it shows as what it is
+	var sight := (hand - camera.global_position).normalized()
+	var across := middle - hand
+	across = (across - sight * across.dot(sight)).normalized()
+	scanner.look_at_from_position(hand, hand + across * sin(SCANNER_SLANT) + sight * cos(SCANNER_SLANT), camera.global_basis.y)
 	scanner.scale = Vector3.ONE * size
-	scanner.global_position = middle + toward * 0.75 - Vector3(0, 0.62 * size, 0)
-	scanner.rotation = Vector3(0, atan2(toward.x, toward.z), 0)
-	sweep.position.y = 0.62 + sin(scan_time * 3.0) * 0.3
+	scanner.global_position = hand - scanner.global_basis * Vector3(0, Items.BORE, 0)
+	# The bar on its readout goes up and down, and a bright band on the body goes with it
+	var sweep := sin(scan_time * 3.0)
+	scan_bar.position.y = Items.READOUT.y + sweep * (Items.READOUT_SIZE.y * 0.5 - 0.015)
 	if pet != null:
-		# (the band on the body is where the bar on the frame is seen against it)
-		pet.scan_skin.set_shader_parameter("band", sweep.global_position.y - toward.y * 0.75)
+		pet.scan_skin.set_shader_parameter("band", pet.global_position.y + pet.tall() * (0.5 + 0.42 * sweep))
+	# The light: a thin cone from the mouth of the gun, as wide as the one it falls on by the
+	# time it gets there, that flickers. Its point is a little way back inside the barrel.
+	var muzzle := scanner.to_global(Items.MUZZLE)
+	var way := (middle - muzzle).normalized()
+	var spread := tall * 0.55 / muzzle.distance_to(middle)
+	var apex := muzzle - way * Items.MOUTH * 0.5 * size / spread
+	var reach := apex.distance_to(middle) * 1.12
+	scan_ray.look_at_from_position(muzzle, middle)
+	scan_ray.scale = Vector3(reach * spread * 2.2, reach * spread * 2.2, reach - apex.distance_to(muzzle))
+	ray_light.set_shader_parameter("apex", apex)
+	ray_light.set_shader_parameter("axis", way)
+	ray_light.set_shader_parameter("spread", spread)
+	ray_light.set_shader_parameter("reach", reach)
+	ray_light.set_shader_parameter("strength", 0.22 + 0.06 * sin(scan_time * 31.0) * sin(scan_time * 7.0))
 
 
 func _word(value: float, words: Array[String]) -> String:
@@ -1524,9 +1568,25 @@ func _build_room() -> void:
 	_build_nest()
 
 	scanner = Items.scanner()
-	sweep = Ps1.part(scanner, Ps1.box(), Ps1.mat(Color(0.3, 1.0, 0.5), 1.0), Vector3(0, 0.62, 0), Vector3(0.66, 0.015, 0.02))
+	scan_bar = Ps1.part(scanner, Ps1.box(), Ps1.mat(Color(0.4, 1.0, 0.55), 1.0), Items.READOUT, Vector3(Items.READOUT_SIZE.x, 0.03, 0.02))
 	scanner.visible = false
 	add_child(scanner)
+	# Its light is the same haze as the lamp's. The shader gives it the shape of a cone; the
+	# mesh only says where to draw, and is a closed tube a unit long and a unit across that
+	# _aim_scanner stretches from the mouth of the gun to the one it is pointed at.
+	ray_light = ShaderMaterial.new()
+	ray_light.shader = load("res://shaders/beam.gdshader")
+	ray_light.set_shader_parameter("tint", Color(0.35, 1.0, 0.75))
+	var tube := CylinderMesh.new()
+	tube.top_radius = 0.5
+	tube.bottom_radius = 0.5
+	tube.height = 1.0
+	tube.radial_segments = 12
+	scan_ray = Node3D.new()
+	var ray := Ps1.part(scan_ray, tube, ray_light, Vector3(0, 0, -0.5), Vector3.ONE, Vector3(PI * 0.5, 0, 0))
+	ray.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	scan_ray.visible = false
+	add_child(scan_ray)
 
 	# A ring that spreads where you tap to call it
 	var ripple_mat := StandardMaterial3D.new()
@@ -2051,9 +2111,10 @@ func _process(delta: float) -> void:
 			held_pet.carry(hold_point)
 	# The scanner on its way up from the shelf, on the end of the finger
 	if grab == Grab.SCANNER:
-		scanner.scale = Vector3.ONE
+		scanner.scale = Vector3.ONE * 0.8
 		scanner.position = scanner.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
-		scanner.rotation = Vector3.ZERO
+		scanner.rotation = Vector3(0, -0.9, 0)
+		scan_bar.position.y = Items.READOUT.y
 
 	_lay_due()
 	if scuffle != null:

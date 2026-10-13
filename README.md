@@ -62,7 +62,7 @@ Tap a thing to use it, or drag it up off the wheel and let go where you want it.
 | --- | --- |
 | **Notebook** (N) | The only words in the game: a page on each egg and cryptlin in the room (leaf through them; a cryptlin can be renamed or let go from its own), how to look after them, the wheel of things, what a finger can do, and the odds and ends (the sound). |
 | **Egg** | One more for the room, of a kind that is not there already. The room holds four, eggs and cryptlins together; with four in it the egg only clicks. |
-| **Scanner** (X) | Held up to one of them for a few seconds (dragged up onto it; or tapped, when it goes to the one last touched, or else the one nearest the middle): its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and notes for how well it is and how at home. Works on an egg too. |
+| **Scanner** (X) | A radar gun of the kind the police point at cars. Pointed at one of them for a few seconds from a lower corner of the screen (dragged up onto it; or tapped, when it goes to the one last touched, or else the one nearest the middle), a thin light flickering from it: its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and notes for how well it is and how at home. Works on an egg too. |
 | **Food**: bone (F), toadstool, candy corn, fish, beetle, berries | It runs over and eats what you drop, loves its favourite, and spits out the one it can't stand. |
 | **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Pick the toy up with a finger and it jumps for it; let go to throw. |
 | **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the wheel to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
@@ -204,7 +204,9 @@ from `Cryptlin.looks()`, which has a generator of its own.
 - `scripts/decor.gd`: the things that stand in the room (shelters and the pool among them) and the nests.
   `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
-  `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes.
+  `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes. The scanner itself is
+  `Items.scanner()`, and `Den._aim_scanner()` holds it in a lower corner of the view (the one further from whoever it
+  is pointed at), turned to lie along the line to them, and stretches its light (the lamp's haze again) out to them.
 - The PlayStation look: the room is drawn into a SubViewport 240 pixels on its short side and blown up with hard
   pixels by `shaders/ps1_screen.gdshader`, which also cuts it to 15-bit colour with the console's dither pattern.
   Every solid thing uses `shaders/ps1.gdshader` (through `scripts/ps1.gd`), which snaps corners to whole pixels and
@@ -229,6 +231,6 @@ them out.
 
 ```
 godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, or one sheet of twelve of the kind, each of another seed
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 ```
