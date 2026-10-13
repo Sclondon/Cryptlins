@@ -45,10 +45,13 @@ const HELP: Array[String] = [
 	"The rest they will show you, and it goes down in here.",
 ]
 # What that leaf goes on to say inside the station, where there is a ticket counter to send the
-# keeper to (the Shop button at its foot goes there)
+# keeper to (the Shop button at its foot goes there) and a show every Friday
 const COUNTER: Array[String] = [
 	"Food, toys, things for the room and eggs are to be had for tickets at the counter upstairs.",
+	"Fridays the station judges the best kept cryptlin: the week's keeping counts, not the morning's. The best three get tickets and a rosette to pin on, and the first a brass cup for the cellar.",
 ]
+# What is said of one that wears a rosette, by its place (first, second, third)
+const PLACES: Array[String] = ["First at the Friday show.", "Second at the Friday show.", "Third at the Friday show."]
 # What is said of an egg, after what is painted on it
 const EGG := "Nobody can say what is in it until it is out. It is cold to the touch."
 # A line or two on each kind: what it looks like and how it struck him. What it needs is the
@@ -359,7 +362,7 @@ func _set_out(paras: Array) -> String:
 func _words_of(which: int) -> Array[String]:
 	var all := everyone()
 	if which >= all.size():
-		return HELP + COUNTER if world.embedded else HELP
+		return _help()
 	var r := all[which]
 	if r.pet != null:
 		return _paras(r.pet)
@@ -378,13 +381,28 @@ func _parents(r: Resident, line: String) -> String:
 func _remembrance(r: Resident) -> Array[String]:
 	var paras: Array[String] = [
 		"%s.%s" % [_a(Cryptlin.KINDS[r.kind]["title"]), _parents(r, " Its parents were %s and %s.")],
-		"It lived %s, and is gone.%s" % [_span(r.lived), _stone(r)],
+		"It lived %s, and is gone.%s%s" % [_span(r.lived), _placed(r), _stone(r)],
 	]
 	var was := Cryptlin.profile(r.kind, r.look_seed)
 	paras.append_array(_found(r.known, false, was["food"], was["yuck"], was["toy"], was["ground"], was["lamp"], was["decor"], was["hates"], Cryptlin.KINDS[r.kind].get("water", false), r.kind, [
 		"Ate gladly", "Would not touch", "Best toy", "Floor it liked", "Lamp it liked", "Liked about the place", "Could not abide", "Wanted water", "Its knack",
 	]))
 	return paras
+
+
+# The keeper's leaf. Inside the station it has the counter and the show to tell of as well, and
+# is set closer to keep it to the one leaf.
+func _help() -> Array[String]:
+	if not world.embedded:
+		return HELP
+	var leaf: Array[String] = [" ".join(HELP.slice(0, 2)), " ".join(HELP.slice(2))]
+	leaf.append_array(COUNTER)
+	return leaf
+
+
+# A few words on the rosette one of them wears, or nothing
+func _placed(r: Resident) -> String:
+	return " " + PLACES[r.rosette - 1] if r.rosette > 0 else ""
 
 
 # A few words on the gravestone of one that died, if the keeper still has it: standing in the
@@ -405,7 +423,7 @@ func _stone(r: Resident) -> String:
 func _paras(pet: Cryptlin) -> Array[String]:
 	var paras: Array[String] = [
 		"%s. %s%s" % [_a("baby " + pet.kind_name() if pet.is_baby() else pet.kind_name()), KIND_NOTES[pet.kind], _parents(pet.me, " Its parents are %s and %s.")],
-		"Hatched %s ago. %s" % [_span(Time.get_unix_time_from_system() - pet.me.born), MOODS[pet.feeling]],
+		"Hatched %s ago. %s%s" % [_span(Time.get_unix_time_from_system() - pet.me.born), MOODS[pet.feeling], _placed(pet.me)],
 	]
 	paras.append_array(_found(pet.me.known, world.dev.visible, pet.fav_food, pet.yuck_food, pet.fav_toy, pet.fav_ground, pet.fav_lamp, pet.like_decor, pet.hate_decor, pet.needs_water(), pet.kind, [
 		"Eats gladly", "Will not touch", "Best toy", "Floor it likes", "Lamp it likes", "Likes about the place", "Cannot abide", "Wants water", "Its knack",

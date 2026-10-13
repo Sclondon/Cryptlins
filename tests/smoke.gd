@@ -568,7 +568,7 @@ func _halfling(pet: Cryptlin) -> void:
 # How many things there are to have on the wheel just now: all of them, but for the gravestone
 # (which is only there when one is put away) and whatever is out in the room
 func _all_but_in_use() -> int:
-	return Items.LIST.filter(func(item: Dictionary) -> bool: return not item["id"] in Items.KEPT and not main.in_room_now(item["id"])).size()
+	return Items.LIST.filter(func(item: Dictionary) -> bool: return not item["id"] in Items.KEPT and (main.dev.visible or not item["id"] in Items.PRIZES) and not main.in_room_now(item["id"])).size()
 
 
 # What is out in the room is not on the wheel: a thing stood in the room leaves it and the rest
@@ -1384,6 +1384,123 @@ func _counter() -> void:
 	await _frames(5)
 
 
+# The station's Friday show: how well each has been kept, which the page is told; the rosettes,
+# which are pinned on; and the cup, which stands in the room
+func _show() -> void:
+	var r := main.who()
+	var pet := r.pet
+	await _until(func() -> bool: return _settled(pet), 900)
+	var as_it_was := pet.get_needs().duplicate()
+	var born := r.born
+	var now := Time.get_unix_time_from_system()
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	# How well kept: a slow average of how it has been
+	pet.set_needs({"belly": 95.0, "fun": 95.0, "energy": 95.0, "health": 100.0})
+	r.born = now - 3.0 * 86400.0
+	r.kept = 50.0
+	var good := main.condition(pet)
+	main.tend(3600.0)
+	var hour := r.kept
+	main.tend(2.0 * 86400.0)
+	var well := r.kept
+	check(good > 62.0 and hour > 50.0 and hour < 51.0 and well > hour + 3.0 and well < good, "well looked after, it is the better kept for it by the day and hardly at all by the hour (as it is %.0f: from 50 to %.1f in an hour and %.1f in two days)" % [good, hour, well])
+	pet.set_needs({"belly": 4.0, "fun": 8.0, "energy": 30.0, "health": 45.0})
+	var mess := main.leave_mess(Mess.Kind.DROPPING, Vector3(1.5, 0, 1.2), pet)
+	var bad := main.condition(pet)
+	main.tend(2.0 * 86400.0)
+	check(bad < good - 30.0 and r.kept < well - 3.0 and r.kept > bad, "hungry, bored and poorly on a dirty floor, it is the worse kept (as it is %.0f: down to %.1f in two days)" % [bad, r.kept])
+	main.clear_mess(mess)
+	var grown := main.kept_score(r)
+	r.born = now - 600.0
+	check(grown == roundi(r.kept) and main.kept_score(r) < grown * 0.4 and main.kept_score(r) > 0, "one newly hatched counts for little yet (%d for %d)" % [main.kept_score(r), grown])
+	r.born = now - 3.0 * 86400.0
+	r.kept = 80.0
+	main.pass_time(86400.0)
+	check(r.kept < 76.0 and r.kept > 40.0, "left hungry for a day with the game shut, it is the worse kept when it is found (%.1f from 80)" % r.kept)
+	var was := r.kept
+	await _restart()
+	r = main.who()
+	pet = r.pet
+	check(absf(r.kept - was) < 0.5, "how well kept it is goes in the save")
+	r.kept = -1.0
+	main.tend(0.0)
+	check(is_equal_approx(r.kept, main.condition(pet)), "one from a save without it starts from how it is")
+	# What the page is told
+	var said: Array = []
+	main.told.connect(func(message: Dictionary) -> void: said.append(message))
+	main.tell_kept()
+	check(said.is_empty(), "played by itself, nobody is told")
+	main.embedded = true
+	main._heard({"type": "CRYPTLINS_STOCK", "items": {}})
+	check(said.size() == 1 and said[0] == {"type": "CRYPTLINS_KEPT", "name": r.name, "kind": pet.kind_name(), "score": main.kept_score(r)} and said[0]["score"] is int, "inside a host page it is told of the best kept once the first stock has come %s" % [said])
+	main._heard({"type": "CRYPTLINS_STOCK", "items": {}})
+	check(said.size() == 1, "and not again for more stock")
+	main.kept_timer = Den.KEPT_EVERY - 0.01
+	await _frames(3)
+	check(said.size() == 2, "but every five minutes")
+	main.rest(true)
+	main.rest(false)
+	check(said.size() == 3 and said[2].get("type") == "CRYPTLINS_KEPT", "and whenever the game is covered")
+	# The rosettes: only from what the page sends, and pinned on by being carried to one of them
+	var shelf := main.shelf
+	main.stock = {"rosette2": 1, "trophy": -1}
+	main._sync()
+	check(shelf.ids.has("rosette2") and shelf.counts.get("rosette2") == 1 and not shelf.ids.has("rosette1") and shelf.ids.has("trophy"), "a rosette and the cup sent by the page are on the wheel")
+	said.clear()
+	main.use("rosette2")
+	check(r.rosette == 0 and main.left_of("rosette2") == 1, "a tap on a rosette does nothing with it")
+	pet.set_needs({"belly": 90.0, "fun": 90.0, "energy": 90.0, "health": 100.0, "bowel": 0.0, "bladder": 0.0})
+	for place: String in ["rosette2", "rosette3", "rosette1"]:
+		main.stock[place] = 1
+		main._sync()
+		pet.position = Vector3(0.2, 0, 0.3)
+		pet._enter(Cryptlin.State.IDLE, 60.0)
+		await _frames(3)
+		var from := _on_shelf(place)
+		await _slide(from, _screen(pet.body_centre() - pet.global_position + pet.position), 16, from - Vector2(0, 190))
+		await _frames(2)
+		if place == "rosette2":
+			check(r.rosette == 2 and pet.rosette != null and pet.rosette.is_inside_tree() and main.left_of(place) == 0 and not shelf.ids.has(place) and said == [{"type": "CRYPTLINS_USED", "item": place}], "carried up to one of them it is pinned on it: one fewer in stock, and the page told")
+		elif place == "rosette3":
+			check(r.rosette == 2 and main.left_of(place) == 1 and said.size() == 1, "a lesser one is not taken by one that has a better")
+		else:
+			check(r.rosette == 1 and main.left_of(place) == 0 and said.size() == 2, "and a better one takes its place")
+	main.notebook.open_at(main.residents.find(r))
+	check(main.notebook.said().contains("First at the Friday show.") and " ".join(main.notebook._remembrance(r)).contains("First at the Friday show."), "its leaf of the handbook says so, and would if it were gone")
+	main.notebook.open_at(main.notebook.chapters() - 1)
+	check(main.notebook.said().contains("Fridays") and main.notebook.said().contains("rosette"), "and the keeper's leaf tells of the show")
+	main.notebook.close()
+	# The cup
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	await _tap(_on_shelf("trophy"))
+	var cup := main.decor_of(Decor.Kind.TROPHY)
+	check(cup != null and not shelf.ids.has("trophy"), "a tap on the cup stands it in the room")
+	main.remove_decor(cup)
+	check(shelf.ids.has("trophy"), "put away, it is on the wheel")
+	main.stock = {}
+	main._sync()
+	check(not shelf.ids.has("trophy") and not main.owns("trophy") and not main.owns("rosette3"), "and it is gone from there when the page has it no more")
+	await _restart()
+	r = main.who()
+	pet = r.pet
+	check(r.rosette == 1 and pet.rosette != null and pet.rosette.is_inside_tree(), "the rosette it wears goes in the save")
+	check(not main.shelf.ids.has("rosette1") and not main.shelf.ids.has("trophy") and not main.owns("trophy"), "played by itself there are no prizes on the wheel")
+	main.dev.visible = true
+	main._sync()
+	check(main.shelf.ids.has("rosette1") and main.shelf.ids.has("trophy"), "(but the test panel has them)")
+	main.dev.visible = false
+	r.rosette = 0
+	pet.wear_rosette(0)
+	r.born = born
+	pet.set_needs(as_it_was)
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	main._sync()
+	main.save_game()
+
+
 func _settled(pet: Cryptlin) -> bool:
 	return pet.state in Cryptlin.INTERRUPTIBLE and not pet.airborne
 
@@ -2126,6 +2243,7 @@ func _run() -> void:
 	await _pages()
 	main.notebook.close()
 	await _counter()
+	await _show()
 
 	# The room is kept
 	main.place_decor(Decor.Kind.SKULL, Vector3(1.0, 0, -1.0))

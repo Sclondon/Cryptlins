@@ -5,23 +5,23 @@ extends Node3D
 ## inside, one is the gravestone left where a cryptlin died, and one is the pool, which is no small
 ## thing: half the floor under water (see fill). Also builds the nests.
 
-enum Kind { ROCK, LOG, FERN, SKULL, CRYSTAL, PUMPKIN, GRAVESTONE, DISH, CAVE, POOL, BARREL, STUMP, TENT, CRATE, POT, MARKER }
+enum Kind { ROCK, LOG, FERN, SKULL, CRYSTAL, PUMPKIN, GRAVESTONE, DISH, CAVE, POOL, BARREL, STUMP, TENT, CRATE, POT, MARKER, TROPHY }
 
 const IDS: Array[String] = [
 	"rock", "log", "fern", "skull", "crystal", "pumpkin", "gravestone", "dish", "cave", "pool",
-	"barrel", "stump", "tent", "crate", "pot", "marker",
+	"barrel", "stump", "tent", "crate", "pot", "marker", "trophy",
 ]
 const NAMES: Array[String] = [
 	"Rock", "Hollow log", "Fern", "Skull", "Crystal", "Pumpkin", "Gravestone", "Water dish", "Cave", "Pool",
-	"Barrel", "Hollow stump", "Rag tent", "Crate", "Flowerpot", "Gravestone",
+	"Barrel", "Hollow stump", "Rag tent", "Crate", "Flowerpot", "Gravestone", "Brass cup",
 ]
 # As in "it likes having the ... about"
 const PLAIN: Array[String] = [
 	"rock", "hollow log", "fern", "skull", "crystal", "pumpkin", "gravestone", "water dish", "cave", "pool",
-	"barrel", "hollow stump", "rag tent", "crate", "flowerpot", "gravestone",
+	"barrel", "hollow stump", "rag tent", "crate", "flowerpot", "gravestone", "brass cup",
 ]
 # How much floor each takes up: the cryptlin walks round it
-const RADII: Array[float] = [0.36, 0.34, 0.22, 0.24, 0.22, 0.28, 0.24, 0.32, 0.85, 0.72, 0.7, 0.74, 0.82, 0.78, 0.76, 0.2]
+const RADII: Array[float] = [0.36, 0.34, 0.22, 0.24, 0.22, 0.28, 0.24, 0.32, 0.85, 0.72, 0.7, 0.74, 0.82, 0.78, 0.76, 0.2, 0.2]
 const NESTS: Array[String] = ["Rags", "Twigs", "Cushion", "Box"]
 const NEST_IDS: Array[String] = ["rags", "twigs", "cushion", "box"]
 # Where the water in the pool stands (a little below the floor), how deep it gets, and how
@@ -133,6 +133,23 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 				var band := Ps1.part(self, Ps1.box(), Ps1.mat(tint), Vector3(-0.008, 0.16, 0), Vector3(0.375, 0.07, 0.115))
 				band.rotation.z = 0.06
 				Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.2, 0.15, 0.1)), Vector3(-0.04, 0.02, 0.13), Vector3(0.26, 0.05, 0.16))
+		Kind.TROPHY:
+			# The cup from the station's Friday show: tarnished brass, two handles, on a wooden base
+			# with a plate on the front of it
+			var brass := Ps1.mat(Color(0.5, 0.4, 0.17), 0.06, 0.3)
+			var dull := Ps1.mat(Color(0.4, 0.34, 0.16), 0.05)
+			var wood := Ps1.mat(Color(0.26, 0.16, 0.09))
+			Ps1.part(self, Ps1.box(), wood, Vector3(0, 0.05, 0), Vector3(0.24, 0.1, 0.24))
+			Ps1.part(self, Ps1.box(), brass, Vector3(0, 0.05, 0.122), Vector3(0.12, 0.05, 0.006))
+			Ps1.part(self, Ps1.drum(8, 0.5), dull, Vector3(0, 0.13, 0), Vector3(0.08, 0.06, 0.08))
+			Ps1.part(self, Ps1.drum(6), dull, Vector3(0, 0.2, 0), Vector3(0.025, 0.1, 0.025))
+			var bowl := Ps1.part(self, Ps1.drum(10, 0.5), brass, Vector3(0, 0.34, 0), Vector3(0.14, 0.2, 0.14))
+			bowl.rotation.x = PI
+			Ps1.part(self, Ps1.drum(10), Ps1.mat(Color(0.2, 0.16, 0.08)), Vector3(0, 0.441, 0), Vector3(0.12, 0.004, 0.12))
+			for side: float in [-1.0, 1.0]:
+				Ps1.part(self, Ps1.box(), dull, Vector3(0.17 * side, 0.4, 0), Vector3(0.07, 0.02, 0.025))
+				Ps1.part(self, Ps1.box(), dull, Vector3(0.195 * side, 0.34, 0), Vector3(0.02, 0.12, 0.025))
+				Ps1.part(self, Ps1.box(), dull, Vector3(0.15 * side, 0.29, 0), Vector3(0.09, 0.02, 0.025), Vector3(0, 0, 0.5 * side))
 		Kind.DISH:
 			Ps1.part(self, Ps1.drum(10, 0.82), Ps1.mat(Color(0.42, 0.24, 0.16)), Vector3(0, 0.05, 0), Vector3(0.3, 0.1, 0.3))
 			Ps1.part(self, Ps1.drum(10), Ps1.mat(Color(0.16, 0.38, 0.5), 0.15), Vector3(0, 0.1, 0), Vector3(0.21, 0.012, 0.21))

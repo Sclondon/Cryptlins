@@ -220,6 +220,38 @@ bring it back out; the others will go and sit by it) but it is never bought or s
 is put away. Its page stays in the notebook, after those of the living and marked as gone (and says so while its stone is kept): what it was, how long it
 lived, and what was ever found out about it. One that died while the game was shut is found lying there when it is
 
+## The Friday show
+
+The station holds a show every Friday for the best kept cryptlin; the judging and the prizes are the host page's,
+and the game's part is three things.
+
+**How well kept.** Each living cryptlin carries a measure of how well it has been kept, 0 to 100 (`Resident.kept`,
+in the save): a slow average, with a memory of about five days (`KEPT_DAYS`), of how it is (`Den.condition`: fed a
+quarter of it, well and at home in its room a fifth each, amused, rested, and a floor clean of droppings and puddles).
+`Den.tend` moves it every couple of seconds as the game runs, and `pass_time` for the time the game was shut, so a
+good hour before the judging does not make up for a neglected week. One from a save without it starts from how it
+is, and one newly hatched counts for a quarter of its measure, rising to all of it over its first day
+(`Den.kept_score`). It is never shown as a number in play. Inside a host page the game posts
+`{type: "CRYPTLINS_KEPT", name, kind, score}` for the best kept living one (`Den.tell_kept`): once when the first
+`CRYPTLINS_STOCK` has come, whenever the game rests (`rest(true)`), and every five minutes while it is shown; with
+nobody living it posts nothing.
+
+**Rosettes.** `rosette1` (first: blue, with a gold middle), `rosette2` (second: red) and `rosette3` (third: yellow)
+are things only the page's stock can give (`Items.PRIZES`: played by itself there are none, though the test panel
+has them), counted. One rides the wheel after the egg; dragged up and let go over a cryptlin it is pinned on it
+(`Den.pin_on`: one leaves stock and `CRYPTLINS_USED` is posted), and that cryptlin wears it from then on, over its
+heart at the front of whatever body it has (`Cryptlin.wear_rosette`; the bolter, which has no chest, has it on its
+head). It wears only the best it has been given: a lesser one let go over it is not taken and not used up. A baby
+can wear one. It is kept with the resident (`rosette`), goes with it when it dies or is let go, is not passed to its
+young, and its leaf of the handbook says so in a line ("First at the Friday show."), as does the leaf kept for one
+that has died. A tap on a rosette on the wheel does nothing.
+
+**The cup.** `trophy`, a tarnished brass cup on a wooden base, is a thing for the room that is on the wheel only
+while the page's stock has it (it sends -1), stood, moved and put away like any other. A bold one likes having it
+about.
+
+Inside a host page the keeper's leaf of the handbook tells of the show in two sentences.
+
 ## Pairing off
 
 Two **grown** cryptlins that both think well of each other (70 or more, each of the other), both fed, well, rested
@@ -332,8 +364,9 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..29]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes and the broom that sweeps them up, what is on the wheel and what is out in the room, the wheel tucked away and brought back, toys wearing out and breaking, the ball and the bones that are given once inside a host page, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the squatchling's build and its look back, the jackalope hopping, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, the notebook fitting a wide screen and an upright one, its Shop button and what the page is told, old saves, eggs as stock and the empty room inside a host page, and the kind's knack
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait|--size=WxH] [--seed=N] [--kind=0..29] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--tuck|--tidy|--book [--fresh] [--station]|--knack|--walk [--baby]|--variety [--with=K [--over]] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]|--poses [--baby]|--strides [--baby]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, the wheel up, sliding and tucked away, and as it is inside a host page with what is given and with that gone (--tuck), the wheel before and after a thing is stood in the room with the broom at work and toys worn and breaking (--tidy), every leaf of the notebook with four in the room (--book, and with --station as it is inside a host page), the kind at its knack, the kind walking across the room and away up it (with the squatchling's look back over its shoulder), one sheet of twelve of the kind, each of another seed, or one of the kind close to, stood, turned, walking, eating, held and asleep (--poses) or at so many moments of going across the room (--strides)
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..29]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes and the broom that sweeps them up, what is on the wheel and what is out in the room, the wheel tucked away and brought back, toys wearing out and breaking, the ball and the bones that are given once inside a host page, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the squatchling's build and its look back, the jackalope hopping, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, the notebook fitting a wide screen and an upright one, its Shop button and what the page is told, how well each is kept and the page told of it, a rosette pinned on and the cup come and gone with stock, old saves, eggs as stock and the empty room inside a host page, and the kind's knack
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait|--size=WxH] [--seed=N] [--kind=0..29] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--tuck|--show|--tidy|--book [--fresh] [--station]|--knack|--walk [--baby]|--variety [--with=K [--over]] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]|--poses [--baby]|--strides [--baby]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, the prizes of the Friday show on the wheel, a rosette on the one in the room and the cup beside it (--show), the wheel up, sliding and tucked away, and as it is inside a host page with what is given and with that gone (--tuck), the wheel before and after a thing is stood in the room with the broom at work and toys worn and breaking (--tidy), every leaf of the notebook with four in the room (--book, and with --station as it is inside a host page), the kind at its knack, the kind walking across the room and away up it (with the squatchling's look back over its shoulder), one sheet of twelve of the kind, each of another seed, or one of the kind close to, stood, turned, walking, eating, held and asleep (--poses) or at so many moments of going across the room (--strides)
 godot --headless --path . --export-release Web build/index.html
+godot --path . -s tests/icons.gd -- --out=C:/tmp/icons [--size=96]   # a picture of each thing on the wheel for the host page, named by its id (the rosettes and the cup among them, which are never sold but shown on its prize notice; not the gravestone, which is never had from it)
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots --pool [--portrait] [--kind=N]   # four in a room with the pool: each place it fits, each lamp, one let go over the middle of it, food and a toy afloat, a drink at the edge, and all asleep
 ```

@@ -159,6 +159,11 @@ const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BELL, Ball.Kind.STONE],
 	[Ball.Kind.GLOW, Ball.Kind.BELL],
 ]
+# The bold nature, and where a rosette is pinned on a kind with no chest to speak of, and how far
+# it is tipped back to lie on it (see
+# wear_rosette), from the middle of its body at the floor
+const BOLD := 5
+const ROSETTE_AT := {Kind.BOLTER: [Vector3(0.15, 0.6, 0.02), -1.25]}
 # Natures that will not go together (shy and bold, sleepy and restless, cuddly and grumpy)
 const OPPOSED: Array[Array] = [[2, 5], [3, 7], [4, 6]]
 # What each kind leans towards in its room: two things to have about (Decor.Kind), two grounds
@@ -675,6 +680,8 @@ var jump_v := 0.0
 var airborne := false
 
 var torso: Node3D
+# The rosette it wears, if it has been given one (see wear_rosette)
+var rosette: Node3D
 var neck: Node3D
 var legs: Array[Node3D] = []
 var arms: Array[Node3D] = []
@@ -751,7 +758,7 @@ static func profile(k: int, s: int) -> Dictionary:
 	# The shelters that came after the first things get their chance last of all, so that nothing
 	# drawn above changes: now and then, one of them to like as well
 	if rng.randf() < 0.45:
-		liked.append(rng.randi_range(Decor.Kind.POOL + 1, Decor.IDS.size() - 1))
+		liked.append(rng.randi_range(Decor.Kind.POOL + 1, Decor.Kind.MARKER))
 		# (the number the stones of the dead once had is the gravestone's now)
 		if liked.back() == Decor.Kind.MARKER:
 			liked.pop_back()
@@ -972,6 +979,9 @@ func _build() -> void:
 	nature2 = both[1]
 	like_decor.assign(drawn["decor"])
 	hate_decor = drawn["hates"]
+	# (a bold one likes a prize to stand by: the cup from the Friday show)
+	if BOLD in both and hate_decor != Decor.Kind.TROPHY:
+		like_decor.append(Decor.Kind.TROPHY)
 	fav_ground = drawn["ground"]
 	fav_lamp = drawn["lamp"]
 	for mine: Dictionary in [NATURES[nature], NATURES[nature2]]:
@@ -3669,6 +3679,36 @@ func _swamped() -> bool:
 func is_baby() -> bool:
 	return age < GROW_AGE
 
+
+# A rosette from the station's Friday show, pinned on it (1 for first, 2 second, 3 third; 0 takes
+# it off): over its heart, out at the front of whatever of its body is there, and going with its
+# body as it moves. ROSETTE_AT is where it goes instead on a kind that has no chest to speak of.
+func wear_rosette(place: int) -> void:
+	if rosette != null:
+		rosette.queue_free()
+		rosette = null
+	if place <= 0:
+		return
+	rosette = Items.rosette(place)
+	torso.add_child(rosette)
+	if ROSETTE_AT.has(kind):
+		rosette.position = ROSETTE_AT[kind][0]
+		rosette.rotation.x = ROSETTE_AT[kind][1]
+		return
+	var at := Vector3(0.07, centre_y + 0.07, 0) + gut_at
+	var front := -INF
+	for part in torso.get_children():
+		var mi := part as MeshInstance3D
+		if mi == null or mi.mesh == null:
+			continue
+		# (each part of the body taken as round: how far forward it comes at that place on it)
+		var bounds: AABB = mi.transform * mi.mesh.get_aabb()
+		var mid := bounds.get_center()
+		var off := Vector2((at.x - mid.x) / maxf(bounds.size.x * 0.5, 0.001), (at.y - mid.y) / maxf(bounds.size.y * 0.5, 0.001))
+		if off.length() < 0.95:
+			front = maxf(front, mid.z + bounds.size.z * 0.5 * sqrt(1.0 - off.length_squared()))
+	at.z = (front if front > -INF else at.z + 0.2) + 0.02
+	rosette.position = at
 
 func size_goal() -> float:
 	return BABY_SIZE if is_baby() else adult_size

@@ -41,6 +41,11 @@ var looks := {}
 # "egg": what the save would hold of that egg}
 var paired := 0.0
 var expecting := {}
+# How well it has been kept, 0 to 100, as a slow average over the last few days (see Den.tend;
+# below zero until it has first been reckoned), and the rosette it wears from the station's
+# Friday show (1 first, 2 second, 3 third; 0 for none)
+var kept := -1.0
+var rosette := 0
 
 
 # The thing itself in the room, egg or cryptlin
@@ -73,6 +78,8 @@ func to_save() -> Dictionary:
 		"looks": looks,
 		"paired": paired,
 		"expecting": expecting,
+		"kept": kept,
+		"rosette": rosette,
 		"at": [spot.x, spot.z] if spot != Vector3.INF else [],
 	}
 
@@ -103,6 +110,8 @@ static func from_save(d: Dictionary) -> Resident:
 	if d.get("looks") is Dictionary:
 		r.looks = d["looks"]
 	r.paired = float(d.get("paired", 0.0))
+	r.kept = clampf(float(d.get("kept", -1.0)), -1.0, 100.0)
+	r.rosette = clampi(int(d.get("rosette", 0)), 0, 3)
 	if d.get("expecting") is Dictionary:
 		r.expecting = d["expecting"]
 	if d.get("regard") is Dictionary:

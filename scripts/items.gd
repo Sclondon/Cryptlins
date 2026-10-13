@@ -34,6 +34,10 @@ const LIST: Array[Dictionary] = [
 	{"id": "tent", "group": "decor", "n": 12, "name": "Rag tent"},
 	{"id": "crate", "group": "decor", "n": 13, "name": "Crate"},
 	{"id": "pot", "group": "decor", "n": 14, "name": "Flowerpot"},
+	{"id": "trophy", "group": "decor", "n": 16, "name": "Brass cup"},
+	{"id": "rosette1", "group": "rosette", "n": 1, "name": "First rosette"},
+	{"id": "rosette2", "group": "rosette", "n": 2, "name": "Second rosette"},
+	{"id": "rosette3", "group": "rosette", "n": 3, "name": "Third rosette"},
 	{"id": "rags", "group": "nest", "n": 0, "name": "Rag nest"},
 	{"id": "twigs", "group": "nest", "n": 1, "name": "Twig nest"},
 	{"id": "cushion", "group": "nest", "n": 2, "name": "Cushion"},
@@ -53,10 +57,19 @@ const FREE: Array[String] = ["notebook", "scanner", "broom", "rags", "dirt"]
 # What every keeper there is given, once, and how many: used up or broken, they are gone, and more are bought
 const GIVEN := {"bone": 3, "ball": 1}
 # Used up when used: each one fed, or each egg laid, is one fewer on the shelf
-const SPENT: Array[String] = ["food", "egg"]
+const SPENT: Array[String] = ["food", "egg", "rosette"]
+# Prizes from the station's Friday show: never to be had but from the stock a host page sends (or
+# the test panel), so that there are none when the game is played by itself
+const PRIZES: Array[String] = ["rosette1", "rosette2", "rosette3", "trophy"]
+# The colours of a rosette, by place (first, second, third): its pleats, its middle and its tails
+const ROSETTES: Array[Array] = [
+	[Color(0.16, 0.3, 0.78), Color(0.95, 0.76, 0.2), Color(0.12, 0.22, 0.6)],
+	[Color(0.8, 0.14, 0.14), Color(0.95, 0.9, 0.8), Color(0.6, 0.1, 0.1)],
+	[Color(0.95, 0.85, 0.3), Color(0.97, 0.95, 0.88), Color(0.8, 0.68, 0.2)],
+]
 # The order things ride in round the wheel, by id or by group: the scanner first and the notebook
 # last, whatever order LIST is in (which saves and the shop go by, and is not to be renumbered)
-const ROW: Array[String] = ["scanner", "broom", "food", "toy", "egg", "decor", "nest", "ground", "notebook"]
+const ROW: Array[String] = ["scanner", "broom", "food", "toy", "egg", "rosette", "decor", "nest", "ground", "notebook"]
 # Never bought or sold: on the shelf only while the keeper has one put away
 const KEPT: Array[String] = ["gravestone"]
 # On the scanner (see scanner()): how far up its barrel runs, the middle of the mouth of its cone
@@ -110,6 +123,11 @@ static func model(id: String) -> Node3D:
 			var bed := Decor.nest(n)
 			bed.scale = Vector3.ONE * 0.55
 			holder.add_child(bed)
+		"rosette":
+			var prize := rosette(n)
+			prize.scale = Vector3.ONE * 2.3
+			prize.position = Vector3(0, 0.44, 0)
+			holder.add_child(prize)
 		"egg":
 			# A plain pale egg: what is painted on the one that drops in is anybody's guess
 			Ps1.part(holder, Ps1.ball(), Ps1.mat(Color(0.86, 0.82, 0.7)), Vector3(0, 0.36, 0), Vector3(Egg.WIDTH, Egg.HEIGHT, Egg.WIDTH) * 0.95)
@@ -141,6 +159,21 @@ static func model(id: String) -> Node3D:
 				s.position = Vector3(0.07, 0.04, 0)
 				holder.add_child(s)
 	return holder
+
+
+# A rosette from the Friday show, for first, second or third place: a pleated ring of ribbon with
+# a button in the middle and two tails hanging from it, a fifth of a unit across, facing +Z with
+# its middle on the origin. A cryptlin wears it (see Cryptlin.wear_rosette).
+static func rosette(place: int) -> Node3D:
+	var r := Node3D.new()
+	var hues: Array = ROSETTES[clampi(place, 1, 3) - 1]
+	var ribbon := Ps1.mat(hues[0], 0.25)
+	var tails := Ps1.mat(hues[2], 0.2)
+	for side: float in [-1.0, 1.0]:
+		Ps1.part(r, Ps1.box(), tails, Vector3(0.035 * side, -0.12, -0.006), Vector3(0.05, 0.17, 0.008), Vector3(0, 0, 0.22 * side))
+	Ps1.part(r, Ps1.drum(8), ribbon, Vector3.ZERO, Vector3(0.1, 0.012, 0.1), Vector3(PI * 0.5, 0, 0))
+	Ps1.part(r, Ps1.drum(8), Ps1.mat(hues[1], 0.35), Vector3(0, 0, 0.012), Vector3(0.05, 0.012, 0.05), Vector3(PI * 0.5, 0, 0.4))
+	return r
 
 
 # The Cryptlin Handbook: a small ring-bound notebook, shut, with its name on a pasted label on

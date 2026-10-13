@@ -45,6 +45,7 @@ var per_row := 4
 var turned := 0.0
 var wheel := false
 var tuck := false
+var show := false
 # With --book: as it is inside the station, with the way to the ticket counter
 var station := false
 var walk := false
@@ -120,6 +121,8 @@ func _initialize() -> void:
 			walk = true
 		if arg == "--station":
 			station = true
+		if arg == "--show":
+			show = true
 		if arg == "--tuck":
 			tuck = true
 		if arg == "--wheel":
@@ -169,6 +172,8 @@ func _initialize() -> void:
 		_run_many.call_deferred()
 	elif walk:
 		_run_walk.call_deferred()
+	elif show:
+		_run_show.call_deferred()
 	elif tuck:
 		_run_tuck.call_deferred()
 	elif wheel:
@@ -421,6 +426,39 @@ func _run_book() -> void:
 		await _wait(0.25)
 		await _snap("b%s%02d" % ["_fresh" if fresh else "", i])
 		main.notebook.turn(1)
+	quit()
+
+
+# The prizes of the station's Friday show: a rosette pinned on the one in the room (seen whole
+# and close to, from the front and half turned), the cup stood beside it, and the wheel inside a
+# host page with a rosette and the cup on it
+func _run_show() -> void:
+	await _wait(1.0)
+	var pet := main.who().pet
+	pet.set_needs({"belly": 80.0, "fun": 70.0, "energy": 90.0, "love": 55.0, "age": 3000.0 if baby else Cryptlin.GROW_AGE, "bowel": 0.0, "bladder": 0.0})
+	pet.position = Vector3(-0.3, 0, 0.9)
+	pet.ball_cooldown = 9999.0
+	pet.beg_cooldown = 9999.0
+	pet._enter(Cryptlin.State.STARE)
+	main.embedded = true
+	main.stock = {"rosette1": 1, "rosette2": 2, "rosette3": 1, "trophy": -1, "fish": 2}
+	main._sync()
+	main.shelf.show_item("rosette2")
+	await _wait(0.8)
+	await _snap("s1_wheel_prizes")
+	main.pin_on(main.who(), "rosette%d" % (1 + kind % 3))
+	main.place_decor(Decor.Kind.TROPHY, Vector3(0.7, 0, 1.0))
+	pet.position = Vector3(-0.3, 0, 0.9)
+	pet._enter(Cryptlin.State.STARE)
+	await _wait(1.2)
+	pet._enter(Cryptlin.State.STARE)
+	await _wait(0.4)
+	await _snap("s2_rosette_and_cup")
+	await _close_up("s3_rosette_close", pet.body_centre() + Vector3(0.4, 0, 0), Vector2i(420, 260))
+	pet.yaw = 0.9
+	pet._enter(Cryptlin.State.IDLE, 30.0)
+	await _wait(0.7)
+	await _close_up("s4_rosette_turned", pet.body_centre() + Vector3(0.4, 0, 0), Vector2i(420, 260))
 	quit()
 
 

@@ -7,7 +7,7 @@ extends Node
 ## Nothing is written on the screen to say how any of it works, and the notebook says little more:
 ## the keeper finds out by trying.
 
-enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER, BROOM, TAB }
+enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER, BROOM, TAB, ROSETTE }
 enum Lamp { BRIGHT, LOW, HEAT, OFF }
 # The part of the floor the pool lies over
 enum Shore { NONE, BACK, LEFT, RIGHT }
@@ -46,6 +46,12 @@ const GROUND_PLAIN: Array[String] = ["flagstones", "floorboards", "moss", "check
 const SCAN_SECONDS := 9.0
 # How long after a toy there is no end of has broken before there is another of its kind
 const TOY_AGAIN_HOURS := 12.0
+# How well kept: how many days back the measure remembers, how long one newly hatched takes to
+# count in full, how often each is looked over, and how often the page is told of the best
+const KEPT_DAYS := 5.0
+const KEPT_NEW_HOURS := 24.0
+const TEND_EVERY := 2.0
+const KEPT_EVERY := 300.0
 # The broom: how near a mess it has to be brought to set about it, how long the sweeping takes,
 # and how long each stroke of it is
 const BROOM_REACH := 0.32
@@ -146,6 +152,14 @@ var used := {}
 var saved_toy := {}
 # Whether the save had the wheel tucked away (see tuck)
 var saved_tucked := false
+# The rosette on the end of a finger, on its way from the wheel to one of them, and which it is
+var pin: Node3D
+var pin_id := ""
+# How long since each of them was last looked over for how well it is kept (see tend), how long
+# since the page was last told of the best kept, and whether it has been told at all
+var tend_timer := 0.0
+var kept_timer := 0.0
+var kept_told := false
 var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
 # What the cryptlins have left on the floor (see Mess)
@@ -461,7 +475,12 @@ func pass_time(seconds: float) -> void:
 			if would_pair(all[i], all[j]) and randf() < 1.0 - exp(-seconds / (PAIR_AWAY_HOURS * Cryptlin.HOUR)):
 				paired(all[i], all[j], seconds * randf_range(0.2, 0.8))
 	for pet in pets():
-		if pet.pass_time(seconds, not light_on):
+		# (how well it is kept goes by how it was over the time: as it was left for a short while,
+		# and as it is found after a long one)
+		var left_as := condition(pet)
+		var slept := pet.pass_time(seconds, not light_on)
+		_keep(pet.me, lerpf(left_as, condition(pet), clampf(0.5 + 0.5 * seconds / 86400.0, 0.5, 1.0)), seconds)
+		if slept:
 			# (in the nest, or for one that lives in water at the edge of the pool)
 			pet.position = pet._bed() + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.2))
 			pet._enter(Cryptlin.State.SLEEP)
@@ -474,6 +493,80 @@ func pass_time(seconds: float) -> void:
 				warm(a, b, minf(seconds / Cryptlin.HOUR * Cryptlin.SLEEP_WARMS, 4.0))
 	_lay_due()
 	_sync()
+
+
+# ---------------------------------------------------------------- how well they are kept
+
+# How one of them is just now, 0 to 100: fed, amused, rested, well, at home in its room, and the
+# floor clean of what has been left on it
+func condition(pet: Cryptlin) -> float:
+	var foul := 0.0
+	for m in messes:
+		if m.kind != Mess.Kind.HEAP:
+			foul += 25.0 if m.kind == Mess.Kind.DROPPING else 8.0
+	return clampf(pet.belly * 0.25 + pet.fun * 0.15 + pet.energy * 0.1 + pet.health * 0.2 + comfort_of(pet) * 0.2 + (100.0 - minf(foul, 100.0)) * 0.1, 0.0, 100.0)
+
+
+# How well one has been kept is how it has been, on the whole, over the last few days: it comes
+# round to how it is now only slowly (KEPT_DAYS), so that a good hour does not make up for a bad
+# week. One it has never been reckoned for starts from how it is.
+func _keep(r: Resident, now: float, seconds: float) -> void:
+	r.kept = now if r.kept < 0.0 else lerpf(r.kept, now, 1.0 - exp(-seconds / (KEPT_DAYS * 86400.0)))
+
+
+# This much time has gone by with each of them as it is just now
+func tend(seconds: float) -> void:
+	for pet in pets():
+		if not pet.me.leaving:
+			_keep(pet.me, condition(pet), seconds)
+
+
+# How well kept one of them is, as a whole number from 0 to 100, which is never shown in play.
+# One newly hatched counts for little until it has been kept a day.
+func kept_score(r: Resident) -> int:
+	if r.pet == null or r.leaving:
+		return 0
+	var known_for := clampf((Time.get_unix_time_from_system() - r.born) / (KEPT_NEW_HOURS * 3600.0), 0.0, 1.0)
+	return roundi(clampf(maxf(r.kept, 0.0) * (0.25 + 0.75 * known_for), 0.0, 100.0))
+
+
+# The best kept of those living in the room, or null with nobody there
+func best_kept() -> Resident:
+	var best: Resident = null
+	for r in residents:
+		if r.pet != null and not r.leaving and (best == null or kept_score(r) > kept_score(best)):
+			best = r
+	return best
+
+
+# Tells the page which of them is the best kept, for the station's Friday show
+func tell_kept() -> void:
+	kept_timer = 0.0
+	tend(0.0)
+	var best := best_kept()
+	if best == null or not embedded:
+		return
+	kept_told = true
+	_post({"type": "CRYPTLINS_KEPT", "name": best.name, "kind": best.pet.kind_name(), "score": kept_score(best)})
+
+
+# A rosette from the Friday show is pinned on one of them, which wears it from then on: one is
+# taken from stock and the page told. It wears only the best it has been given, so one no better
+# than what it has on is not taken.
+func pin_on(r: Resident, id: String) -> void:
+	var place: int = Items.find(id).get("n", 0)
+	if r.pet == null or place <= 0 or not owns(id) or (r.rosette > 0 and r.rosette <= place):
+		sfx.play("click", 0.7)
+		return
+	r.rosette = place
+	r.pet.wear_rosette(place)
+	r.pet.feel(Cryptlin.Feeling.HAPPY, 3.0)
+	chosen = r
+	sfx.play("jingle", 1.2, -6.0)
+	crumbs(r.pet.body_centre(), Items.ROSETTES[place - 1][1])
+	_spend(id)
+	_sync()
+	save_game()
 
 
 # ---------------------------------------------------------------- how they get on
@@ -794,6 +887,8 @@ func _spawn_pet(r: Resident, at: Vector3) -> void:
 	pet.comfort = comfort_of(pet)
 	pet.left.connect(_on_left.bind(r))
 	r.pet = pet
+	if r.rosette > 0:
+		pet.wear_rosette(r.rosette)
 	_sync()
 
 
@@ -1046,6 +1141,10 @@ func owns(id: String) -> bool:
 	# (what is being put away has a place on it, whatever else)
 	if id == stowing and id != "":
 		return true
+	# (a prize from the Friday show is to be had only from what a host page sends, or from the test
+	# panel: played by itself the game has none)
+	if id in Items.PRIZES and not (dev != null and dev.visible):
+		return embedded and int(stock.get(id, 0)) != 0
 	# (a gravestone is never bought, whatever the page says: it is on the shelf while one has been
 	# put away)
 	if id in Items.KEPT:
@@ -1214,6 +1313,9 @@ func use(id: String) -> void:
 			feed(n)
 		"toy":
 			play_ball(n)
+		"rosette":
+			# (it is pinned on by being carried up to one of them, not by a tap)
+			sfx.play("click", 0.7)
 		"egg":
 			lay_egg()
 		"decor" when id in Items.KEPT:
@@ -2711,6 +2813,9 @@ func _process(delta: float) -> void:
 			Input.vibrate_handheld(30)
 		if carrying:
 			held_pet.carry(hold_point)
+	if grab == Grab.ROSETTE and pin != null:
+		pin.position = pin.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
+		pin.rotation.y = sin(clock * 3.0) * 0.4
 	# The scanner on its way up from the shelf, on the end of the finger
 	if grab == Grab.SCANNER:
 		scanner.scale = Vector3.ONE * 0.8
@@ -2754,6 +2859,15 @@ func _process(delta: float) -> void:
 
 	_aim_camera()
 
+	# How well each is kept is looked to every couple of seconds, and the page told of the best
+	# kept every five minutes
+	tend_timer += delta
+	if tend_timer >= TEND_EVERY:
+		tend(tend_timer)
+		tend_timer = 0.0
+	kept_timer += delta
+	if kept_timer >= KEPT_EVERY:
+		tell_kept()
 	save_timer += delta
 	if save_timer > 10.0:
 		save_game()
@@ -2874,6 +2988,8 @@ func _input(event: InputEvent) -> void:
 			Grab.EGG:
 				if moved > 14.0 and is_instance_valid(held_egg):
 					held_egg.rub()
+			Grab.ROSETTE:
+				hold_point = _held_at(event.position, 0.6)
 			Grab.SCANNER:
 				hold_point = _floor_at(event.position, 0.0, 0.3)
 			Grab.BROOM:
@@ -3080,6 +3196,17 @@ func _pull(id: String, at: Vector2) -> void:
 			held_thing = nest
 			grab = Grab.THING
 			moved = 15.0
+		"rosette":
+			# Carried up to whichever of them it is to be pinned on
+			if pets().is_empty():
+				return
+			grab = Grab.ROSETTE
+			pin_id = id
+			hold_point = _held_at(at, 0.6)
+			pin = Items.rosette(n)
+			pin.scale = Vector3.ONE * 1.6
+			add_child(pin)
+			pin.position = hold_point
 		"tool" when id == "scanner" and not scanning:
 			# Carried up to whichever of them it is let go over
 			grab = Grab.SCANNER
@@ -3132,6 +3259,15 @@ func _release() -> void:
 	light_dragging = false
 	release_time = clock
 	match was:
+		Grab.ROSETTE:
+			if pin != null:
+				pin.queue_free()
+				pin = null
+			var on := _resident_at(last_at)
+			if on != null and on.pet != null and not on.leaving:
+				pin_on(on, pin_id)
+			else:
+				sfx.play("click", 0.7)
 		Grab.TAB:
 			tuck(not shelf.tucked)
 		Grab.SHELF:
@@ -3242,6 +3378,10 @@ func _release() -> void:
 #   out: {type: "CRYPTLINS_READY"}, {type: "CRYPTLINS_USED", item: <id>}
 #        {type: "CRYPTLINS_SHOP"}: the keeper has asked for the ticket counter (the handbook's
 #        Shop button); the game has saved, and expects to be hidden
+#        {type: "CRYPTLINS_KEPT", name: <its name>, kind: <its kind, as "phantom kangaroo">,
+#        score: <0 to 100>}: the best kept of those living in the room (see tend), for the
+#        station's Friday show; sent once the first stock has come, whenever the game rests,
+#        and every five minutes while it is shown, and never with nobody living there
 #   in:  {type: "CRYPTLINS_STOCK", items: {<id>: <how many, or -1 for no end of them>}}
 #        {type: "CRYPTLINS_SHOW"} and {type: "CRYPTLINS_HIDE"}: in front, or covered and left
 # The page loads the game out of sight, so it rests (see rest) until it is first shown.
@@ -3283,13 +3423,20 @@ func _post(message: Dictionary) -> void:
 
 func _message(args: Array) -> void:
 	var data: Variant = JSON.parse_string(str(JavaScriptBridge.get_interface("JSON").stringify(args[0].data)))
-	if not data is Dictionary:
-		return
+	if data is Dictionary:
+		_heard(data)
+
+
+# What the page has said
+func _heard(data: Dictionary) -> void:
 	match data.get("type"):
 		"CRYPTLINS_STOCK":
 			if data.get("items") is Dictionary:
 				stock = data["items"]
 				_sync()
+				# (the first time, it is told in return which of them is the best kept)
+				if not kept_told:
+					tell_kept()
 		"CRYPTLINS_SHOW":
 			shown = true
 			rest(false)
@@ -3308,6 +3455,7 @@ func rest(on: bool) -> void:
 		if finger != -1:
 			_release()
 		save_game()
+		tell_kept()
 		rested_at = Time.get_unix_time_from_system()
 	else:
 		var gone := Time.get_unix_time_from_system() - rested_at
