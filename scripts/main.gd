@@ -138,6 +138,10 @@ var scuffs := {}
 # By item id, for a kind of toy there is no end of whose last one broke: when (unix time) there
 # will be another
 var broken := {}
+# Inside a host page, which of the things given once (Items.ONCE) the keeper has had the one of:
+# the bone that has been fed, the ball that has been brought out (and is the room's from then on,
+# like one that was bought, until it breaks)
+var used := {}
 var saved_toy := {}
 var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
@@ -172,6 +176,8 @@ var embedded := false
 var posted := false
 var stock := {}
 var _on_message: JavaScriptObject
+# What the page is told (see _post), for the tests to hear
+signal told(message: Dictionary)
 # Whether the page has put the game in front yet, and whether it is resting out of sight
 var shown := false
 var resting := false
@@ -294,6 +300,8 @@ func _ready() -> void:
 		pass_time(away)
 		away = 0.0
 	_bridge()
+	if embedded:
+		_keep_own()
 	# A new game, or a room with nobody left in it. Played by itself it is given one egg for
 	# nothing. Inside a host page eggs are the keeper's own, out of the stock the page sends: the
 	# room stands empty until one is laid from the wheel, which shows which thing that is (see
@@ -1040,7 +1048,7 @@ func owns(id: String) -> bool:
 		if Time.get_unix_time_from_system() < float(broken[id]):
 			return false
 		broken.erase(id)
-	return _has_all() or id in Items.FREE or int(stock.get(id, 0)) != 0
+	return _has_all() or id in Items.FREE or left_of(id) != 0
 
 
 # Whether a finger is far enough down the screen to be putting what it holds away: on the wheel,
@@ -1085,7 +1093,9 @@ func in_room_now(id: String) -> bool:
 func left_of(id: String) -> int:
 	if _has_all() or id in Items.FREE:
 		return -1
-	return int(stock.get(id, 0))
+	var bought := int(stock.get(id, 0))
+	# (the one that is given once is one more than was bought, until it has been used)
+	return bought + 1 if bought >= 0 and id in Items.ONCE and not used.has(id) else bought
 
 
 # Everything without end: the game played by itself, or the test panel open (inside a page with
@@ -1095,10 +1105,46 @@ func _has_all() -> bool:
 
 
 func _spend(id: String) -> void:
-	if left_of(id) > 0:
-		stock[id] = left_of(id) - 1
+	if left_of(id) <= 0:
+		return
+	if id in Items.ONCE and not used.has(id):
+		# The one that was given goes first, and is none of the page's business: it is not told
+		used[id] = true
+		save_game()
+	else:
+		stock[id] = int(stock.get(id, 0)) - 1
 		_post({"type": "CRYPTLINS_USED", "item": id})
-		_sync()
+	_sync()
+
+
+# One of a thing that gets used up is put back unused (the page is not told)
+func _unspend(id: String) -> void:
+	if left_of(id) < 0:
+		return
+	if id in Items.ONCE and used.has(id):
+		used.erase(id)
+	else:
+		stock[id] = int(stock.get(id, 0)) + 1
+	_sync()
+
+
+# Inside a host page the ball is given once (Items.ONCE) and is the room's own like one that was
+# bought. One from a save made before that was so, lying on the floor or put away, is that one;
+# a keeper who had neither has theirs still to come, whatever had broken.
+func _keep_own() -> void:
+	for id in Items.ONCE:
+		if Items.find(id)["group"] != "toy":
+			continue
+		if ball != null and not ball.bought and Items.id_of("toy", ball.kind) == id:
+			ball.bought = true
+			used[id] = true
+		elif scuffs.has(id):
+			if not toybox.has(id):
+				toybox[id] = []
+			toybox[id].append(scuffs[id])
+			used[id] = true
+		scuffs.erase(id)
+		broken.erase(id)
 
 
 # A tap on something on the shelf (or its key): the quick way to use it
@@ -1173,6 +1219,10 @@ func _serve(snack: Snack) -> void:
 # Throws a toy in: a given one, or whichever is out already (the ball, if none is)
 func play_ball(which := -1) -> void:
 	if pets().is_empty():
+		sfx.play("click", 0.7)
+		return
+	# (one the keeper has not got is not to be had by asking: nothing is said, it only clicks)
+	if (ball == null or (which >= 0 and which != ball.kind)) and not owns(Items.id_of("toy", maxi(which, 0))):
 		sfx.play("click", 0.7)
 		return
 	if ball != null and which >= 0 and which != ball.kind:
@@ -3054,9 +3104,8 @@ func _release() -> void:
 					# Put away again. One taken up off the floor untouched goes back into what is
 					# left of its kind (the page the game is played in is not told).
 					var id := Items.id_of("food", held_snack.kind)
-					if snack_lying and held_snack.bites_left == Snack.BITES and left_of(id) >= 0:
-						stock[id] = left_of(id) + 1
-						_sync()
+					if snack_lying and held_snack.bites_left == Snack.BITES:
+						_unspend(id)
 					held_snack.queue_free()
 				else:
 					# Let go: it comes inside the walls (and far enough back not to lie under the row
@@ -3150,6 +3199,7 @@ func _inside_a_page() -> bool:
 
 func _post(message: Dictionary) -> void:
 	if embedded:
+		told.emit(message)
 		JavaScriptBridge.eval("window.parent.postMessage(%s, '*')" % JSON.stringify(message), true)
 
 
@@ -3224,6 +3274,7 @@ func save_game() -> void:
 		"toybox": toybox,
 		"scuffs": scuffs,
 		"broken": broken,
+		"used": used.keys(),
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
 		"time": Time.get_unix_time_from_system(),
@@ -3295,6 +3346,9 @@ func _load_game() -> void:
 	if d.get("broken") is Dictionary:
 		for id: String in d["broken"]:
 			broken[id] = float(d["broken"][id])
+	if d.get("used") is Array:
+		for id: Variant in d["used"]:
+			used[str(id)] = true
 	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
 	away = maxf(now - float(d.get("time", now)), 0.0)
 	_muted_at_start = bool(d.get("muted", false))

@@ -694,7 +694,7 @@ func _in_and_out(pet: Cryptlin) -> void:
 	main.embedded = true
 	main.stock = {}
 	main._sync()
-	var free := Items.FREE.filter(func(id: String) -> bool: return not main.in_room_now(id))
+	var free := (Items.FREE + Items.ONCE).filter(func(id: String) -> bool: return not main.in_room_now(id))
 	check(shelf.ids.size() == free.size() and shelf.ids[0] == "scanner" and shelf.ids[1] == "broom" and shelf.ids.back() == "notebook", "with a shop and nothing bought, the wheel holds the tools and what comes free and is not in use (%s)" % ", ".join(shelf.ids))
 	main.stock = {"fish": 1, "stone": 1}
 	main._sync()
@@ -845,7 +845,87 @@ func _toys() -> void:
 	main.stock = {"glow": 0}
 	main._sync()
 	check(main.ball == null and not main.owns("glow") and main.toybox.get("glow", []).is_empty() and not main.broken.has("glow") and not main.shelf.ids.has("glow"), "one that was bought is gone for good when it breaks")
+	# The ball and the bone that every keeper there is given: one of each, and once
+	main.stock = {}
+	main._clear_toys()
+	main._sync()
+	var said: Array = []
+	var hear := func(message: Dictionary) -> void: said.append(message)
+	main.told.connect(hear)
+	check(main.used.is_empty() and main.left_of("ball") == 1 and main.left_of("bone") == 1 and main.shelf.counts.get("ball") == 1 and main.shelf.counts.get("bone") == 1, "inside a host page a keeper has one ball and one bone of their own")
+	pet.belly = 100.0
+	main.feed(Snack.Kind.BONE)
+	check(main.snacks.size() == 1 and main.used.has("bone") and main.left_of("bone") == 0 and not main.owns("bone") and not main.shelf.ids.has("bone") and said.is_empty(), "the bone fed, there is none on the wheel, and the page is not told of it")
+	main.feed(Snack.Kind.BONE)
+	main.use("bone")
+	check(main.snacks.size() == 1 and main.toast.modulate.a == 0.0 and not main._modal(), "there is not another for the asking, and nothing is said about it")
+	main.play_ball(Ball.Kind.BALL)
+	check(main.ball != null and main.ball.bought and main.used.has("ball") and main.left_of("ball") == 0 and said.is_empty(), "the ball brought out is the room's own from then on")
+	main.ball.wear = 30.0
+	main._clear_toys()
+	check(main.shelf.ids.has("ball") and main.shelf.counts.get("ball") == 1 and main.toybox.get("ball", []).size() == 1, "and put away, it is the one on the wheel")
+	await _restart()
+	main.embedded = true
+	main._sync()
+	pet = main.who().pet
+	pet.ball_cooldown = 9999.0
+	check(main.used.has("ball") and main.used.has("bone") and main.owns("ball") and not main.owns("bone") and not main.shelf.ids.has("bone"), "which of them have been had is kept in the save")
+	main.play_ball(Ball.Kind.BALL)
+	check(main.ball != null and is_equal_approx(main.ball.wear, 30.0), "and the ball is as worn as it was")
+	main.ball.wear = Ball.WORN_OUT
+	main.wear_toy(main.ball, pet)
+	check(main.ball == null and not main.owns("ball") and not main.shelf.ids.has("ball") and not main.broken.has("ball") and main.toybox.get("ball", []).is_empty(), "broken, it is gone for good")
+	main.play_ball(Ball.Kind.BALL)
+	main.use("ball")
+	check(main.ball == null and main.toast.modulate.a == 0.0, "with no other to be had for the asking")
+	main.told.connect(hear)
+	main.stock = {"ball": 2, "bone": 3}
+	main._sync()
+	check(main.shelf.counts.get("ball") == 2 and main.shelf.counts.get("bone") == 3, "more of them are what the page says have been bought")
+	main.feed(Snack.Kind.BONE)
+	check(main.left_of("bone") == 2 and said.size() == 1 and said[0].get("item") == "bone", "and those are taken from stock, and the page told")
+	main.used.erase("bone")
+	main._sync()
+	check(main.left_of("bone") == 3 and main.shelf.counts.get("bone") == 3, "bought ones are counted with the one that was given, while that is left")
+	main.stock = {"ball": -1}
+	check(main.left_of("ball") == -1 and main.owns("ball"), "and no end of them is no end of them")
+	# Saves from before they were given only once
+	main.stock = {}
+	main.used.clear()
+	main._clear_toys()
+	main.scuffs["ball"] = 40.0
+	main.broken["ball"] = Time.get_unix_time_from_system() + 3600.0
+	main._keep_own()
+	main._sync()
+	check(main.used.has("ball") and main.toybox.get("ball", []) == [40.0] and main.scuffs.is_empty() and main.broken.is_empty() and main.shelf.counts.get("ball") == 1 and main.left_of("bone") == 1, "a ball that was put away in an older save is the keeper's one, as worn as it was, and their bone is still to come")
+	main.toybox.clear()
+	main.used.clear()
+	main.broken["ball"] = Time.get_unix_time_from_system() + 3600.0
+	main._keep_own()
+	check(main.left_of("ball") == 1 and main.owns("ball") and main.broken.is_empty(), "a keeper whose ball had broken before then has the one")
 	main.embedded = false
+	main.play_ball(Ball.Kind.BALL)
+	main.ball.wear = 55.0
+	check(not main.ball.bought, "(played by itself the ball is one of a kind there is no end of)")
+	main.save_game()
+	main.queue_free()
+	await _frames(3)
+	main = load("res://main.tscn").instantiate()
+	main.save_path = save
+	main.ask_names = false
+	main.embedded = true
+	root.add_child(main)
+	await _frames(5)
+	check(main.ball != null and main.ball.bought and is_equal_approx(main.ball.wear, 55.0) and main.used.has("ball") and main.left_of("ball") == 0 and not main.shelf.ids.has("ball") and main.left_of("bone") == 1, "a ball that was out on the floor in an older save is the keeper's one")
+	main._clear_toys()
+	main.toybox.clear()
+	main.used.clear()
+	main.embedded = false
+	main._sync()
+	pet = main.who().pet
+	main.feed(Snack.Kind.BONE)
+	check(main.left_of("bone") == -1 and main.owns("ball") and main.used.is_empty() and main.shelf.ids.has("bone") and not main.shelf.counts.has("bone"), "played by itself there is no end of either, as ever")
+	main._clear_toys()
 	for m in main.messes.duplicate():
 		main.clear_mess(m)
 	main._sync()

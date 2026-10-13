@@ -109,11 +109,21 @@ a third of the way gone the toy is scuffed and dull, and far gone it is patched 
 some of its bounce. Worn right out it comes apart at the next kick (`Den.break_toy`): a snap, the pieces flying,
 whichever of them is near by pleased with itself or startled as its nature has it, and the bits left on the floor
 as a mess for the broom. Three of them with the ball out get through it in about half an hour of play, one alone
-in some hours: days of ordinary visits. A broken toy does not go back on the wheel. Played by itself (and for the
-ball, which is free everywhere) there is another of its kind twelve hours later (`TOY_AGAIN_HOURS`). Inside a host
+in some hours: days of ordinary visits. A broken toy does not go back on the wheel. Played by itself there is
+another of its kind twelve hours later (`TOY_AGAIN_HOURS`). Inside a host
 page a bought toy is taken from the stock when it is first brought out (the page is told, as for food and eggs)
 and is the room's own from then on, kept in the save whether it is on the floor or put away; when it breaks it is
 gone for good. How worn a toy is goes with it when it is put away.
+
+**The ball and the bone are given once.** Inside a host page every keeper has one ball and one bone of their own
+(`Items.ONCE`), and they do not come back: the bone is gone when it is fed, and the ball is the room's own from the
+moment it is first brought out, like a toy that was bought, and gone for good when it breaks. `used` in the save is
+which of the two have been had. More come only from the page's stock (ids `ball` and `bone`): a count the page sends
+is added to the one that was given while that is left (`Den.left_of`), the given one is used first and the page is
+not told of it, and -1 is no end of them. With none left the wheel simply has no bone or no ball on it; nothing is
+said. A save from before this keeps a ball that was on the floor or put away as its one (`Den._keep_own`), and one
+that had neither is given its one. Played by itself nothing has changed: there is no end of food, and another ball
+twelve hours after one breaks, as for every other toy. The test panel has everything, as ever.
 
 ## More than one
 The room holds up to four, eggs and cryptlins together. Played by itself a new game starts with one egg, and the
@@ -270,7 +280,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `residents` is the list of those that live there (`scripts/resident.gd`: an egg or a cryptlin, and what the save
   keeps of it), `pets()` the cryptlins among them, and `who()` the one in question when a single one is meant (the
   one last tapped or scanned, or else the eldest). `comfort_of()` is how well the room suits a cryptlin; `learned()`
-  is told when one has shown one of its tastes. The save is version 3 (`residents` is a list; `toy` is the toy on the floor, with where it is, how worn and whether it was bought, `toybox` the bought toys that are put away, by item id, each with its wear, `scuffs` the wear on the put-away one of each kind there is no end of, and `broken` when another of such a kind is to be had: a save without them loads with no toy out and every toy as new); a version 2 save, of
+  is told when one has shown one of its tastes. The save is version 3 (`residents` is a list; `toy` is the toy on the floor, with where it is, how worn and whether it was bought, `toybox` the bought toys that are put away, by item id, each with its wear, `scuffs` the wear on the put-away one of each kind there is no end of, `broken` when another of such a kind is to be had, and `used` which of the things given once inside a host page have been had: a save without them loads with no toy out and every toy as new); a version 2 save, of
   one cryptlin or one egg, loads as a room with that one in it. Each resident in the list holds `id`, `name`,
   `kind`, `seed`, `hatched`, `born`, `warmth`, `at`, `needs` (health among them), `known`, `regard` (what it thinks
   of each of the others, by their ids), `parents` and `parent_names`, `fur`, `nature` and `looks` (what it has from them),
@@ -320,7 +330,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..29]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes and the broom that sweeps them up, what is on the wheel and what is out in the room, toys wearing out and breaking, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the squatchling's build and its look back, the jackalope hopping, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, the notebook fitting a wide screen and an upright one, old saves, eggs as stock and the empty room inside a host page, and the kind's knack
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..29]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes and the broom that sweeps them up, what is on the wheel and what is out in the room, toys wearing out and breaking, the ball and the bone that are given once inside a host page, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the squatchling's build and its look back, the jackalope hopping, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, the notebook fitting a wide screen and an upright one, old saves, eggs as stock and the empty room inside a host page, and the kind's knack
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait|--size=WxH] [--seed=N] [--kind=0..29] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--tidy|--book [--fresh]|--knack|--walk [--baby]|--variety [--with=K [--over]] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]|--poses [--baby]|--strides [--baby]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, the wheel before and after a thing is stood in the room with the broom at work and toys worn and breaking (--tidy), every leaf of the notebook with four in the room (--book), the kind at its knack, the kind walking across the room and away up it (with the squatchling's look back over its shoulder), one sheet of twelve of the kind, each of another seed, or one of the kind close to, stood, turned, walking, eating, held and asleep (--poses) or at so many moments of going across the room (--strides)
 godot --headless --path . --export-release Web build/index.html
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots --pool [--portrait] [--kind=N]   # four in a room with the pool: each place it fits, each lamp, one let go over the middle of it, food and a toy afloat, a drink at the edge, and all asleep
