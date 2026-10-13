@@ -25,6 +25,8 @@ uniform float rows = 2.5;
 uniform float streak = 0.45;
 uniform float root_shade = 0.4;
 uniform float tip_bleach = 0.18;
+// What the darker of it is tinted, for a pale coat that wants colour in its shadows
+uniform vec3 shadow : source_color = vec3(1.0);
 // Where its face is: this far round from the front (0 to 1, the middle of the back) and from
 // this far down, the hair is cut to `face_hair` of its length so that its eyes show
 uniform float face = 0.0;
@@ -79,7 +81,8 @@ void fragment() {
 		}
 	}
 	vec3 c = tint * texture(tex, uv).rgb * gain;
-	c *= (1.0 + (strand - 0.5) * streak) * mix(1.0 - root_shade, 1.0 + tip_bleach, shell);
+	float lit = (1.0 + (strand - 0.5) * streak) * mix(1.0 - root_shade, 1.0 + tip_bleach, shell);
+	c *= lit * mix(shadow, vec3(1.0), smoothstep(0.55, 1.0, lit));
 	ALBEDO = c;
 	EMISSION = c * glow;
 	ROUGHNESS = 1.0;

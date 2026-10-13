@@ -30,7 +30,7 @@ eggs are all plain eggs, a little rounder or taller by their kind; what is paint
 | Toadstool | **living fungus** | A toadstool that got up and walked: a wide spotted cap on a pale stalk. Slow, quiet, eats little. |
 | Dappled | **jackalope** | A hare with a buck's antlers coming in. The most spring of anything here, and the zoomies to go with it. |
 | Starry | **alien** | A head too big for its body, long thin hands, and two black eyes with a light far down in each. Stares most of all. |
-| Frosted | **yeti** | A snow-ape's cub: white and shaggy, with a blue face, hands and feet, and arms it could trip over. Heavy, deep-voiced, hungry. |
+| Frosted | **yeti** | A yeti of the gentle sort: a huge soft pear of thick white shaggy fur with no neck and sloping shoulders, a small bare tan face set low on it (a broad flat nose, a wide thick-lipped mouth, small friendly eyes under a heavy brow), big hands on long heavy arms that hang to the ground, and short thick legs. Off-white, with blue in the shadows of its coat. A baby is a ball of fluff with the same little face. Heavy, lumbering, deep-voiced, hungry. |
 | Ember-veined | **Cerberus** | Three heads on one pup. The middle one leads and the other two follow it round. Always hungry. |
 | Tunnelled | **mole person** | One of the people from under the ground: stout and velvety, with spade hands far too big for it, a pink star for a nose and tiny pale eyes. Slow and short-sighted (it does not see a toy or the moving light until they are close), hides readily, and digs far more than the rest, whatever the floor, though it likes dirt best. Wants the lamp low, is as happy with it off, and is never at ease under the bright one. |
 
@@ -229,7 +229,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   drawn one dot to one dot of that picture. Because the room is drawn smaller than the screen, touches go through
   `Den._in_view()` before any camera ray, and `Den.screen_of()` goes the other way.
 - The eyes are emissive and the room has almost no ambient light, so outside the beam the eyes are all that shows.
-- `shaders/fur.gdshader` (through `Ps1.fur`): long hair, for the kinds that are mostly hair. The coat is streaked down the lie of the hair and drawn again a few times over, each layer pushed further off the skin, left to hang and with more of it cut away, so that what is left stands off the body in ragged locks; nothing in it is see-through. The scanner takes the layers off with the coat and puts them back.
+- `shaders/fur.gdshader` (through `Ps1.fur` and `Cryptlin._shaggy`): long hair, for the kinds that are mostly hair (the squatchling, and the yeti, whose coat is tinted blue in its shadows). The coat is streaked down the lie of the hair and drawn again a few times over, each layer pushed further off the skin, left to hang and with more of it cut away, so that what is left stands off the body in ragged locks; nothing in it is see-through. The scanner takes the layers off with the coat and puts them back.
 - `shaders/beam.gdshader`: the haze in the beam. `shaders/floor.gdshader`: the grounds, from world position.
   `shaders/brick.gdshader`: the walls. No art or audio files anywhere: `scripts/sfx.gd` synthesises every sound at
   start-up.
@@ -245,7 +245,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the bolter, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock and the empty room inside a host page
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock and the empty room inside a host page
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots --pool [--portrait] [--kind=N]   # four in a room with the pool: each place it fits, each lamp, one let go over the middle of it, food and a toy afloat, a drink at the edge, and all asleep

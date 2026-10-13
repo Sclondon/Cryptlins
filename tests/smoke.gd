@@ -215,6 +215,28 @@ func _whale(pet: Cryptlin) -> void:
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 
 
+# The yeti: a coat of the long hair, off-white (never so pale as to be one flat white under the
+# lamp) with blue in its shadows; a ball of fluff newly hatched, which grows into a pear with
+# its shoulders higher and its arms longer
+func _snowball(pet: Cryptlin) -> void:
+	var tint: Color = pet.fur.get_shader_parameter("tint")
+	var shadow: Color = pet.fur.get_shader_parameter("shadow")
+	check(pet.fur.shader == Ps1.FUR and pet.fur.next_pass != null and maxf(tint.r, maxf(tint.g, tint.b)) < 0.85 and shadow.b > shadow.r, "its coat is long hair, off-white, with blue in its shadows")
+	var was := pet.get_needs()
+	pet.set_needs({"age": 0.0})
+	pet.grow = pet.size_goal()
+	await _frames(3)
+	var ball := pet.podge.scale.y
+	var low := pet.shoulders.position.y
+	var short := pet.arms[0].scale.y
+	pet.set_needs({"age": Cryptlin.GROW_AGE})
+	pet.grow = pet.size_goal()
+	await _frames(3)
+	check(ball < pet.podge.scale.y * 0.8 and low < pet.shoulders.position.y - 0.1 and short < pet.arms[0].scale.y, "a baby is a ball of fluff, and grows into its shape")
+	pet.set_needs(was)
+	pet.grow = pet.size_goal()
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -618,6 +640,8 @@ func _run() -> void:
 		await _serpent(pet)
 	if pet.heave > 0.0:
 		await _whale(pet)
+	if pet.podge != null:
+		await _snowball(pet)
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name
@@ -858,7 +882,8 @@ func _run() -> void:
 	# Dragging something about the floor, and back to the shelf
 	var thing := main.decor_of(liked)
 	thing.position = Vector3(-1.2, 0, 0.6)
-	pet.position = Vector3(1.4, 0, -0.5)
+	# (well out of the way: a big one is easy to catch hold of by mistake)
+	pet.position = Vector3(-2.2, 0, -1.6)
 	pet._enter(Cryptlin.State.IDLE, 6.0)
 	await _frames(2)
 	await _slide(_screen(thing.position + Vector3(0, 0.2, 0)), _screen(Vector3(0.9, 0, 1.0)))
@@ -891,6 +916,7 @@ func _run() -> void:
 	var rock := main.place_decor(Decor.Kind.ROCK, Vector3(0.8, 0, -0.6))
 	await _until(func() -> bool: return _settled(pet), 900)
 	pet._enter(Cryptlin.State.VISIT)
+	pet.visiting = rock
 	check(await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.lift > 0.3, 900), "and climbs up to sit on the rock")
 	main.remove_decor(rock)
 	# A pool: half the floor under water. A water kind is not at home without one; the rest take it or leave it

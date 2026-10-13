@@ -340,6 +340,14 @@ var gut_stretch := Vector3.ONE
 # one that drags itself along on its belly bunches up and stretches out as it goes
 var head_turn := 1.25
 var heave := 0.0
+# A body that is rounder on a baby (the yeti's, a ball of fluff that grows into its shape): the
+# body and its size grown and newly hatched, what carries its arms and head, how far that is
+# lower on a baby, and how long its arms are grown
+var podge: MeshInstance3D
+var podge_sizes: Array[Vector3] = []
+var shoulders: Node3D
+var baby_sink := 0.0
+var reach := 1.0
 # What is its own about its shape (see looks()): the size of its head, of each eye, and of what
 # its kind wears on its head or back; how far longer legs raise its body, and whether it goes on
 # four of them; where a tuft would grow on its head; what is painted on its coat (the marking,
@@ -952,7 +960,7 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 	gravity = 15.0
 	brain_at = Vector3(0, 0.4, 0.04)
 	crown = Vector3(0, 0.52, 0)
-	_shaggy(3, 0.15, {"hang": 0.9, "face": 0.2, "face_from": 0.42})
+	fur = _shaggy(fur_colour * 0.76, 3, 0.15, {"hang": 0.9, "face": 0.2, "face_from": 0.42})
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.18 * side, 0.24, 0.02))
 		_part(leg, _capsule(0.07, 0.24), dark, Vector3(0, -0.1, 0))
@@ -1005,12 +1013,13 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.11, 0.06, 0.04))
 
 
-# Turns its coat to long hair that hangs off it in locks (see Ps1.fur), keeping what is painted
-# on it: `shells` layers of it, the longest `hair` off the skin in the measure of what wears it
-func _shaggy(shells: int, hair: float, values := {}) -> void:
-	var coat := Ps1.fur(fur_colour * 0.76, shells, hair, values)
+# Its coat as long hair of this colour that hangs off it in locks (see Ps1.fur), with whatever is
+# painted on it: `shells` layers of it, the longest `hair` off the skin in the measure of the
+# mesh that wears it
+func _shaggy(colour: Color, shells: int, hair: float, values := {}) -> ShaderMaterial:
+	var coat := Ps1.fur(colour, shells, hair, values)
 	Ps1.comb(coat, {"tex": fur.get_shader_parameter("tex"), "gain": fur.get_shader_parameter("gain")})
-	fur = coat
+	return coat
 
 
 # The cockatrice is the serpent. It rises from behind a stuffed rooster that it carries in front
@@ -1887,55 +1896,66 @@ func _build_alien(chub: float) -> void:
 	_part(mouth_node, _sphere(), black, Vector3.ZERO, Vector3(0.04, 0.025, 0.02))
 
 
-# A snow-ape's cub: white and shaggy, with a blue face, blue hands and feet, two nubs of horn,
-# and arms it could trip over
+# A yeti of the gentle sort: a huge soft pear of thick white fur with no neck and sloping
+# shoulders, a small bare tan face set low on it (a broad flat nose, a wide thick-lipped mouth,
+# small friendly eyes under a heavy brow), big hands on long heavy arms that hang to the ground,
+# and short thick legs. A baby is a ball of fluff with the same little face (see `podge`).
 func _build_yeti(chub: float, rng: RandomNumberGenerator) -> void:
-	neck_y = 0.6
-	centre_y = 0.46
-	top_y = 1.16
+	neck_y = 0.64
+	head_y = 0.12
+	centre_y = 0.48
+	top_y = 1.06
 	gravity = 14.0
-	var blue := Ps1.mat(Color(0.3, 0.46, 0.66), 0.0, 0.35)
+	head_turn = 0.7
+	brain_at = Vector3(0, 0.17, 0.02)
+	crown = Vector3(0, 0.36, 0.0)
+	# Off-white, and blue in the shadows of its coat, so that it is never one flat white under
+	# the bright lamp. The coat on what is lathed or a capsule is measured as it stands; on a
+	# ball, which is drawn a quarter of the size, the same hair is four times as long.
+	var frost := {"shadow": Color(0.74, 0.84, 1.0), "tip_bleach": 0.05, "root_shade": 0.3, "streak": 0.3, "locks": 12.0, "rows": 3.0}
+	fur = _shaggy(fur_colour * 0.8, 3, 0.1, frost)
+	var fluff := _shaggy(fur_colour * 0.8, 3, 0.36, frost.merged({"face": 0.2, "face_from": 0.36, "face_hair": 0.1}))
+	var tan := Ps1.mat(Color(0.56, 0.42, 0.3), 0.0, 0.3)
+	var lip := Ps1.mat(Color(0.4, 0.27, 0.2), 0.0, 0.3)
 	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(self, Vector3(0.16 * side, 0.2, 0))
-		_part(leg, _sphere(), fur, Vector3(0, -0.03, 0), Vector3(0.12, 0.15, 0.12))
-		_part(leg, _sphere(), blue, Vector3(0, -0.155, 0.07), Vector3(0.11, 0.045, 0.17))
+		var leg := _pivot(self, Vector3(0.17 * side, 0.2, 0.02))
+		_part(leg, _capsule(0.11, 0.26), fur, Vector3(0, -0.05, 0))
+		_part(leg, _sphere(), tan, Vector3(0, -0.16, 0.08), Vector3(0.12, 0.045, 0.18))
 		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
-	_part(torso, _sphere(), fur, Vector3(0, 0.42, 0), Vector3(0.34 * chub, 0.32, 0.3 * chub))
-	# Shag hangs off it all round in two rows, light and lighter
-	for i in 18:
-		var around := TAU * (i + 0.5 * (i % 2)) / 18.0
-		var high := 0.5 if i % 2 == 0 else 0.32
-		var wide := 0.27 if i % 2 == 0 else 0.31
-		var lie := Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, PI - 0.3)
-		var hank := _part(torso, _cone(), pale if i % 3 == 0 else fur, Vector3.ZERO)
-		var long := rng.randf_range(0.14, 0.22)
-		hank.basis = lie * Basis.from_scale(Vector3(0.075, long, 0.04))
-		hank.position = Vector3(sin(around) * wide * chub, high, cos(around) * wide * 0.88 * chub) + lie * Vector3(0, long * 0.5, 0)
-	tail = _pivot(torso, Vector3(0, 0.3, -0.26 * chub))
-
+	var pear: Array[Vector2] = [
+		Vector2(0.28, 0.0), Vector2(0.4, 0.07), Vector2(0.45, 0.2), Vector2(0.43, 0.35), Vector2(0.36, 0.5),
+		Vector2(0.28, 0.63), Vector2(0.2, 0.73), Vector2(0.1, 0.8), Vector2(0.0, 0.82),
+	]
+	podge = _part(torso, _lathe(pear, 12), fur, Vector3(0, 0.1, 0), Vector3(chub, 1.0, 0.9 * chub))
+	podge_sizes = [podge.scale, Vector3(0.92 * chub, 0.7, 0.9 * chub)]
+	tail = _pivot(torso, Vector3(0, 0.3, -0.36 * chub))
+	# Its shoulders, which carry its arms and its head, and are a good deal lower on a baby
+	shoulders = _pivot(torso, Vector3.ZERO)
+	baby_sink = 0.2
 	for side: float in [-1.0, 1.0]:
-		var a := _pivot(torso, Vector3(0.33 * chub * side, 0.62, 0.02))
-		_part(a, _capsule(0.075, 0.42), fur, Vector3(0, -0.17, 0))
-		_part(a, _cone(), pale, Vector3(0, -0.3, -0.03), Vector3(0.08, 0.16, 0.05), Vector3(PI, 0, 0))
-		_part(a, _sphere(), blue, Vector3(0, -0.4, 0.01), Vector3(0.09, 0.08, 0.09))
+		var a := _pivot(shoulders, Vector3(0.37 * chub * side, 0.68, 0.07))
+		_part(a, _capsule(0.085, 0.4), fur, Vector3(0.02 * side, -0.16, 0))
+		_part(a, _capsule(0.1, 0.34), fur, Vector3(0.04 * side, -0.4, 0.01))
+		_part(a, _sphere(), tan, Vector3(0.05 * side, -0.57, 0.03), Vector3(0.11, 0.085, 0.12))
 		arms.append(a)
 
-	neck = _pivot(torso, Vector3(0, neck_y, 0.04))
-	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.28, 0.25, 0.26))
-	_part(neck, _sphere(), blue, Vector3(0, 0.17, 0.12), Vector3(0.19, 0.16, 0.16))
-	_part(neck, _sphere(), fur, Vector3(0, 0.3, 0.16), Vector3(0.2, 0.06, 0.1))
-	_part(neck, _sphere(), dark, Vector3(0, 0.16, 0.285), Vector3(0.03, 0.022, 0.02))
+	neck = _pivot(shoulders, Vector3(0, neck_y, 0.05))
+	_part(neck, _sphere(), fluff, Vector3(0, 0.13, 0), Vector3(0.27, 0.25, 0.26))
+	# The face, low on the front of it
+	_part(neck, _sphere(), tan, Vector3(0, 0.07, 0.15), Vector3(0.16, 0.13, 0.12))
+	_part(neck, _sphere(), fluff, Vector3(0, 0.17, 0.2), Vector3(0.17, 0.05, 0.08))
+	_part(neck, _sphere(), lip, Vector3(0, 0.075, 0.265), Vector3(0.062, 0.03, 0.035))
+	_part(neck, _sphere(), lip, Vector3(0, 0.0, 0.235), Vector3(0.115, 0.04, 0.05))
+	var knot := neck.get_child_count()
 	for i in 3:
-		_part(neck, _cone(), pale, Vector3((i - 1) * 0.07, 0.47, 0.02), Vector3(0.05, 0.14, 0.04), Vector3(0.3, 0, (i - 1) * -0.4))
+		_spike(neck, pale, Vector3((i - 1) * 0.06, 0.33, -0.02), Vector3((i - 1) * 0.5 + rng.randf_range(-0.2, 0.2), 1.0, -0.4), rng.randf_range(0.1, 0.16), 0.045)
+	_swell(neck, knot, Vector3(0, 0.33, 0), Vector3.ONE * crest)
 	for side: float in [-1.0, 1.0]:
-		_part(neck, _cone(), blue, Vector3(0.21 * side, 0.4, 0), Vector3(0.045, 0.14, 0.045), Vector3(0, 0, -0.6 * side))
-		_swell(neck, neck.get_child_count() - 1, Vector3(0.17 * side, 0.34, 0), Vector3.ONE * crest * _snapped(side))
-		_eye(Vector3(0.085 * side, 0.21, 0.245), 0.055)
-		_part(neck, _cone(), bone, Vector3(0.05 * side, 0.1, 0.265), Vector3(0.018, 0.05, 0.018))
-	mouth_node = _pivot(neck, Vector3(0, 0.07, 0.265))
-	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.09, 0.045, 0.04))
+		_eye(Vector3(0.068 * side, 0.115, 0.255), 0.032)
+	mouth_node = _pivot(neck, Vector3(0, 0.0, 0.275))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.09, 0.04, 0.03))
 
 
 # Three heads on one pup, each with a mind of its own and all of them hungry
@@ -2115,6 +2135,7 @@ func _shape_up() -> void:
 		leg.scale.y = limb
 	for a in arms:
 		a.scale.y = (a.position.y + stand) / a.position.y if fours else lerpf(1.0, limb, 0.6)
+	reach = arms[0].scale.y
 	gut *= minf(span(kind, "build", shape["build"]) + 0.06, 1.0)
 
 	var lip := mouth_node.position
@@ -4244,7 +4265,13 @@ func _animate(delta: float) -> void:
 	# A baby is small with a big head, and grows into its size
 	grow = move_toward(grow, size_goal(), delta * 0.25)
 	scale = Vector3.ONE * grow
-	neck.scale = Vector3.ONE * head_size * lerpf(1.0, 1.28, clampf(inverse_lerp(adult_size, BABY_SIZE, grow), 0.0, 1.0))
+	var young := clampf(inverse_lerp(adult_size, BABY_SIZE, grow), 0.0, 1.0)
+	neck.scale = Vector3.ONE * head_size * lerpf(1.0, 1.28, young)
+	if podge != null:
+		podge.scale = podge_sizes[0].lerp(podge_sizes[1], young)
+		shoulders.position.y = -baby_sink * young
+		for a in arms:
+			a.scale.y = reach * lerpf(1.0, 0.72, young)
 
 	arm = arm.lerp(arm_goal, ease_fast)
 	var wave := sin(anim_t * 9.0) * arm_wave
