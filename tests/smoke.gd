@@ -222,6 +222,52 @@ func _serpent(pet: Cryptlin) -> void:
 	pet.wiggle = 0.0
 
 
+# One that hops (the jackalope) does not walk: going anywhere it leaves the ground and comes
+# down again, over and over, it covers the ground it would have covered at a walk, and it keeps
+# its feet on the floor when it is standing still
+func _hopper(pet: Cryptlin) -> void:
+	pet.position = Vector3(-1.3, 0, 0.5)
+	pet.velocity = Vector3.ZERO
+	pet._enter(Cryptlin.State.IDLE, 5.0)
+	await _frames(20)
+	var still := 0.0
+	for i in 60:
+		await process_frame
+		still = maxf(still, maxf(pet.hop_y, pet.hop_t))
+	check(still == 0.0, "standing still, it does not hop")
+	pet.target = Vector3(1.4, 0, 1.1)
+	pet._enter(Cryptlin.State.WANDER)
+	var from := pet.position
+	var meant := 0.0
+	var high := 0.0
+	var ups := 0
+	var downs := 0
+	var up := false
+	var stopped := 0.0
+	for i in 100:
+		var before := pet.position
+		await process_frame
+		if pet.state != Cryptlin.State.WANDER:
+			break
+		meant += Vector2(pet.velocity.x, pet.velocity.z).length() / 60.0
+		high = maxf(high, pet.hop_y)
+		if pet.hop_y <= 0.0 and Vector2(pet.velocity.x, pet.velocity.z).length() > 0.5:
+			stopped = maxf(stopped, 1.0 if pet.position.distance_to(before) < 0.002 else 0.0)
+		if pet.hop_y > 0.04 and not up:
+			up = true
+			ups += 1
+		if pet.hop_y <= 0.0 and up:
+			up = false
+			downs += 1
+	var went := Vector2(pet.position.x - from.x, pet.position.z - from.z).length()
+	check(ups >= 3 and downs >= 2 and high > 0.06 and stopped > 0.0, "going somewhere, it hops: off the ground and down again (%d times, %.2f high), with a pause between" % [ups, high])
+	check(went > 1.0 and went > meant * 0.88 and went < meant * 1.12, "and it covers the ground it did at a walk (%.2f of %.2f)" % [went, meant])
+	pet.velocity = Vector3.ZERO
+	pet._enter(Cryptlin.State.IDLE, 2.0)
+	await _frames(40)
+	check(pet.hop_y == 0.0 and pet.hop_t == 0.0, "and is down and still again when it stops")
+
+
 # Whether the cockatrice's snake and its dummy are joined: the first joint of the snake is where
 # the dummy hangs from, and that is inside the dummy's body
 func _joined(pet: Cryptlin) -> bool:
@@ -1176,6 +1222,8 @@ func _run() -> void:
 		await _tracker(pet)
 	if pet.decoy != null:
 		await _serpent(pet)
+	if pet.hops != "":
+		await _hopper(pet)
 	if pet.heave > 0.0:
 		await _whale(pet)
 	if pet.podge != null:

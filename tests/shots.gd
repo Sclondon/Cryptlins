@@ -1,6 +1,6 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]|--poses [--baby]|--strides [--baby]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --scan: the
 ## scanner on the wheel, on the finger, and pointed at a grown one, a baby and an egg. With --faces:
@@ -698,8 +698,7 @@ func _run_close() -> void:
 					pet.boop()
 			for i in 8:
 				tiles.append(await _tile(pet))
-				for frame in (3 if pace < 2 else 5):
-					await process_frame
+				await _wait(0.05 if pace < 2 else 0.09)
 	else:
 		for turn: float in [0.0, 70.0, 180.0, 250.0]:
 			pet.position = spot
@@ -752,8 +751,8 @@ func _tile(pet: Cryptlin) -> Image:
 	var shot := root.get_texture().get_image()
 	shot.convert(Image.FORMAT_RGB8)
 	var scale := Vector2(shot.get_size()) / main.get_viewport().get_visible_rect().size
-	var size := Vector2i(250, 220)
-	var mid := Vector2i(main.screen_of(Vector3(pet.position.x, 0.62 + pet.lift, pet.position.z)) * scale)
+	var size := Vector2i(260, 300)
+	var mid := Vector2i(main.screen_of(Vector3(pet.position.x, 0.8 + pet.lift + pet.jump_y * 0.6, pet.position.z)) * scale)
 	var piece := Image.create(size.x, size.y, false, Image.FORMAT_RGB8)
 	piece.blit_rect(shot, Rect2i(mid - size / 2, size).intersection(Rect2i(Vector2i.ZERO, shot.get_size())), Vector2i.ZERO)
 	return piece

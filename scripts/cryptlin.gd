@@ -346,6 +346,18 @@ var gut_stretch := Vector3.ONE
 # one that drags itself along on its belly bunches up and stretches out as it goes
 var head_turn := 1.25
 var heave := 0.0
+# One that hops where the rest walk, and in what manner ("rabbit"; nothing for one that walks:
+# see _hop): how far through the hop it is on (0 between hops), how long that hop takes, how
+# high it goes and how much of a run it is, which way a clumsy one tips over in it, how far off
+# the floor it is just now, and how far what trails after it is lagging
+var hops := ""
+var hop_t := 0.0
+var hop_len := 0.4
+var hop_high := 0.0
+var hop_run := 0.0
+var hop_tip := 0.0
+var hop_y := 0.0
+var hop_lag := 0.0
 # A body that is rounder on a baby (the yeti's, a ball of fluff that grows into its shape): the
 # body and its size grown and newly hatched, what carries its arms and head, how far that is
 # lower on a baby, and how long its arms are grown
@@ -1837,6 +1849,7 @@ func _build_fungus(chub: float, rng: RandomNumberGenerator) -> void:
 
 # A hare with a buck's antlers coming in: long ears, long feet, a scut, and a great deal of spring
 func _build_jackalope(chub: float, ear_len: float) -> void:
+	hops = "rabbit"
 	neck_y = 0.46
 	head_y = 0.18
 	centre_y = 0.36
@@ -4279,8 +4292,10 @@ func _keep_off_others(delta: float) -> void:
 
 
 func _move(delta: float) -> void:
-	position.x += velocity.x * delta
-	position.z += velocity.z * delta
+	# (one that hops covers its ground in the hops, and none of it between them)
+	var go := delta * (_hop_drive() if hops != "" else 1.0)
+	position.x += velocity.x * go
+	position.z += velocity.z * go
 	if state != State.LEAVE and state != State.DYING:
 		# It walks round the things in its tank, and stays inside the walls
 		if lift <= 0.05:
@@ -4317,6 +4332,130 @@ func _move(delta: float) -> void:
 	rotation.y = yaw
 
 
+# ---------------------------------------------------------------- hopping
+
+# Whether one that hops is going about on its own feet just now, and so in hops: not while it is
+# held up, thrown into the air, skidding from a shove, in a fight or out of its depth
+func _hops_now() -> bool:
+	return hops != "" and lift <= 0.05 and not airborne and not state in [State.HELD, State.SHOVED, State.FLOUNDER, State.SCUFFLE, State.DYING] and _sunk() > -0.02
+
+
+# Of a hop, the part of it that is gone when it leaves the ground, and the part it takes to
+# settle once it is down again
+const HOP_OFF := 0.14
+const HOP_SETTLE := 0.14
+
+
+# How far through a hop it comes down again: sooner in a lolloping hop, which has a pause after
+# it, than in a bound at a run, which has next to none
+func _hop_down() -> float:
+	return lerpf(0.66, 0.84, hop_run)
+
+
+# How much of its speed over the ground it has at this moment of a hop: none while it gathers
+# itself and none in the pause after, and the more for it in between, so that over a whole hop
+# it covers the same ground as one that walks at that speed
+func _hop_drive() -> float:
+	if not _hops_now():
+		return 1.0
+	var from := HOP_OFF * 0.4
+	var to := _hop_down() + HOP_SETTLE * 0.5
+	var u := inverse_lerp(from, to, hop_t)
+	return 6.0 * u * (1.0 - u) / (to - from) if hop_t > 0.0 and u > 0.0 and u < 1.0 else 0.0
+
+
+# The gait of one that hops where the rest walk (`hops`, set by its kind's build function). This
+# keeps the time of it: the hop begins when it wants to be moving, is short and small at a walk
+# and long and low at a run, shorter and clumsier for a baby, and ends with it down again and
+# still for a moment; what is keyed to a step (a print, the squash of landing) is keyed to coming
+# down. How it holds itself through the hop is its own manner's business: see _hop_rabbit.
+func _hop(delta: float) -> void:
+	var speed := Vector2(velocity.x, velocity.z).length()
+	var young := clampf(inverse_lerp(adult_size, BABY_SIZE, grow), 0.0, 1.0)
+	var down := _hop_down()
+	var before := hop_t
+	if not _hops_now():
+		hop_t = 0.0
+	elif hop_t > 0.0:
+		hop_t += delta / hop_len
+		if before < down and hop_t >= down:
+			squash_v += 1.4 + young
+			if likes.has("print"):
+				for side: float in [-1.0, 1.0]:
+					world.leave_print(str(likes["print"]), global_transform * Vector3(absf(legs[0].position.x) * side, 0, 0.1), yaw + 0.2 * side, side, grow)
+		if hop_t >= 1.0:
+			hop_t = fmod(hop_t, 1.0) if speed > 0.08 else 0.0
+			before = 0.0
+	elif speed > 0.08:
+		hop_t = 0.0001
+	if hop_t > 0.0 and before <= 0.0:
+		hop_run = clampf((speed - 1.5) / 1.6, 0.0, 1.0)
+		hop_len = lerpf(0.44, 0.33, hop_run) * lerpf(1.0, 0.72, young)
+		hop_high = lerpf(0.12, 0.16, hop_run) * clampf(speed, 0.3, 1.0) * lerpf(1.0, randf_range(0.8, 1.7), young)
+		hop_tip = randf_range(-0.35, 0.35) * young
+	var air := clampf(inverse_lerp(HOP_OFF, _hop_down(), hop_t), 0.0, 1.0) if hop_t > 0.0 else 0.0
+	hop_y = sin(air * PI) * hop_high
+	# What trails after it (ears, antlers, a tail) goes by how fast it is rising or falling, late
+	var rising := jump_v if airborne else (cos(air * PI) * hop_high * PI / (hop_len * (_hop_down() - HOP_OFF)) if air > 0.0 and air < 1.0 else 0.0)
+	hop_lag = lerpf(hop_lag, clampf(rising * 0.3, -0.45, 0.8), 1.0 - exp(-delta * 9.0))
+	match hops:
+		"rabbit":
+			_hop_rabbit(air, young)
+
+
+# A rabbit's hop, on all fours: it bunches up on its haunches, springs off the big hind legs with
+# its nose up and its body stretched out and its forepaws reaching, tips over the top of the hop,
+# comes down on its forepaws with its nose down, and its hindquarters swing in under it. Its
+# ears and antlers lag behind all of this, and bob. Thrown straight up (startled, or jumping for
+# something) its legs hang and its ears stream.
+func _hop_rabbit(air: float, young: float) -> void:
+	var down := _hop_down()
+	var pitch := 0.0
+	var kick := 0.0
+	var paw := 0.0
+	var stretch := 0.0
+	if airborne:
+		kick = 0.55
+		paw = -0.5
+		stretch = clampf(jump_v * 0.03, -0.08, 0.12)
+	elif hop_t <= 0.0:
+		pass
+	elif hop_t < HOP_OFF:
+		var u := hop_t / HOP_OFF
+		pitch = -0.34 * u
+		kick = -0.5 * sin(u * PI) + 1.1 * u * u
+		paw = -0.6 * u
+		stretch = -0.08 * sin(u * PI) + 0.06 * u
+	elif hop_t < down:
+		# (and it goes over the top of the hop laid out along its way, the more so at a run)
+		pitch = -0.34 * cos(air * PI) + sin(air * PI) * lerpf(0.25, 0.45, hop_run)
+		kick = lerpf(1.1, -0.9, smoothstep(0.2, 1.0, air))
+		paw = -0.6 - 0.5 * sin(air * PI)
+		stretch = 0.06 + sin(air * PI) * lerpf(0.14, 0.24, hop_run)
+	else:
+		var u := clampf((hop_t - down) / HOP_SETTLE, 0.0, 1.0)
+		var rest := clampf(inverse_lerp(down + HOP_SETTLE, 1.0, hop_t), 0.0, 1.0)
+		pitch = 0.34 * (1.0 - u)
+		kick = lerpf(-0.9, -0.35, u) * (1.0 - rest)
+		paw = -0.6 * (1.0 - u)
+		stretch = 0.06 * (1.0 - u)
+	torso.position.y += hop_y
+	torso.rotation.x += pitch
+	torso.rotation.z += hop_tip * sin(air * PI)
+	torso.scale.z *= 1.0 + stretch
+	torso.scale.y *= 1.0 - stretch * 0.5
+	for i in 2:
+		var side := -1.0 if i == 0 else 1.0
+		legs[i].position.y = 0.18 * legs[i].scale.y + hop_y
+		if lift <= 0.05:
+			legs[i].rotation.x += kick + hop_tip * side * sin(air * PI)
+		arms[i].rotation.x += paw
+		ears[i].rotation.x = -hop_lag - 0.1 * minf(Vector2(velocity.x, velocity.z).length(), 3.0)
+		ears[i].rotation.z -= side * hop_lag * 0.2 * young
+	neck.rotation.x += -pitch * 0.75 + hop_lag * 0.2
+	tail.rotation.x -= hop_lag * 0.6
+
+
 # ---------------------------------------------------------------- animation
 
 func _animate(delta: float) -> void:
@@ -4324,6 +4463,9 @@ func _animate(delta: float) -> void:
 	var ease_slow := 1.0 - exp(-delta * 5.0)
 	var speed := Vector2(velocity.x, velocity.z).length()
 	gait = move_toward(gait, clampf(speed / 0.7, 0.0, 1.0), delta * 5.0)
+	if hops != "":
+		# (one that hops has no walk: see _hop, below)
+		gait = 0.0
 	phase += delta * (3.0 + speed * 5.5)
 	var swing := sin(phase) * gait
 	# One with a foot heavy enough to mark the floor leaves a print each time one comes down
@@ -4435,6 +4577,8 @@ func _animate(delta: float) -> void:
 		heads[i].scale = neck.scale * 0.9
 	if decoy != null:
 		_flop(delta)
+	if hops != "":
+		_hop(delta)
 
 	if xrayed:
 		_show_insides()
