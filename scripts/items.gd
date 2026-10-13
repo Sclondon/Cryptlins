@@ -51,8 +51,8 @@ const LIST: Array[Dictionary] = [
 # inside a site that keeps one (see Den.stock), eggs among them: a room there is never given an
 # egg for nothing. Played by itself, everything is on the shelf.
 const FREE: Array[String] = ["notebook", "scanner", "broom", "rags", "dirt"]
-# What every keeper there is given one of, once: used up or broken, it is gone, and more are bought
-const ONCE: Array[String] = ["bone", "ball"]
+# What every keeper there is given, once, and how many: used up or broken, they are gone, and more are bought
+const GIVEN := {"bone": 3, "ball": 1}
 # Used up when used: each one fed, or each egg laid, is one fewer on the shelf
 const SPENT: Array[String] = ["food", "egg"]
 # The order things ride in round the wheel, by id or by group: the scanner first and the notebook

@@ -138,8 +138,8 @@ var scuffs := {}
 # By item id, for a kind of toy there is no end of whose last one broke: when (unix time) there
 # will be another
 var broken := {}
-# Inside a host page, which of the things given once (Items.ONCE) the keeper has had the one of:
-# the bone that has been fed, the ball that has been brought out (and is the room's from then on,
+# Inside a host page, how many of each of the things given once (Items.GIVEN) the keeper has had:
+# the bones that have been fed, the ball that has been brought out (and is the room's from then on,
 # like one that was bought, until it breaks)
 var used := {}
 var saved_toy := {}
@@ -1094,8 +1094,13 @@ func left_of(id: String) -> int:
 	if _has_all() or id in Items.FREE:
 		return -1
 	var bought := int(stock.get(id, 0))
-	# (the one that is given once is one more than was bought, until it has been used)
-	return bought + 1 if bought >= 0 and id in Items.ONCE and not used.has(id) else bought
+	# (what was given and has not been used yet is so many more than were bought)
+	return bought + _given(id) if bought >= 0 else bought
+
+
+# How many the keeper still has of what they were given of a thing (Items.GIVEN)
+func _given(id: String) -> int:
+	return maxi(int(Items.GIVEN.get(id, 0)) - int(used.get(id, 0)), 0)
 
 
 # Everything without end: the game played by itself, or the test panel open (inside a page with
@@ -1107,9 +1112,9 @@ func _has_all() -> bool:
 func _spend(id: String) -> void:
 	if left_of(id) <= 0:
 		return
-	if id in Items.ONCE and not used.has(id):
-		# The one that was given goes first, and is none of the page's business: it is not told
-		used[id] = true
+	if _given(id) > 0:
+		# What was given goes first, and is none of the page's business: it is not told
+		used[id] = int(used.get(id, 0)) + 1
 		save_game()
 	else:
 		stock[id] = int(stock.get(id, 0)) - 1
@@ -1121,28 +1126,28 @@ func _spend(id: String) -> void:
 func _unspend(id: String) -> void:
 	if left_of(id) < 0:
 		return
-	if id in Items.ONCE and used.has(id):
-		used.erase(id)
+	if int(used.get(id, 0)) > 0:
+		used[id] = int(used[id]) - 1
 	else:
 		stock[id] = int(stock.get(id, 0)) + 1
 	_sync()
 
 
-# Inside a host page the ball is given once (Items.ONCE) and is the room's own like one that was
+# Inside a host page the ball is given once (Items.GIVEN) and is the room's own like one that was
 # bought. One from a save made before that was so, lying on the floor or put away, is that one;
 # a keeper who had neither has theirs still to come, whatever had broken.
 func _keep_own() -> void:
-	for id in Items.ONCE:
+	for id: String in Items.GIVEN:
 		if Items.find(id)["group"] != "toy":
 			continue
 		if ball != null and not ball.bought and Items.id_of("toy", ball.kind) == id:
 			ball.bought = true
-			used[id] = true
+			used[id] = Items.GIVEN[id]
 		elif scuffs.has(id):
 			if not toybox.has(id):
 				toybox[id] = []
 			toybox[id].append(scuffs[id])
-			used[id] = true
+			used[id] = Items.GIVEN[id]
 		scuffs.erase(id)
 		broken.erase(id)
 
@@ -3274,7 +3279,7 @@ func save_game() -> void:
 		"toybox": toybox,
 		"scuffs": scuffs,
 		"broken": broken,
-		"used": used.keys(),
+		"used": used,
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
 		"time": Time.get_unix_time_from_system(),
@@ -3346,9 +3351,9 @@ func _load_game() -> void:
 	if d.get("broken") is Dictionary:
 		for id: String in d["broken"]:
 			broken[id] = float(d["broken"][id])
-	if d.get("used") is Array:
-		for id: Variant in d["used"]:
-			used[str(id)] = true
+	if d.get("used") is Dictionary:
+		for id: String in d["used"]:
+			used[id] = int(d["used"][id])
 	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
 	away = maxf(now - float(d.get("time", now)), 0.0)
 	_muted_at_start = bool(d.get("muted", false))
