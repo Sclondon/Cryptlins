@@ -9,6 +9,7 @@ enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
 	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED, INSPECT, SCANNED, VISIT, MOVE_NEST,
 	TOILET, FOND, SCRATCH, STRETCH, DIG, SPIN, GAZE,
+	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED,
 }
 # The cryptids they are the young of
 enum Kind {
@@ -144,6 +145,11 @@ const PEE_HOURS := 3.0
 # The longest it is taken to have been left alone, however long it really was
 const LONGEST_AWAY := 14.0 * 24.0 * HOUR
 const BABY_SIZE := 0.55
+# What losing a fight costs in health, and the health that fighting alone never takes it below
+const FIGHT_HURT := 8.0
+const FIGHT_FLOOR := 30.0
+# How much an hour asleep in the one nest raises what two of them think of each other
+const SLEEP_WARMS := 0.6
 
 const WALK := 1.0
 const RUN := 2.6
@@ -153,7 +159,7 @@ const BELLY_ARM := Vector3(-0.9, 0.0, -0.35)
 # States that give way to food, a thrown ball, the moving light or tiredness
 const INTERRUPTIBLE: Array[int] = [
 	State.IDLE, State.WANDER, State.STARE, State.LURK, State.COME, State.BEG, State.ZOOMIES, State.DANCE,
-	State.SCRATCH, State.DIG, State.SPIN, State.GAZE,
+	State.SCRATCH, State.DIG, State.SPIN, State.GAZE, State.SNIFF, State.FOLLOW,
 ]
 # Fur and eye colours to draw from, by kind
 const FURS: Array[Array] = [
@@ -245,6 +251,8 @@ var belly := 70.0
 var fun := 60.0
 var energy := 80.0
 var love := 20.0
+# How well it is in itself, 0 to 100: a lost fight takes a little of it
+var health := 100.0
 # What it has eaten and not yet passed, and how nearly it has to go (100: now), one way and the other
 var digest := 0.0
 var bowel := 0.0
@@ -318,6 +326,10 @@ var kick_limit := 3
 var ball_cooldown := 0.0
 # How long after finishing a bit of food before it goes for the next (the others get a look in)
 var food_cooldown := 0.0
+# The other cryptlin it is busy with (sniffing at, following, chasing, running from, fighting),
+# and how long before it can come to blows again
+var partner: Cryptlin
+var fight_cooldown := 20.0
 var beg_cooldown := 6.0
 var pounce_cooldown := 0.0
 var last_stroke := -10.0
@@ -1662,7 +1674,7 @@ func mood() -> float:
 
 
 func get_needs() -> Dictionary:
-	return {"belly": belly, "fun": fun, "energy": energy, "love": love, "age": age, "digest": digest, "bowel": bowel, "bladder": bladder}
+	return {"belly": belly, "fun": fun, "energy": energy, "love": love, "health": health, "age": age, "digest": digest, "bowel": bowel, "bladder": bladder}
 
 
 func set_needs(d: Dictionary) -> void:
@@ -1670,6 +1682,7 @@ func set_needs(d: Dictionary) -> void:
 	fun = clampf(float(d.get("fun", fun)), 0.0, 100.0)
 	energy = clampf(float(d.get("energy", energy)), 0.0, 100.0)
 	love = clampf(float(d.get("love", love)), 0.0, 100.0)
+	health = clampf(float(d.get("health", health)), 0.0, 100.0)
 	# Saves from before there were babies hold a grown one
 	age = float(d.get("age", GROW_AGE))
 	digest = maxf(float(d.get("digest", digest)), 0.0)
@@ -2062,6 +2075,7 @@ func _process(delta: float) -> void:
 	state_time += delta
 	ball_cooldown -= delta
 	food_cooldown -= delta
+	fight_cooldown -= delta
 	beg_cooldown -= delta
 	pounce_cooldown -= delta
 	nest_cooldown -= delta
@@ -2069,6 +2083,7 @@ func _process(delta: float) -> void:
 	glance_time -= delta
 	_tick_needs(delta)
 	_feel(delta)
+	_bristle(delta)
 	gaze = _default_gaze()
 	_think(delta)
 	_move(delta)
@@ -2161,7 +2176,7 @@ func _enter(s: int, length := 0.0) -> void:
 			arm_goal = UP_ARM
 		State.GO_SLEEP:
 			_cry("yawn")
-			target = world.nest_pos
+			target = _bed()
 			droop_goal = 0.8
 			eye_goal = 0.6
 		State.HELD:
@@ -2190,6 +2205,19 @@ func _enter(s: int, length := 0.0) -> void:
 			target = world.nest_pos
 			if world.ball != null and world.ball.kind == fav_toy and world.ball.speed() < 0.3 and randf() < 0.4:
 				target = Vector3(world.ball.position.x, 0, world.ball.position.z)
+		State.SNIFF:
+			wag = 6.0
+		State.FOLLOW:
+			state_len = randf_range(6.0, 10.0)
+			wag = 6.0
+		State.TAG, State.FLEE:
+			kicks = 0
+			wag = 9.0
+		State.SCUFFLE:
+			velocity = Vector3.ZERO
+		State.COWED:
+			droop_goal = 0.9
+			wag = 1.0
 		State.SCRATCH:
 			state_len = randf_range(1.6, 2.6)
 		State.DIG:
@@ -2267,6 +2295,14 @@ func _decide() -> void:
 		options[State.SPIN] = 3.0 * float(likes["zoom"])
 	if _fancies():
 		options[State.FOND] = 3.0
+	# The others: a sniff at one, trailing after one it likes (a baby after anybody), a chase
+	var other := _someone()
+	if other != null:
+		options[State.SNIFF] = 9.0
+		if world.regard(self, other) >= 45.0 or is_baby():
+			options[State.FOLLOW] = 5.0 * (1.6 if _is(4) or is_baby() else 1.0)
+		if world.regard(self, other) >= 45.0 and energy > 40.0 and other.energy > 30.0:
+			options[State.TAG] = 5.0 * float(likes["zoom"]) * (1.5 if _is(1) else 1.0)
 	var total := 0.0
 	for w: float in options.values():
 		total += w
@@ -2277,7 +2313,10 @@ func _decide() -> void:
 			if s == State.WANDER:
 				var a := randf() * TAU
 				target = Den.in_room(Vector3(randf_range(-9.0, 9.0), 0, randf_range(-9.0, 9.0)).limit_length(Den.half.length()), 0.4)
-			_enter(s)
+			if s in [State.SNIFF, State.FOLLOW, State.TAG]:
+				meet(s, other)
+			else:
+				_enter(s)
 			return
 	_enter(State.IDLE)
 
@@ -2634,6 +2673,21 @@ func _think(delta: float) -> void:
 				droop_goal = 1.0
 				if state_time > 3.0:
 					_enter(State.IDLE, 1.0)
+		State.SNIFF:
+			_sniff(delta)
+		State.FOLLOW:
+			_follow(delta)
+		State.TAG:
+			_tag(delta)
+		State.FLEE:
+			_flee(delta)
+		State.SCUFFLE:
+			# Somewhere in the ball of dust (Den has the two of them until it is over)
+			velocity = Vector3.ZERO
+			if world.scuffle == null:
+				_enter(State.IDLE, 1.0)
+		State.COWED:
+			_cowed(delta)
 		State.SCRATCH:
 			# A good scratch behind the ear, head on one side
 			_halt(delta)
@@ -2709,7 +2763,7 @@ func _think(delta: float) -> void:
 			gaze = target + Vector3(0, 0.2, 0)
 			if state_time < 0.9:
 				_halt(delta)
-			elif _steer(target, WALK * 0.85, delta, 0.5 if _bed_taken() else 0.12) or state_time > 12.0:
+			elif _steer(target, WALK * 0.85, delta, _bed_reach() if target == world.nest_pos else 0.12) or state_time > 12.0:
 				_enter(State.SLEEP)
 		State.LEAVE:
 			if step == 0:
@@ -2730,6 +2784,9 @@ func _think(delta: float) -> void:
 			_halt(delta)
 			_face(world.camera.global_position + Vector3(4.0, 0, 0), delta)
 			hearts.emitting = anim_t - last_stroke < 0.5
+			# A night in the one nest brings them round to each other
+			for other in _bedfellows():
+				world.warm(self, other, delta * SLEEP_WARMS / HOUR)
 			if int(state_time / 3.4) > step:
 				step = int(state_time / 3.4)
 				_cry("snore", 1.0, -8.0)
@@ -2741,12 +2798,40 @@ func _think(delta: float) -> void:
 				state_len = -1.0
 
 
-# Whether another is asleep in the nest already (the next one in lies down beside it)
-func _bed_taken() -> bool:
+# Those asleep in the nest already
+func _bedfellows() -> Array[Cryptlin]:
+	var there: Array[Cryptlin] = []
 	for other in world.pets():
-		if other != self and other.state == State.SLEEP and other.position.distance_to(world.nest_pos) < 0.6:
-			return true
-	return false
+		if other != self and other.state == State.SLEEP and other.position.distance_to(world.nest_pos) < 0.7:
+			there.append(other)
+	return there
+
+
+# Where it goes to sleep: the nest, or the floor a little way off if one it does not get on
+# with is in it already
+func _bed() -> Vector3:
+	for other in _bedfellows():
+		if world.standing(self, other) < 35.0:
+			var off := world.nest_pos.x * -1.0 if absf(world.nest_pos.x) > 0.1 else 1.0
+			return Den.in_room(world.nest_pos + Vector3(signf(off) * 1.0, 0, 0.3), 0.4)
+	return world.nest_pos
+
+
+# How near its bed it has to get before it lies down: right in if the nest is empty, in a heap
+# with those it gets on with, and beside the rest
+func _bed_reach() -> float:
+	var reach := 0.12
+	for other in _bedfellows():
+		reach = maxf(reach, 0.28 if world.standing(self, other) >= 60.0 else 0.5)
+	return reach
+
+
+# The one eating a bit of food already, or null
+func _eater_of(food: Snack) -> Cryptlin:
+	for other in world.pets():
+		if other != self and other.state == State.EAT and other.snack == food:
+			return other
+	return null
 
 
 # Whether it leaves the food to the others for now: one that has just eaten gives them a moment
@@ -2776,6 +2861,16 @@ func _go_food(delta: float) -> void:
 	# A greedy or a bold one pushes in ahead of the rest
 	var haste := 1.25 if _is(0) or _is(5) else 1.0
 	if _steer(snack.position, RUN * haste, delta, 0.42) and snack.landed:
+		# Somebody is at it already: a shy one thinks better of it, and two that do not get on may
+		# well fall out over it. Otherwise they share.
+		var eater := _eater_of(snack)
+		if eater != null:
+			if _is(2) and belly >= 20.0:
+				food_cooldown = 3.0
+				_enter(State.IDLE, 1.0)
+				return
+			if squabble(eater, 0.8):
+				return
 		var s := snack
 		_enter(State.EAT)
 		snack = s
@@ -2813,7 +2908,11 @@ func _eat(delta: float) -> void:
 			feel(Feeling.DISGUSTED, 5.0)
 			world.learned(self, "yuck")
 			return
-		# Each bite is whoever's took it, so two at one bit of food share it as they come
+		# Each bite is whoever's took it, so two at one bit of food share it as they come; and
+		# eating side by side is a thing done together
+		for other in world.pets():
+			if other != self and other.state == State.EAT and position.distance_to(other.position) < 1.3:
+				world.warm(self, other, 0.4)
 		var loved := eaten == fav_food
 		var share := 1.0 / Snack.BITES
 		digest += 100.0 * share
@@ -2862,6 +2961,13 @@ func _chase_ball(delta: float) -> void:
 
 
 func _kick(b: Ball) -> void:
+	# Others after the same toy: a game shared, or (over a favourite, between two that do not
+	# get on) something to fall out about
+	for other in world.pets():
+		if other != self and other.state == State.CHASE_BALL and position.distance_to(other.position) < 1.4:
+			if (b.kind == fav_toy or b.kind == other.fav_toy) and squabble(other, 0.35):
+				return
+			world.warm(self, other, 0.4)
 	var dir := Vector3(sin(yaw), 0, cos(yaw))
 	# Fetch it back if it has gone off into the dark
 	var home := -position
@@ -2886,6 +2992,228 @@ func _kick(b: Ball) -> void:
 	else:
 		step = 1
 		state_time = 0.0
+
+
+# ---------------------------------------------------------------- one another
+
+# How well its natures go with another's, as a lean on what they make of each other to begin
+# with: opposites grate (shy and bold, sleepy and restless, cuddly and grumpy), a grumpy one is
+# hard going for anybody, and a nature in common or a cuddly one helps
+func suits(other: Cryptlin) -> float:
+	var lean := 0.0
+	for pair: Array in OPPOSED:
+		if (_is(pair[0]) and other._is(pair[1])) or (_is(pair[1]) and other._is(pair[0])):
+			lean -= 14.0
+	if _is(6) or other._is(6):
+		lean -= 6.0
+	if other._is(nature) or other._is(nature2):
+		lean += 8.0
+	if _is(4) or other._is(4):
+		lean += 5.0
+	return lean
+
+
+# Whether the one it was busy with is still about
+func _has_partner() -> bool:
+	return is_instance_valid(partner) and partner in world.pets()
+
+
+# Another cryptlin that is up and free to be bothered, or null
+func _someone() -> Cryptlin:
+	var free: Array[Cryptlin] = []
+	for other in world.pets():
+		if other != self and other.state in INTERRUPTIBLE:
+			free.append(other)
+	return free.pick_random() if not free.is_empty() else null
+
+
+# Takes up with another: to sniff at it, to follow it about, or to chase it (which sets the
+# other running)
+func meet(s: int, other: Cryptlin) -> void:
+	partner = other
+	_enter(s)
+	if s == State.TAG:
+		other.partner = self
+		other._enter(State.FLEE)
+		_cry("chirp", 1.2)
+
+
+# How ready it is to come to blows with another, 0 to 1: mostly how little they think of each
+# other, more when it is hungry, out of sorts or ill at ease, and next to nothing between two
+# that are fed, at home and on good terms
+func temper(other: Cryptlin) -> float:
+	var standing := world.standing(self, other)
+	var t := clampf((50.0 - standing) / 40.0, 0.0, 1.0)
+	if belly < 25.0:
+		t += 0.25
+	if other.belly < 25.0:
+		t += 0.1
+	if comfort < 35.0:
+		t += 0.1
+	if _is(6) or feeling == Feeling.GRUMPY:
+		t += 0.15
+	if belly > 50.0 and other.belly > 50.0 and comfort > 50.0 and standing >= 45.0:
+		t *= 0.1
+	return clampf(t, 0.0, 1.0)
+
+
+# Whether it is in a state to be fought with: up, on the floor and not in anybody's hands
+func _can_fight() -> bool:
+	return fight_cooldown <= 0.0 and lift <= 0.05 and not state in [State.SLEEP, State.HELD, State.LEAVE, State.SCANNED, State.SCUFFLE, State.COWED, State.SHOVED, State.PETTED]
+
+
+# Something to fall out over (food, the toy, being crowded): at these odds, and by how ready
+# the two of them are for it, it comes to blows. True if it did.
+func squabble(other: Cryptlin, odds: float) -> bool:
+	if not _can_fight() or not other._can_fight() or randf() >= odds * temper(other):
+		return false
+	world.start_fight(self, other)
+	return true
+
+
+# One that is hungry or in a foul mood takes against whoever is standing too close
+func _bristle(delta: float) -> void:
+	if not state in INTERRUPTIBLE or (belly >= 20.0 and feeling != Feeling.GRUMPY):
+		return
+	for other in world.pets():
+		if other != self and position.distance_to(other.position) < 0.75 and squabble(other, delta * 0.3):
+			return
+
+
+# How it is likely to do in a fight, this time: the bigger, the bolder and the fitter, with a
+# good deal of luck in it
+func might() -> float:
+	var nerve := 1.0 + (0.3 if _is(5) else 0.0) + (0.2 if _is(6) else 0.0) - (0.2 if _is(2) else 0.0)
+	return grow * nerve * (0.5 + health / 200.0) * randf_range(0.6, 1.4)
+
+
+# Cuffed out of the way by a grown one: a baby is sent tumbling and squeaks, and is not hurt
+func cuffed(by: Cryptlin) -> void:
+	push(position - by.position)
+	feel(Feeling.SCARED, 4.0)
+
+
+# The fight is over and it lost: a little the worse for it (never a baby, and never below the
+# floor: fighting alone does not kill), it backs off from the one that won
+func beaten(by: Cryptlin) -> void:
+	if not is_baby():
+		health = maxf(health - FIGHT_HURT, minf(health, FIGHT_FLOOR))
+	partner = by
+	_enter(State.COWED)
+	_cry("whimper", 1.1)
+	feel(Feeling.SCARED, 6.0)
+
+
+# Goes over to another and has a good sniff at it
+func _sniff(delta: float) -> void:
+	if not _has_partner():
+		_enter(State.IDLE, 0.6)
+		return
+	gaze = partner.global_position + Vector3(0, partner.tall() * 0.5, 0)
+	if step == 0:
+		if _steer(partner.position, WALK * 1.2, delta, 0.36 * (grow + partner.grow) + 0.1) or state_time > 7.0:
+			step = 1
+			state_time = 0.0
+			# (the other looks round to see what is at it)
+			partner.glance_time = 1.6
+			partner.glance_point = global_position + Vector3(0, tall() * 0.6, 0)
+	else:
+		_halt(delta)
+		_face(partner.position, delta)
+		nod = 0.3 + sin(state_time * 11.0) * 0.08
+		if state_time > 1.6:
+			var other := partner
+			# Between two that do not get on, a sniff is a liberty
+			if world.standing(self, other) < 35.0 and other.squabble(self, 0.6):
+				return
+			world.warm(self, other, 1.0)
+			world.warm(other, self, 0.6)
+			_cry("chirp", 0.9)
+			_enter(State.IDLE, 1.0)
+
+
+# Trails round after another for a while
+func _follow(delta: float) -> void:
+	if not _has_partner() or state_time > state_len:
+		if _has_partner():
+			world.warm(self, partner, 0.6)
+		_enter(State.IDLE, 0.8)
+		return
+	gaze = partner.global_position + Vector3(0, partner.tall() * 0.5, 0)
+	var behind := partner.position - Vector3(sin(partner.yaw), 0, cos(partner.yaw)) * (0.32 * (grow + partner.grow) + 0.1)
+	_steer(behind, WALK * 1.3, delta, 0.2)
+
+
+# A game of chase: it runs the other down, and a touch turns the game round
+func _tag(delta: float) -> void:
+	if not _has_partner() or partner.state != State.FLEE or partner.partner != self:
+		_enter(State.IDLE, 0.8)
+		return
+	fun = minf(fun + delta * 0.5, 100.0)
+	gaze = partner.global_position + Vector3(0, 0.3, 0)
+	mouth_goal = 0.6
+	var caught_up := _steer(partner.position, RUN * 1.12, delta, 0.33 * (grow + partner.grow) + 0.12)
+	if caught_up or state_time > 9.0:
+		var other := partner
+		for both: Cryptlin in [self, other]:
+			both.fun = minf(both.fun + 5.0, 100.0)
+			both.hop(2.2)
+		world.warm(self, other, 1.5)
+		world.warm(other, self, 1.5)
+		_cry("chirp", 1.2)
+		kicks += 1
+		if caught_up and kicks < 3 and other.energy > 25.0:
+			# Tag: the other is it now
+			var turns := kicks
+			other.meet(State.TAG, self)
+			other.kicks = turns
+		else:
+			_enter(State.IDLE, 1.2)
+			other._enter(State.IDLE, 1.2)
+
+
+# Running from the one that is it, round the room
+func _flee(delta: float) -> void:
+	if not _has_partner() or partner.state != State.TAG or partner.partner != self:
+		_enter(State.IDLE, 0.8)
+		return
+	gaze = partner.global_position + Vector3(0, 0.3, 0)
+	# A beat's start at the off, then away to wherever is furthest from it
+	if state_time < 0.5:
+		_halt(delta)
+		return
+	var from := position - partner.position
+	from.y = 0.0
+	if from.length() < 1.6 or position.distance_to(target) < 0.5:
+		var side := from.normalized().rotated(Vector3.UP, 1.1 if me.id % 2 == 0 else -1.1)
+		target = Den.in_room(position + (from.normalized() + side) * 1.4, 0.5)
+		if target.distance_to(position) < 0.8:
+			# Cornered: break back past it
+			target = Den.in_room(-position * 0.8, 0.5)
+	_steer(target, RUN * 1.05, delta, 0.3)
+
+
+# Lost a fight: off to the far side of the room from the one that won, and small there a while
+func _cowed(delta: float) -> void:
+	if step == 0:
+		if _has_partner():
+			var from := position - partner.position
+			from.y = 0.0
+			target = Den.in_room(position + from.normalized() * 2.2, 0.45)
+		gaze = target + Vector3(0, 0.2, 0)
+		if _steer(target, RUN, delta, 0.3) or state_time > 2.5:
+			step = 1
+			state_time = 0.0
+	else:
+		_halt(delta)
+		sit_goal = 1.0
+		droop_goal = 1.0
+		eye_goal = 0.7
+		if _has_partner():
+			gaze = partner.global_position + Vector3(0, 0.3, 0)
+			_face(partner.position, delta)
+		if state_time > 3.0:
+			_enter(State.IDLE, 1.5)
 
 
 # ---------------------------------------------------------------- moving
@@ -2935,12 +3263,14 @@ func _keep_off_others(delta: float) -> void:
 		if r.egg != null and r.egg.landed:
 			_keep_off(r.egg.position, 0.3 + 0.2 * grow, delta)
 	for other in world.pets():
-		if other == self or other.lift > 0.05:
+		if other == self or other.lift > 0.05 or other.state == State.SCUFFLE:
 			continue
 		if state == State.SLEEP and other.state != State.SLEEP:
 			continue
 		var room := 0.3 * (grow + other.grow)
-		_keep_off(other.position, room * (0.7 if state == State.SLEEP else 1.0), delta)
+		if state == State.SLEEP:
+			room *= 0.45 if world.standing(self, other) >= 60.0 else 0.75
+		_keep_off(other.position, room, delta)
 
 
 func _move(delta: float) -> void:

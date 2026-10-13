@@ -19,6 +19,8 @@ They sleep when they are worn out. Put the lamp out at night and they go to the 
 
 They leave droppings. Tap one to clear it up: they spoil the place. Puddles dry by themselves.
 
+They do not all get on. Two that have fallen out may fight: a tap on the scuffle breaks it up.
+
 The scanner on the shelf shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, and whether it likes its home. Drag it up onto the one you mean."
 const SHELF := "Everything you have is on the shelf. Slide it sideways to see the rest.
 

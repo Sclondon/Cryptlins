@@ -17,6 +17,8 @@ var at := Vector3.INF
 # Its needs as last saved (see Cryptlin.get_needs), and what has been found out about its tastes
 var needs := {}
 var known := {}
+# What it thinks of each of the others, 0 to 100, by their numbers (see Den.regard)
+var regard := {}
 # Whichever of the two it is in the room just now
 var pet: Cryptlin
 var egg: Egg
@@ -44,6 +46,7 @@ func to_save() -> Dictionary:
 		"warmth": egg.warmth if egg != null else 0.0,
 		"needs": pet.get_needs() if pet != null else needs,
 		"known": known,
+		"regard": regard,
 		"at": [spot.x, spot.z] if spot != Vector3.INF else [],
 	}
 
@@ -61,6 +64,8 @@ static func from_save(d: Dictionary) -> Resident:
 		r.needs = d["needs"]
 	if d.get("known") is Dictionary:
 		r.known = d["known"]
+	if d.get("regard") is Dictionary:
+		r.regard = d["regard"]
 	if d.get("at") is Array and d["at"].size() == 2:
 		r.at = Vector3(float(d["at"][0]), 0, float(d["at"][1]))
 	return r

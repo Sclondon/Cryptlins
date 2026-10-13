@@ -21,6 +21,10 @@ const LAMPS: Array[Dictionary] = [
 const MAX_SNACKS := 3
 # How many eggs and cryptlins the room holds at once
 const MAX_RESIDENTS := 4
+# How much a fight fought out lowers what each of the two thinks of the other, and the colour
+# of the dust it raises
+const FIGHT_SOURS := 12.0
+const DUST := Color(0.6, 0.56, 0.5)
 const NAME_HEADS: Array[String] = ["Grub", "Mog", "Snag", "Fizz", "Bork", "Nib", "Skrit", "Womp", "Gloom", "Pim", "Zog", "Murk"]
 const NAME_TAILS: Array[String] = ["nik", "let", "wort", "bo", "gle", "kin", "zle", "by", "mort", "ix"]
 const EGG_SPOT := Vector3(0, 0, 0.3)
@@ -70,6 +74,12 @@ var sfx: Sfx
 var residents: Array[Resident] = []
 var next_id := 1
 var chosen: Resident
+# A fight, while one is going on: the ball of dust, the two in it, how long it has left to
+# run, and how long till the next squeak out of it
+var scuffle: Scuffle
+var fighters: Array[Cryptlin] = []
+var scuffle_left := 0.0
+var scuffle_beat := 0.0
 var ball: Ball
 var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
@@ -244,13 +254,123 @@ func room_for_more() -> bool:
 # Time that went by with nobody looking (the game shut, or covered by the page it is played
 # in): each of them lives through it, and is found asleep in the nest if that is how it ended
 func pass_time(seconds: float) -> void:
+	end_fight(true)
 	for pet in pets():
 		if pet.pass_time(seconds, not light_on):
 			pet.position = nest_pos + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.2))
 			pet._enter(Cryptlin.State.SLEEP)
 		elif pet.state == Cryptlin.State.SLEEP:
 			pet._enter(Cryptlin.State.IDLE)
+	# Those that slept the time out in the one nest come through it better friends
+	for a in pets():
+		for b in pets():
+			if a != b and a.state == Cryptlin.State.SLEEP and b.state == Cryptlin.State.SLEEP and regard(a, b) >= 35.0:
+				warm(a, b, minf(seconds / Cryptlin.HOUR * Cryptlin.SLEEP_WARMS, 4.0))
 	_sync()
+
+
+# ---------------------------------------------------------------- how they get on
+
+# What one cryptlin thinks of another, 0 to 100. Until something has passed between them it is
+# a little either side of indifferent, by how their natures suit.
+func regard(a: Cryptlin, b: Cryptlin) -> float:
+	return float(a.me.regard.get(str(b.me.id), 50.0 + a.suits(b)))
+
+
+# One of them thinks better of another (or worse, below zero) for something that has happened
+func warm(a: Cryptlin, b: Cryptlin, by: float) -> void:
+	a.me.regard[str(b.me.id)] = clampf(regard(a, b) + by, 0.0, 100.0)
+
+
+# How two of them stand with each other: no better than the one that thinks less of the other
+func standing(a: Cryptlin, b: Cryptlin) -> float:
+	return minf(regard(a, b), regard(b, a))
+
+
+# Two of them have fallen out badly enough to fight: a short scuffle, out of which one comes
+# the loser. A grown one does not fight a baby: it cuffs it out of the way, and that is that.
+func start_fight(a: Cryptlin, b: Cryptlin) -> void:
+	if scuffle != null:
+		return
+	if a.is_baby() != b.is_baby():
+		var small := a if a.is_baby() else b
+		var big := b if a.is_baby() else a
+		small.cuffed(big)
+		big._cry("grumble")
+		small.fight_cooldown = 60.0
+		big.fight_cooldown = 60.0
+		warm(small, big, -3.0)
+		return
+	if finger != -1 and grab == Grab.PET:
+		_release()
+	if scanning and scanned.pet in [a, b]:
+		stop_scan()
+	var tints: Array[Color] = [a.fur.get_shader_parameter("tint"), b.fur.get_shader_parameter("tint")]
+	scuffle = Scuffle.new(tints, (a.grow + b.grow) * 0.5)
+	add_child(scuffle)
+	scuffle.position = Vector3((a.position.x + b.position.x) * 0.5, 0, (a.position.z + b.position.z) * 0.5)
+	scuffle_left = randf_range(2.6, 3.8)
+	fighters = [a, b]
+	a.partner = b
+	b.partner = a
+	for f in fighters:
+		f._enter(Cryptlin.State.SCUFFLE)
+		f.visible = false
+	crumbs(scuffle.position + Vector3(0, 0.3, 0), DUST)
+
+
+# The scuffle while it lasts: squeaks and grumbles out of it, and an end to it when it has run
+# its course, or sooner if the keeper drops food on it or swings the lamp over it
+func _tick_fight(delta: float) -> void:
+	scuffle_left -= delta
+	scuffle_beat -= delta
+	for f in fighters:
+		f.position = scuffle.position
+	if scuffle_beat <= 0.0:
+		scuffle_beat = randf_range(0.2, 0.38)
+		var voice: String = ["squeak", "grumble", "squeak", "chirp"].pick_random()
+		fighters.pick_random()._cry(voice, randf_range(0.9, 1.3))
+		crumbs(scuffle.position + Vector3(0, 0.2, 0), DUST)
+	var broken := light_dragging and light_point.distance_to(scuffle.position) < 0.8
+	for s in snacks:
+		if s.position.y < 0.5 and Vector2(s.position.x - scuffle.position.x, s.position.z - scuffle.position.z).length() < 0.7:
+			broken = true
+	if broken or scuffle_left <= 0.0:
+		end_fight(broken)
+
+
+# The dust settles. Fought out, the weaker comes off worse and backs away, and they think the
+# less of each other for it; broken up by the keeper, nobody is hurt and less harm is done.
+func end_fight(broken: bool) -> void:
+	if scuffle == null:
+		return
+	var at := scuffle.position
+	crumbs(at + Vector3(0, 0.3, 0), DUST)
+	scuffle.queue_free()
+	scuffle = null
+	var a := fighters[0]
+	var b := fighters[1]
+	fighters.clear()
+	var apart := Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU) * 0.5
+	a.position = in_room(at + apart, 0.3)
+	b.position = in_room(at - apart, 0.3)
+	for f: Cryptlin in [a, b]:
+		f.visible = true
+		f.fight_cooldown = randf_range(90.0, 150.0)
+	warm(a, b, -FIGHT_SOURS * (0.3 if broken else 1.0))
+	warm(b, a, -FIGHT_SOURS * (0.3 if broken else 1.0))
+	if broken:
+		for f: Cryptlin in [a, b]:
+			f._enter(Cryptlin.State.STARTLED, 1.0)
+			f.feel(Cryptlin.Feeling.SCARED, 3.0)
+	else:
+		var loser := a if a.might() < b.might() else b
+		var winner := b if loser == a else a
+		winner._enter(Cryptlin.State.STARTLED, 0.8)
+		winner._cry("grumble")
+		winner.feel(Cryptlin.Feeling.GRUMPY, 5.0)
+		loser.beaten(winner)
+	save_game()
 
 
 # ---------------------------------------------------------------- eggs and hatchlings
@@ -390,6 +510,7 @@ func _name_done(_typed := "") -> void:
 
 # "Let go" on a cryptlin's page of the notebook: asks first, since it sends it away for good
 func ask_let_go(r: Resident) -> void:
+	end_fight(true)
 	if not r in residents or r.pet == null or r.leaving:
 		return
 	if finger != -1:
@@ -415,6 +536,8 @@ func _answer(yes: bool) -> void:
 
 func _on_left(r: Resident) -> void:
 	r.pet.queue_free()
+	for other in residents:
+		other.regard.erase(str(r.id))
 	r.pet = null
 	residents.erase(r)
 	if pets().is_empty():
@@ -441,6 +564,7 @@ func dev_toggle() -> void:
 
 # Turns the one in question into a cryptlin of this kind at once, or its egg
 func dev_show(kind: int, as_egg := false, new_look := false) -> void:
+	end_fight(true)
 	if finger != -1:
 		_release()
 	stop_scan()
@@ -1019,6 +1143,7 @@ func toggle_sound() -> void:
 # and how full, rested, amused and fond it is. To the one it is given; or else the one last
 # tapped; or else whichever is nearest the middle of the room.
 func start_scan(r: Resident = null) -> void:
+	end_fight(true)
 	if r == null:
 		r = chosen if chosen in residents else _nearest_resident(Vector3.ZERO)
 	if r == null or r.leaving or r.body() == null or scanning:
@@ -1734,6 +1859,9 @@ func _process(delta: float) -> void:
 		scanner.position = scanner.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
 		scanner.rotation = Vector3.ZERO
 
+	if scuffle != null:
+		_tick_fight(delta)
+
 	if grab == Grab.BALL and ball != null:
 		var before := ball.position
 		ball.position = ball.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
@@ -1824,7 +1952,7 @@ func _resident_at(at: Vector2) -> Resident:
 		var off := INF
 		if r.egg != null:
 			off = _ray_off(at, r.egg.centre()) / 0.6
-		elif r.pet != null and not r.leaving:
+		elif r.pet != null and not r.leaving and r.pet.visible:
 			off = _ray_off(at, r.pet.body_centre()) / (0.7 * maxf(r.pet.grow, 0.75))
 		if off < 1.0 and off < best_off:
 			best_off = off
@@ -1938,6 +2066,14 @@ func _press(e: InputEventScreenTouch) -> void:
 		shelf_item = shelf.item_at(e.position)
 		sliding = false
 		shelf.grab()
+	elif scuffle != null and _ray_hits(e.position, scuffle.position + Vector3(0, 0.35, 0), 0.75):
+		# A finger on the ball of dust breaks it up, and has hold of one of the two
+		chosen = fighters[0].me
+		held_pet = fighters[0]
+		end_fight(true)
+		grab = Grab.PET
+		carrying = false
+		_sync()
 	elif _ray_hits(e.position, bulb.global_position + Vector3(0, 0.1, 0), 0.42):
 		grab = Grab.LAMP
 	elif ball != null and _ray_hits(e.position, ball.global_position, 0.5):

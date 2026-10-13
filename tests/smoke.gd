@@ -666,6 +666,8 @@ func _run() -> void:
 	await _until(func() -> bool: return _settled(one) and _settled(two), 900)
 
 	# Food is for whoever gets there, and neither stands in the other
+	one.fight_cooldown = 9999.0
+	two.fight_cooldown = 9999.0
 	var both_eat := 0
 	while both_eat == one.yuck_food or both_eat == two.yuck_food:
 		both_eat += 1
@@ -714,6 +716,8 @@ func _run() -> void:
 
 	# One room, and each its own idea of it
 	await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
 	var thing_one: int = one.like_decor[0]
 	if main.decor_of(thing_one) != null:
 		main.remove_decor(main.decor_of(thing_one))
@@ -745,6 +749,152 @@ func _run() -> void:
 	check(main.droppings() == 2, "and each has left a dropping")
 	for m in main.messes.duplicate():
 		main.clear_mess(m)
+
+	# Getting on: what each thinks of the other, and what they get up to together
+	for p: Cryptlin in [one, two]:
+		p.set_needs({"belly": 80.0, "energy": 90.0, "fun": 50.0, "age": Cryptlin.GROW_AGE, "bowel": 0.0, "bladder": 0.0})
+		p.grow = p.adult_size
+		p.fight_cooldown = 0.0
+		p.me.regard = {}
+		p._enter(Cryptlin.State.IDLE, 30.0)
+	one.position = Vector3(-0.9, 0, 0.5)
+	two.position = Vector3(0.9, 0, 0.5)
+	check(is_equal_approx(main.regard(one, two), 50.0 + one.suits(two)) and is_equal_approx(one.suits(two), two.suits(one)), "to begin with they think of each other as their natures suit (%.0f)" % main.regard(one, two))
+	main.warm(one, two, 60.0 - main.regard(one, two))
+	main.warm(two, one, 60.0 - main.regard(two, one))
+	one.meet(Cryptlin.State.SNIFF, two)
+	check(await _until(func() -> bool: return one.state == Cryptlin.State.SNIFF and one.step == 1, 600) and one.position.distance_to(two.position) < 1.3, "one goes over to the other and sniffs at it")
+	check(await _until(func() -> bool: return one.state != Cryptlin.State.SNIFF, 300) and main.regard(one, two) > 60.0 and main.regard(two, one) > 60.0, "and they think the better of each other for it")
+	two.position = Vector3(1.2, 0, 0.8)
+	two.target = Vector3(-1.2, 0, -0.6)
+	two._enter(Cryptlin.State.WANDER)
+	one.meet(Cryptlin.State.FOLLOW, two)
+	await _frames(150)
+	check(one.state == Cryptlin.State.FOLLOW and one.position.distance_to(two.position) < 1.7, "one trails round after the other")
+	for p: Cryptlin in [one, two]:
+		p._enter(Cryptlin.State.IDLE, 30.0)
+		p.fun = 40.0
+	var liking := main.standing(one, two)
+	one.meet(Cryptlin.State.TAG, two)
+	check(one.state == Cryptlin.State.TAG and two.state == Cryptlin.State.FLEE, "a game of chase: one runs and the other runs after it")
+	check(await _until(func() -> bool: return not one.state in [Cryptlin.State.TAG, Cryptlin.State.FLEE] and not two.state in [Cryptlin.State.TAG, Cryptlin.State.FLEE], 2400), "which ends")
+	check(one.fun > 40.0 and two.fun > 40.0 and main.standing(one, two) > liking, "with both the better amused and the better friends (%.0f)" % main.standing(one, two))
+	# Asleep in the one nest: a heap if they get on, side by side if not
+	main.move_nest(Vector3(0, 0, 0.2))
+	main.warm(one, two, 80.0 - main.regard(one, two))
+	main.warm(two, one, 80.0 - main.regard(two, one))
+	for p: Cryptlin in [one, two]:
+		p.energy = 30.0
+		p.position = main.nest_pos + Vector3(0.05 if p == one else -0.05, 0, 0)
+		p.velocity = Vector3.ZERO
+		p._enter(Cryptlin.State.SLEEP)
+	await _frames(120)
+	var heaped := one.position.distance_to(two.position)
+	main.warm(one, two, -60.0)
+	main.warm(two, one, -60.0)
+	await _frames(120)
+	check(heaped > 0.05 and heaped < one.position.distance_to(two.position) - 0.1, "two that get on sleep in a heap, and two that do not lie apart (%.2f, %.2f)" % [heaped, one.position.distance_to(two.position)])
+	main.warm(one, two, 30.0)
+	main.warm(two, one, 30.0)
+	liking = main.standing(one, two)
+	main.set_lamp(Den.Lamp.OFF)
+	main.pass_time(4.0 * 3600.0)
+	check(one.state == Cryptlin.State.SLEEP and two.state == Cryptlin.State.SLEEP and main.standing(one, two) > liking + 1.0, "a night in the one nest brings them round to each other (%.0f, from %.0f)" % [main.standing(one, two), liking])
+	main.set_lamp(Den.Lamp.BRIGHT)
+
+	# Falling out. Two that are fed, at home and on good terms all but never fight
+	for p: Cryptlin in [one, two]:
+		p.set_needs({"belly": 90.0, "energy": 90.0, "fun": 60.0, "health": 100.0, "bowel": 0.0, "bladder": 0.0})
+		p.comfort = 70.0
+		p._enter(Cryptlin.State.IDLE, 30.0)
+		p.flash_time = 0.0
+	one.position = Vector3(-0.3, 0, 0.5)
+	two.position = Vector3(0.3, 0, 0.5)
+	main.warm(one, two, 70.0 - main.regard(one, two))
+	main.warm(two, one, 70.0 - main.regard(two, one))
+	await _frames(3)
+	check(one.temper(two) < 0.05 and not one.squabble(two, 0.5), "two that are fed, at home and on good terms have next to no fight in them (%.2f)" % one.temper(two))
+	# An ill-matched hungry pair is another matter
+	main.warm(one, two, -100.0)
+	main.warm(two, one, -100.0)
+	main.warm(one, two, 20.0)
+	main.warm(two, one, 20.0)
+	one.belly = 10.0
+	two.belly = 10.0
+	check(one.temper(two) > 0.9, "two that are hungry and cannot stand each other are spoiling for one (%.2f)" % one.temper(two))
+	check(one.squabble(two, 1.0) and main.scuffle != null and one.state == Cryptlin.State.SCUFFLE and two.state == Cryptlin.State.SCUFFLE and not one.visible and not two.visible, "and come to blows: a ball of dust with the pair of them in it")
+	check(await _until(func() -> bool: return main.scuffle == null, 400) and one.visible and two.visible, "which is soon over")
+	var loser := one if one.health < two.health else two
+	var winner := two if loser == one else one
+	check(is_equal_approx(loser.health, 100.0 - Cryptlin.FIGHT_HURT) and winner.health == 100.0 and loser.state == Cryptlin.State.COWED, "the loser backs off a little the worse for it (%.0f)" % loser.health)
+	check(is_equal_approx(main.regard(one, two), 20.0 - Den.FIGHT_SOURS) and is_equal_approx(main.regard(two, one), 20.0 - Den.FIGHT_SOURS), "and each thinks the less of the other")
+	check(not one.squabble(two, 1.0), "they do not go straight back to it")
+	for round in 3:
+		await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+		for p: Cryptlin in [one, two]:
+			p.health = minf(p.health, Cryptlin.FIGHT_FLOOR + 3.0)
+			p.fight_cooldown = 0.0
+			p.belly = 10.0
+		one.squabble(two, 1.0)
+		await _until(func() -> bool: return main.scuffle == null, 400)
+	check(is_equal_approx(minf(one.health, two.health), Cryptlin.FIGHT_FLOOR), "fight after fight never takes one below the floor (%.0f, %.0f)" % [one.health, two.health])
+	# The keeper can break it up: a tap, food dropped on it, the lamp swung over it
+	for way in 3:
+		await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+		for p: Cryptlin in [one, two]:
+			p.health = 80.0
+			p.fight_cooldown = 0.0
+			p.belly = 10.0
+			p.position = Vector3(-0.3 if p == one else 0.3, 0, 0.6)
+		one.squabble(two, 1.0)
+		await _frames(20)
+		match way:
+			0:
+				await _tap(_screen(main.scuffle.position + Vector3(0, 0.35, 0)))
+			1:
+				main.feed(Snack.Kind.BONE, main.scuffle.position + Vector3(0, 1.5, 0))
+				await _until(func() -> bool: return main.scuffle == null, 100)
+			2:
+				main.light_goal = main.scuffle.position
+				main.light_point = main.scuffle.position
+				main.light_dragging = true
+				await _frames(3)
+				main.light_dragging = false
+		check(main.scuffle == null and main.scuffle_left > 0.5 and one.health == 80.0 and two.health == 80.0 and one.visible and two.visible, "%s breaks it up, and nobody is hurt" % ["a tap on the scuffle", "food dropped on it", "the lamp swung over it"][way])
+		main._clear_toys()
+	# A grown one never hurts a baby
+	await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+	two.age = 0.0
+	for p: Cryptlin in [one, two]:
+		p.fight_cooldown = 0.0
+	one.squabble(two, 1.0)
+	check(main.scuffle == null and two.state == Cryptlin.State.SHOVED and two.health == 80.0 and one.health == 80.0, "a grown one does not fight a baby: it cuffs it away, and the baby is not hurt")
+	two.age = Cryptlin.GROW_AGE
+	# Left to themselves, the hungry pair fall out of their own accord
+	for round in 8:
+		if main.scuffle != null:
+			break
+		await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+		for p: Cryptlin in [one, two]:
+			p.fight_cooldown = 0.0
+			p.belly = 10.0
+			p._enter(Cryptlin.State.IDLE, 4.0)
+			p.position = Vector3(-0.3 if p == one else 0.3, 0, 0.6)
+		if round % 2 == 1:
+			main.feed(Snack.Kind.BONE, Vector3(0, 2.0, 0.6))
+		await _until(func() -> bool: return main.scuffle != null, 400)
+	check(main.scuffle != null, "left to themselves, a hungry pair that do not get on fall out: over being crowded, or over food")
+	await _until(func() -> bool: return main.scuffle == null, 400)
+	main._clear_toys()
+	var worse := minf(one.health, two.health)
+	var thinks := main.regard(one, two)
+	await _restart()
+	one = main.residents[0].pet
+	two = main.residents[1].pet
+	check(is_equal_approx(minf(one.health, two.health), worse) and is_equal_approx(main.regard(one, two), thinks), "health and what they think of each other are kept")
+	for p: Cryptlin in [one, two]:
+		p.set_needs({"belly": 80.0, "health": 100.0})
+		p.fight_cooldown = 9999.0
 
 	# The room holds four and no more
 	await _tap(_on_shelf("egg"))

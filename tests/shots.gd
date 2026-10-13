@@ -215,6 +215,28 @@ func _run_many() -> void:
 		all[i].energy = 90.0
 		all[i].position = Vector3(-1.1 + i * 1.1, 0, 0.6)
 		all[i]._enter(Cryptlin.State.IDLE, 30.0)
+	# What they get up to together: a sniff, a chase, a fight and the loser afterwards
+	for pet in all:
+		pet.fight_cooldown = 0.0
+	all[0].meet(Cryptlin.State.SNIFF, all[1])
+	await _until(func() -> bool: return all[0].step == 1, 6.0)
+	await _wait(0.6)
+	await _snap("n1_sniff")
+	all[2].meet(Cryptlin.State.TAG, all[0])
+	await _wait(1.2)
+	await _snap("n2_chase")
+	await _until(func() -> bool: return all[2].state != Cryptlin.State.TAG and all[2].state != Cryptlin.State.FLEE, 12.0)
+	all[0].position = Vector3(-0.2, 0, 0.7)
+	all[1].position = Vector3(0.4, 0, 0.7)
+	main.start_fight(all[0], all[1])
+	await _wait(0.9)
+	await _snap("n3_scuffle")
+	await _wait(0.5)
+	await _snap("n3_scuffle2")
+	await _until(func() -> bool: return main.scuffle == null, 6.0)
+	await _wait(1.6)
+	await _snap("n4_after")
+	await _wait(2.5)
 	main.new_egg()
 	await _wait(2.0)
 	main.start_scan(all[1].me)

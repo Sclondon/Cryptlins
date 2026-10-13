@@ -97,6 +97,21 @@ back, two at one bit of food share it bite by bite, and one that will not eat a 
 than one will chase a toy. They walk round each other as they do round the things in the room, and sleep side by
 side in the one nest. The marks on the row of things are what is known of the one last tapped or scanned.
 
+Each pair has a **standing** with one another, kept in the save: what each thinks of the other, a little either side
+of indifferent to begin with by how their natures suit (opposites grate, a grumpy one is hard going, a nature in
+common or a cuddly one helps). It goes up when they sniff at each other, play chase, go after the same toy, eat side
+by side and sleep in the one nest, and down when they fight. Left to themselves one will go over and sniff at
+another, trail round after one it likes (a baby after anybody), or start a game of chase that turns round when it
+catches up. Two that get on sleep in a heap; two that do not lie apart, or one takes the floor.
+
+Two that do not get on can come to blows: over food one will not back off from, over a favourite toy, over a sniff
+taken as a liberty, or because a hungry or grumpy one finds another standing too close. It is a ball of dust with
+the odd limb and star coming out of it and a good deal of squeaking, over in a few seconds; the loser backs off to
+the far side of the room with a little less **health**, and both think less of each other. A tap on the scuffle
+(or a finger held on it, which picks one of them up), food dropped on it or the lamp swung over it breaks it up
+with nobody hurt. Two that are fed, at home and on good terms all but never fight; fighting alone never takes one
+below a third of its health; and a grown one does not fight a baby: it cuffs it out of the way, unhurt.
+
 **Let go** (on a cryptlin's page of the notebook) asks first, then that one waves and walks off into the dark. No
 egg comes in its place, unless the room is left with nobody in it: an empty room is always sent an egg for nothing.
 
@@ -128,7 +143,7 @@ odd-sized eyes, its natures and its tastes.
   `scripts/items.gd` lists what can be on it; inside a site that keeps a shop, only what comes free and what has been
   bought.
 - `scripts/decor.gd`: the things that stand in the room (shelters and the pool among them) and the nests.
-  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
+  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
 - The PlayStation look: the room is drawn into a SubViewport 240 pixels on its short side and blown up with hard
   pixels by `shaders/ps1_screen.gdshader`, which also cuts it to 15-bit colour with the console's dither pattern.
@@ -152,7 +167,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, old saves, eggs as stock
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, how they get on and fall out, old saves, eggs as stock
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, or of three sharing the room
 godot --headless --path . --export-release Web build/index.html
 ```
