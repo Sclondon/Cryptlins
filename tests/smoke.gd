@@ -1856,6 +1856,11 @@ func _run() -> void:
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	pet.position = Vector3(0, 0, 0.6)
 	var comfort := main.comfort_of(pet)
+	# (a gravestone is not to be had for the asking: what is tried here is something that is)
+	if pet.like_decor[0] == Decor.Kind.GRAVESTONE:
+		pet.like_decor[0] = Decor.Kind.SKULL if pet.hate_decor != Decor.Kind.SKULL and not Decor.Kind.SKULL in pet.like_decor else Decor.Kind.FERN
+	if pet.hate_decor == Decor.Kind.GRAVESTONE:
+		pet.hate_decor = Decor.Kind.PUMPKIN if not Decor.Kind.PUMPKIN in pet.like_decor else Decor.Kind.DISH
 	var liked: int = pet.like_decor[0]
 	await _tap(_on_shelf(Decor.IDS[liked]))
 	check(main.decor_of(liked) != null, "a tap on the %s stands it in the room" % Decor.PLAIN[liked])
