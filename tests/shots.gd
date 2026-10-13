@@ -10,6 +10,7 @@ extends SceneTree
 ## them; fewer to a row with --per, for the wide ones; turned any way with --turn; with --with=K every
 ## other one is of kind K, to see two kinds side by side).
 ## With --wheel: the wheel of things at both of its stops and part of the way round.
+## With --knack [--at=SECONDS] [--then=SECONDS]: the kind taking a turn at the one thing only it does, with another beside it: two moments of it side by side (so long after it gets going, and so long after that).
 ## With --pool (and no other of those): four in a room with the pool in it, in each place it fits and under each lamp.
 
 # The save this run uses: one for each kind and shape of screen, so that several can be run at once
@@ -35,6 +36,9 @@ var per_row := 4
 var turned := 0.0
 var wheel := false
 var pool := false
+var knack := false
+var first_wait := 0.8
+var second_wait := 1.8
 
 
 func _initialize() -> void:
@@ -55,6 +59,12 @@ func _initialize() -> void:
 			ui_only = true
 		if arg == "--scan":
 			scan_only = true
+		if arg == "--knack":
+			knack = true
+		if arg.begins_with("--at="):
+			first_wait = float(arg.trim_prefix("--at="))
+		if arg.begins_with("--then="):
+			second_wait = float(arg.trim_prefix("--then="))
 		if arg == "--pool":
 			pool = true
 		if arg == "--many":
@@ -84,10 +94,10 @@ func _initialize() -> void:
 	if variety:
 		_run_variety.call_deferred()
 		return
-	if many or pool:
+	if many or pool or knack:
 		# Three of different kinds (or, for the pool, four), grown, as a save holds them
 		var three: Array = []
-		for i in (4 if pool else 3):
+		for i in (4 if pool else (2 if knack else 3)):
 			var k := (kind + i * 5) % Cryptlin.KINDS.size()
 			three.append({"id": i + 1, "name": ["Mog", "Pim", "Zog", "Nib"][i], "kind": Cryptlin.KINDS[k]["title"], "seed": maxi(look, 1) + i * 37, "hatched": true, "born": Time.get_unix_time_from_system() - 200000.0, "needs": {"belly": 70.0, "fun": 70.0, "energy": 90.0, "love": 50.0}})
 		var f := FileAccess.open(save, FileAccess.WRITE)
@@ -102,7 +112,9 @@ func _initialize() -> void:
 	main.first_kind = kind
 	main.ask_names = false
 	root.add_child(main)
-	if pool:
+	if knack:
+		_run_knack.call_deferred()
+	elif pool:
 		_run_pool.call_deferred()
 	elif many:
 		_run_many.call_deferred()
@@ -492,6 +504,46 @@ func _run_variety() -> void:
 	var tag := "%s%s%s%s%s%s" % ["_with%d" % beside if beside >= 0 else "", "_side" if side_on else "", "_turn%d" % roundi(rad_to_deg(turned)) if turned != 0.0 else "", "_baby" if baby else "", "_dark" if dark else "", "_xray" if bare else ""]
 	sheet.resize(sheet.get_width() * 2, sheet.get_height() * 2, Image.INTERPOLATE_NEAREST)
 	sheet.save_png("%s/k%d_variety%s.png" % [out, kind, tag])
+	quit()
+
+
+# Its knack: one of the kind with another beside it and what it needs to hand, taking its turn
+# at it. One picture of two moments, the middle of the room cut out of each and set side by side.
+func _run_knack() -> void:
+	await _wait(1.0)
+	var pet: Cryptlin = main.residents[0].pet
+	var mate: Cryptlin = main.residents[1].pet
+	if pet.kind in [Cryptlin.Kind.NESSIE, Cryptlin.Kind.KELPIE]:
+		main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
+	main.place_decor(Decor.Kind.SKULL, Vector3(1.4, 0, 0.9))
+	main.play_ball(Ball.Kind.BALL)
+	main.ball.position = Vector3(-1.5, 0.2, 1.1)
+	main.ball.vel = Vector3.ZERO
+	for p: Cryptlin in [pet, mate]:
+		p.set_needs({"belly": 90.0, "energy": 90.0, "fun": 50.0})
+		p.fight_cooldown = 999.0
+		p.ball_cooldown = 999.0
+		p.beg_cooldown = 999.0
+		p.emote_again = 999.0
+		p._enter(Cryptlin.State.IDLE, 60.0)
+	pet.position = Vector3(-0.6, 0, 0.8)
+	mate.position = Vector3(0.6, 0, 0.8)
+	await _wait(0.6)
+	pet.knack.again = 0.0
+	pet._enter(Cryptlin.State.TRICK)
+	var cut := Rect2i(250, 110, 780, 520)
+	var sheet := Image.create(cut.size.x * 2, cut.size.y, false, Image.FORMAT_RGB8)
+	for moment in 2:
+		if moment == 0:
+			await _until(func() -> bool: return pet.step >= 1, 6.0)
+			await _wait(first_wait)
+		else:
+			await _wait(second_wait)
+		await RenderingServer.frame_post_draw
+		var shot := root.get_texture().get_image()
+		shot.convert(Image.FORMAT_RGB8)
+		sheet.blit_rect(shot, cut, Vector2i(cut.size.x * moment, 0))
+	sheet.save_png("%s/k%d_knack.png" % [out, kind])
 	quit()
 
 

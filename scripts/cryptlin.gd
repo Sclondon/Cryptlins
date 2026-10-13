@@ -9,7 +9,7 @@ enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
 	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED, INSPECT, SCANNED, VISIT, MOVE_NEST,
 	TOILET, FOND, SCRATCH, STRETCH, DIG, SPIN, GAZE,
-	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED, DYING, PAIR, FLOUNDER,
+	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED, DYING, PAIR, FLOUNDER, TRICK, SPELL,
 }
 # The cryptids they are the young of
 enum Kind {
@@ -435,6 +435,10 @@ var lungs: Array[MeshInstance3D] = []
 var brain: MeshInstance3D
 var lift := 0.0
 var fall_v := 0.0
+# How far under the floor (or the water) it has gone, for those whose knack takes them there
+var dive := 0.0
+# The one thing its kind does that no other does (see Knack)
+var knack: Knack
 
 var state: int = State.IDLE
 var state_time := 0.0
@@ -911,6 +915,7 @@ func _build() -> void:
 		add_child(z)
 		zzz.append(z)
 	_build_emote()
+	knack = Knack.new(self)
 
 
 func _build_gremlin(chub: float, ear_len: float, horns: bool) -> void:
@@ -2494,7 +2499,7 @@ func _sunk() -> float:
 # Whether it is in the pool with no business there: carried over it and let go, shoved in, or
 # the water come to where it was standing
 func _swamped() -> bool:
-	return not needs_water() and lift <= 0.05 and Den.wade(position) > 0.15 and not state in [State.FLOUNDER, State.HELD, State.SHOVED, State.LEAVE, State.SCUFFLE]
+	return not needs_water() and lift <= 0.05 and Den.wade(position) > 0.15 and not state in [State.FLOUNDER, State.HELD, State.SHOVED, State.LEAVE, State.SCUFFLE, State.TRICK, State.SPELL]
 
 
 func is_baby() -> bool:
@@ -2809,6 +2814,7 @@ func _process(delta: float) -> void:
 	pounce_cooldown -= delta
 	nest_cooldown -= delta
 	fond_cooldown -= delta
+	knack.always(delta)
 	glance_time -= delta
 	_tick_needs(delta)
 	_feel(delta)
@@ -2861,6 +2867,9 @@ func _enter(s: int, length := 0.0) -> void:
 	# And there is no digging where it stands in water
 	if s == State.DIG and Den.wade(position) > 0.0:
 		s = State.IDLE
+	# Whatever its knack, or a spell on it, had changed about it is put back
+	if state in [State.TRICK, State.SPELL]:
+		knack.over()
 	waiting = false
 	if state == State.PETTED and s != State.PETTED:
 		world.sfx.purr(false)
@@ -2954,6 +2963,8 @@ func _enter(s: int, length := 0.0) -> void:
 			visiting = world.somewhere_to_go(self)
 			kicks = 0
 			wag = 5.0
+		State.TRICK:
+			knack.begin()
 		State.FLOUNDER:
 			# Out by the shortest way, and making the most of it
 			target = Den.on_dry(position, 0.3, 0.45)
@@ -3086,6 +3097,8 @@ func _decide() -> void:
 		options[State.DIG] = 6.0 * digger * (1.0 if world.floor_style >= 4 else 0.5) * (1.5 if _is(1) or _is(7) else 1.0) * (1.4 if world.floor_style == fav_ground else 1.0)
 	if tail.get_child_count() > 0 and energy > 40.0:
 		options[State.SPIN] = 3.0 * float(likes["zoom"])
+	if knack.ready():
+		options[State.TRICK] = knack.weight()
 	if _fancies():
 		options[State.FOND] = 3.0
 	# The others: a sniff at one, trailing after one it likes (a baby after anybody), a chase
@@ -3351,6 +3364,10 @@ func _think(delta: float) -> void:
 					if visiting.kind in like_decor:
 						love = minf(love + 0.3, 100.0)
 					_enter(State.IDLE, 1.0)
+		State.TRICK:
+			knack.tick(delta)
+		State.SPELL:
+			knack.spelled(delta)
 		State.FLOUNDER:
 			# Thrashing for the bank, and none too pleased once it is on it
 			gaze = target + Vector3(0, 0.2, 0)
@@ -3902,7 +3919,7 @@ func temper(other: Cryptlin) -> float:
 
 # Whether it is in a state to be fought with: up, on dry floor and not in anybody's hands
 func _can_fight() -> bool:
-	return fight_cooldown <= 0.0 and lift <= 0.05 and Den.wade(position) <= 0.0 and not state in [State.SLEEP, State.HELD, State.LEAVE, State.SCANNED, State.SCUFFLE, State.COWED, State.SHOVED, State.PETTED, State.FLOUNDER]
+	return fight_cooldown <= 0.0 and lift <= 0.05 and Den.wade(position) <= 0.0 and not state in [State.SLEEP, State.HELD, State.LEAVE, State.SCANNED, State.SCUFFLE, State.COWED, State.SHOVED, State.PETTED, State.FLOUNDER, State.TRICK, State.SPELL]
 
 
 # Something to fall out over (food, the toy, being crowded): at these odds, and by how ready
@@ -4204,7 +4221,7 @@ func _move(delta: float) -> void:
 			_keep_off_others(delta)
 			# One that does not live in water goes no further than the edge of the pool, unless
 			# it is sent in (when it has to get itself out again: see _swamped)
-			if not needs_water() and Den.wade(position) <= 0.15 and not state in [State.SHOVED, State.FLOUNDER, State.HELD]:
+			if not needs_water() and Den.wade(position) <= 0.15 and not state in [State.SHOVED, State.FLOUNDER, State.HELD, State.SPELL]:
 				var ashore := Den.on_dry(position, 0.0, 0.1 * grow)
 				position.x = ashore.x
 				position.z = ashore.z
@@ -4218,7 +4235,7 @@ func _move(delta: float) -> void:
 			jump_y = 0.0
 			airborne = false
 			squash_v = 3.2
-	position.y = jump_y + lift + _sunk()
+	position.y = jump_y + lift + _sunk() - dive
 	rotation.y = yaw
 
 
@@ -4360,6 +4377,8 @@ func _animate(delta: float) -> void:
 func xray(on: bool) -> void:
 	if on == xrayed:
 		return
+	if on:
+		knack.over()
 	xrayed = on
 	if insides.is_empty():
 		_build_insides()
@@ -4369,12 +4388,18 @@ func xray(on: bool) -> void:
 		scan_skin = Ps1.xray(Color(0.35, 0.85, 1.0), true)
 		_ghost(self, scan_skin)
 	else:
-		for mi: MeshInstance3D in skin:
-			if is_instance_valid(mi):
-				mi.material_override = skin[mi]
-		skin.clear()
+		_unghost()
 
 
+# What it wore before it was turned to one stuff all over (see _ghost) is put back on it
+func _unghost() -> void:
+	for mi: MeshInstance3D in skin:
+		if is_instance_valid(mi):
+			mi.material_override = skin[mi]
+	skin.clear()
+
+
+# Turns the whole of it to one stuff, remembering what each part of it wore
 func _ghost(node: Node, ghost: Material) -> void:
 	if node == bubble or node == emote or node in insides:
 		return

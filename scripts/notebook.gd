@@ -26,6 +26,8 @@ Two grown ones that are fond of each other, fed and at home may pair off, and so
 
 One left hungry for days sickens, and in the end dies.
 
+Each kind has a knack of its own that none of the others has. Watch for it.
+
 The scanner on the wheel shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, how well it is, and whether it likes its home. Drag it up onto the one you mean."
 const SHELF := "Everything you have rides a wheel at the bottom of the screen, the scanner first and this notebook last. Turn it sideways to see the rest.
 
@@ -258,6 +260,7 @@ Likes the lamp: %s
 Likes having about: %s
 Can't stand: %s
 Needs water: %s
+Its knack: %s
 
 What it shows you gets written down here." % [
 		pet.nature_name(), "baby " if pet.is_baby() else "", pet.kind_name(), _parents(pet.me, "
@@ -270,6 +273,7 @@ Hatched from an egg laid here. Its parents are %s and %s."), grown, pet.feeling_
 		", ".join(likes) if not likes.is_empty() else "?",
 		"the " + hates if open or known.get("decor-" + Decor.IDS[pet.hate_decor], false) else "?",
 		water if open or known.get("water", false) else "?",
+		"it " + Knack.NOTES[pet.kind] if open or known.get("knack", false) else "?",
 	]
 
 

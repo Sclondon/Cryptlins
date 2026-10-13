@@ -237,6 +237,64 @@ func _snowball(pet: Cryptlin) -> void:
 	pet.grow = pet.size_goal()
 
 
+# The one thing its kind does that no other does: it is not known until it is seen; given what
+# it needs (light, another of them at a loose end, a toy, a thing in the room, a pool for those
+# whose knack is in the water) it is one of the things it may take it into its head to do; the
+# turn comes off, and is written in the notebook; and when it is over nothing is left changed
+func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
+	if Knack.NOTES[pet.kind] == "":
+		return
+	check(not pet.me.known.get("knack", false) and main.notebook._notes(pet).contains("Its knack: ?"), "its knack is not written down before it has been seen")
+	var wet := pet.kind in [Cryptlin.Kind.NESSIE, Cryptlin.Kind.KELPIE]
+	if wet:
+		main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
+	var skull := main.place_decor(Decor.Kind.SKULL, Vector3(1.6, 0, 1.2))
+	main.play_ball(Ball.Kind.BALL)
+	main.ball.position = Vector3(-1.6, 0.2, 1.3)
+	main.ball.vel = Vector3.ZERO
+	for p: Cryptlin in [pet, mate]:
+		p.set_needs({"belly": 90.0, "energy": 90.0, "fun": 50.0, "health": 100.0, "bowel": 0.0, "bladder": 0.0})
+		p.fight_cooldown = 9999.0
+		p.ball_cooldown = 9999.0
+		p.beg_cooldown = 9999.0
+		p._enter(Cryptlin.State.IDLE, 60.0)
+	pet.position = Vector3(-0.6, 0, 0.9)
+	mate.position = Vector3(0.6, 0, 0.9)
+	await _frames(30)
+	pet.knack.again = 0.0
+	check(pet.knack.ready(), "with what it needs to hand, it is ready to do it")
+	var turns := 0
+	for i in 300:
+		pet.knack.again = 0.0
+		pet._enter(Cryptlin.State.IDLE, 1.0)
+		mate._enter(Cryptlin.State.IDLE, 60.0)
+		pet._decide()
+		if pet.state == Cryptlin.State.TRICK:
+			turns += 1
+	check(turns >= 3, "it is one of the things it takes it into its head to do (%d times in 300)" % turns)
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+	mate._enter(Cryptlin.State.IDLE, 60.0)
+	pet.position = Vector3(-0.6, 0, 0.9)
+	pet.knack.again = 0.0
+	pet._enter(Cryptlin.State.TRICK)
+	var came_off := await _until(func() -> bool: return pet.state != Cryptlin.State.TRICK, 1800)
+	check(came_off and pet.knack.done, "it does it: it %s" % Knack.NOTES[pet.kind])
+	check(pet.me.known.get("knack", false) and main.notebook._notes(pet).contains(Knack.NOTES[pet.kind]), "and once seen it is written in the notebook")
+	check(not pet.knack.ready(), "it does not do it again at once")
+	await _until(func() -> bool: return mate.state != Cryptlin.State.SPELL and mate.state != Cryptlin.State.FLOUNDER and pet.lift <= 0.0, 900)
+	await _frames(90)
+	var clean := is_zero_approx(pet.dive) and is_zero_approx(pet.torso.position.x) and pet.skin.is_empty() and mate.skin.is_empty() and pet.visible and mate.visible and main.flicker <= 0.0
+	check(clean and pet.lift <= 0.05 and mate.lift <= 0.05 and mate.health >= 100.0 and not main.would_pair(pet, mate), "and when it is over nothing is left changed, and nobody the worse")
+	main._clear_toys()
+	main.remove_decor(skull)
+	if wet:
+		main.remove_decor(main.decor_of(Decor.Kind.POOL))
+	for p: Cryptlin in [pet, mate]:
+		p.ball_cooldown = 0.0
+		p.beg_cooldown = 0.0
+		p._enter(Cryptlin.State.IDLE, 1.0)
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -1785,5 +1843,14 @@ func _run() -> void:
 	main._dev_egg()
 	await _frames(170)
 	check(main.who().pet != null and main.who().egg == null, "which hatches when told to")
+
+	# Its knack, with another of them in the room to work it on
+	main.dev_toggle()
+	main.dev_show(kind)
+	var beside := main.new_egg((kind + 5) % Cryptlin.KINDS.size())
+	beside.egg.warmth = 100.0
+	check(await _until(func() -> bool: return main.pets().size() == 2, 900), "one of another kind hatches beside it")
+	await _until(func() -> bool: return _settled(main.residents[0].pet) and _settled(main.residents[1].pet), 600)
+	await _knack(main.residents[0].pet, main.residents[1].pet)
 	print("smoke: %d failure(s)" % failures)
 	quit(failures)

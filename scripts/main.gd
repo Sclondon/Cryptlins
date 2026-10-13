@@ -118,6 +118,10 @@ var decors: Array[Decor] = []
 var messes: Array[Mess] = []
 # Footprints on the floor just now (see leave_print)
 var tracks: Array[Track] = []
+# What their knacks have done to the room for the moment (see Knack): how long the lamp has
+# left to flicker, and the things that are shrivelled, each with how long it has left to be
+var flicker := 0.0
+var shrivelled := {}
 var nest: Node3D
 var nest_pos := Vector3(-1.6, 0, -1.2)
 
@@ -2264,6 +2268,27 @@ func leave_print(shape: String, at: Vector3, facing: float, side: float, big: fl
 	tracks.append(print)
 
 
+# Leaves a thing in the room (or the toy) shrivelled for so many seconds: sunk in on itself,
+# and filling out again at the end of them
+func shrivel(thing: Node3D, seconds: float) -> void:
+	shrivelled[thing] = seconds
+
+
+# What is shrivelled comes back to its shape as its time runs out
+func _plump(delta: float) -> void:
+	for thing: Variant in shrivelled.keys():
+		if not is_instance_valid(thing):
+			shrivelled.erase(thing)
+			continue
+		shrivelled[thing] = float(shrivelled[thing]) - delta
+		var sunk := clampf(float(shrivelled[thing]) / 4.0, 0.0, 1.0)
+		thing.scale = thing.scale.lerp(Vector3.ONE.lerp(Vector3(0.8, 0.45, 0.8), sunk), 1.0 - exp(-delta * 5.0))
+		if float(shrivelled[thing]) <= 0.0:
+			thing.scale = Vector3.ONE
+			shrivelled.erase(thing)
+
+
+
 # Water thrown up by something wading in the pool
 func splash(at: Vector3) -> void:
 	crumbs(Vector3(at.x, Decor.WATER + 0.08, at.z), Color(0.5, 0.75, 0.9))
@@ -2292,6 +2317,11 @@ func _process(delta: float) -> void:
 		lamp_energy = lerpf(lamp_energy, float(mode["energy"]) * (2.6 if tall_room else 1.2), ease_in)
 		lamp_angle = lerpf(lamp_angle, float(mode["angle"]) * (0.6 if tall_room else 1.0), ease_in)
 	spot.light_energy = lamp_energy * light_level * (1.0 + sin(clock * 13.0) * sin(clock * 3.1) * 0.025)
+	if flicker > 0.0:
+		# Something is at the cord: it gutters
+		flicker -= delta
+		spot.light_energy *= 0.15 if sin(clock * 61.0) * sin(clock * 23.0) > 0.1 else 1.0
+	_plump(delta)
 	spot.spot_angle = lamp_angle
 	spot.visible = light_level > 0.001
 	bulb.material_override.set_shader_parameter("tint", Color(0.2, 0.17, 0.15).lerp(spot.light_color, light_level))

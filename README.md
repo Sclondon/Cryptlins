@@ -125,6 +125,26 @@ below a third of its health; and a grown one does not fight a baby: it cuffs it 
 **Let go** (on a cryptlin's page of the notebook) asks first, then that one waves and walks off into the dark. No
 egg comes in its place, unless the room is left with nobody in it: played by itself, an empty room is always sent an
 egg for nothing (inside a host page it waits for one of the keeper's own, as above).
+## Knacks
+
+Each kind has one thing that only it does, out of its own legend: its **knack** (`scripts/knack.gd`). It is a turn
+the cryptlin takes now and then, of its own accord, like wandering off or having a scratch (`State.TRICK`, with a
+weight in `Cryptlin._decide`), with its own antics and noises, and for some a small real effect on the room or on
+another of them that soon wears off. One that needs something that is not there (another of them at a loose end, a
+toy, the pool) simply does not do it until there is. No knack hurts anybody, starts a fight or a pairing, or gets
+round any of the room's rules; what is done to another is a spell on it (`State.SPELL`) that runs out by itself, and
+picking one up, scanning it or anything else that takes it out of its turn puts everything back as it was. Nothing
+says what a knack is: the keeper finds out by seeing it done, and from then on it is written on that cryptlin's page
+of the notebook ("Its knack", a "?" until then).
+
+| Kind | Its knack |
+| --- | --- |
+| gremlin | Goes and gets at the lamp's cord, jumping for it, and the light flickers while it does. |
+| squatchling | Looked at too long it goes still and will not come into focus; then it slips off to where it cannot be seen, and its footprints are what is left. |
+| cockatrice | Fixes one of the others with its eye until its own eyes blaze, and that one stands stiff and grey as stone for a few seconds. |
+| mothman | Flies up and circles the bulb, throwing its shadow over the room. It does so three times as often when there is trouble coming (one of them poorly, two of them close to blows), and then its eyes glare. |
+| chupacabra | Creeps up on the toy, or a thing in the room, gets its teeth into it and sucks. The thing is left shrivelled for most of a minute. |
+
 ## Health, and dying
 
 Each has a **health**, 0 to 100, kept with its needs. It wears away while its belly is empty (all of it in four
@@ -218,6 +238,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   not live in water is stopped at the edge in `Cryptlin._move()`, and gets itself out (`State.FLOUNDER`) if it is
   ever further in.
   `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
+- `scripts/knack.gd`: the one thing each kind does that no other does (see Knacks above).
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
   `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes. The scanner itself is
   `Items.scanner()`, and `Den._aim_scanner()` holds it in a lower corner of the view (the one further from whoever it
@@ -245,8 +266,8 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock and the empty room inside a host page
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, or one sheet of twelve of the kind, each of another seed
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock and the empty room inside a host page, and the kind's knack
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--knack|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, the kind at its knack, or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots --pool [--portrait] [--kind=N]   # four in a room with the pool: each place it fits, each lamp, one let go over the middle of it, food and a toy afloat, a drink at the edge, and all asleep
 ```
