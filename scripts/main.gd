@@ -1350,6 +1350,9 @@ func _aim_scanner() -> void:
 	scanner.global_position = middle + toward * 0.75 - Vector3(0, 0.62 * size, 0)
 	scanner.rotation = Vector3(0, atan2(toward.x, toward.z), 0)
 	sweep.position.y = 0.62 + sin(scan_time * 3.0) * 0.3
+	if pet != null:
+		# (the band on the body is where the bar on the frame is seen against it)
+		pet.scan_skin.set_shader_parameter("band", sweep.global_position.y - toward.y * 0.75)
 
 
 func _word(value: float, words: Array[String]) -> String:
@@ -1379,28 +1382,29 @@ func _paint_notes() -> void:
 	var feet := screen_of(pet.global_position)
 	_note(feet, Vector2(0, 64), "Home", _word(pet.comfort, home), pet.comfort, Color(0.6, 0.9, 0.5), screen_size)
 	var well: Array[String] = ["failing", "poorly", "off colour", "well", "in fine fettle"]
-	_note(screen_of(pet.body_centre()), Vector2(200, 130), "Health", _word(pet.health, well), pet.health, Color(0.93, 0.9, 0.8), screen_size)
+	# (far enough to the side that it is clear of the one under its feet, whose words are wider on a wide screen)
+	_note(screen_of(pet.body_centre()), Vector2(240.0 if screen_size.x < 900.0 else 310.0, 130), "Health", _word(pet.health, well), pet.health, Color(0.93, 0.9, 0.8), screen_size)
 
 
 func _note(from: Vector2, offset: Vector2, title: String, word: String, value: float, colour: Color, screen_size: Vector2) -> void:
-	var font := scan_notes.get_theme_default_font()
-	var wide := maxf(font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x, 120.0)
+	# In the scanner's own lettering (see Readout), bigger where there is the room for it
+	var dot := 3.0 if screen_size.x >= 900.0 else 2.0
+	var wide := maxf(Readout.width(word, dot), 120.0)
 	var at := from + offset
 	# Kept on the screen, and clear of the shelf
 	at.x = clampf(at.x, wide * 0.5 + 12.0, screen_size.x - wide * 0.5 - 12.0)
 	at.y = clampf(at.y, 40.0, shelf.position.y - 60.0)
-	var left := at.x - wide * 0.5
+	var left := floorf(at.x - wide * 0.5)
+	at.y = floorf(at.y)
 	scan_notes.draw_line(from, Vector2(clampf(from.x, left, left + wide), at.y + 8.0), Color(colour, 0.7), 2.0)
 	scan_notes.draw_circle(from, 4.0, colour)
-	scan_notes.draw_string_outline(font, Vector2(left, at.y), title.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 6, Color(0, 0, 0, 0.85))
-	scan_notes.draw_string(font, Vector2(left, at.y), title.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, colour)
+	Readout.paint(scan_notes, Vector2(left, at.y - 13.0), title, 2.0, colour)
 	# How much, in five pips
 	for i in 5:
 		var pip := Rect2(left + i * 18.0, at.y + 7.0, 14.0, 7.0)
 		scan_notes.draw_rect(pip.grow(1.5), Color(0, 0, 0, 0.7))
 		scan_notes.draw_rect(pip, colour if value >= i * 20.0 + 10.0 else Color(colour, 0.22))
-	scan_notes.draw_string_outline(font, Vector2(left, at.y + 36.0), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 6, Color(0, 0, 0, 0.85))
-	scan_notes.draw_string(font, Vector2(left, at.y + 36.0), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Icons.BONE)
+	Readout.paint(scan_notes, Vector2(left, at.y + 21.0), word, dot, Icons.BONE)
 
 
 # ---------------------------------------------------------------- keeping the shelf and the pages up to date

@@ -185,6 +185,7 @@ odd-sized eyes, its natures and its tastes.
 - `scripts/decor.gd`: the things that stand in the room (shelters and the pool among them) and the nests.
   `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
+  `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes.
 - The PlayStation look: the room is drawn into a SubViewport 240 pixels on its short side and blown up with hard
   pixels by `shaders/ps1_screen.gdshader`, which also cuts it to 15-bit colour with the console's dither pattern.
   Every solid thing uses `shaders/ps1.gdshader` (through `scripts/ps1.gd`), which snaps corners to whole pixels and

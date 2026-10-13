@@ -307,6 +307,8 @@ var inspect_liking := 0
 var inspect_key := ""
 # Under the scanner: its insides, and what its skin wore before
 var xrayed := false
+# What it wears under the scanner: the scanner tells it how high its sweep has got
+var scan_skin: ShaderMaterial
 var brain_at := Vector3.ZERO
 var insides: Array[Node3D] = []
 var skin := {}
@@ -3603,7 +3605,8 @@ func xray(on: bool) -> void:
 	for part in insides:
 		part.visible = on
 	if on:
-		_ghost(self, Ps1.xray(Color(0.35, 0.85, 1.0)))
+		scan_skin = Ps1.xray(Color(0.35, 0.85, 1.0), true)
+		_ghost(self, scan_skin)
 	else:
 		for mi: MeshInstance3D in skin:
 			if is_instance_valid(mi):

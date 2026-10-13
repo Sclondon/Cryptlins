@@ -39,10 +39,11 @@ static func ball() -> SphereMesh:
 
 
 # What the scanner makes of a body: a ghost of its outline, brightest at the edges
-static func xray(c: Color) -> ShaderMaterial:
+static func xray(c: Color, raster := false) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = XRAY
 	m.render_priority = 1
+	m.set_shader_parameter("lines", 1.0 if raster else 0.0)
 	m.set_shader_parameter("tint", c)
 	return m
 
