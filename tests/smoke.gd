@@ -2382,6 +2382,9 @@ func _run() -> void:
 	main.place_decor(thing_one, Vector3(-1.4, 0, -1.0))
 	check(main.comfort_of(one) > home_one + 10.0 and (main.comfort_of(two) > home_two + 10.0) == (thing_one in two.like_decor), "what one likes having about is not for that reason to the other's liking")
 	main.remove_decor(main.decor_of(thing_one))
+	# (a gravestone stood there for the purpose is nobody's, and is not kept)
+	main.markers_away.clear()
+	main._sync()
 
 	# Saved and restored, and time away is lived through by each
 	for m in main.messes.duplicate():
