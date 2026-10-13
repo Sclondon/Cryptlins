@@ -1,6 +1,6 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..29] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]|--poses [--baby]|--strides [--baby]]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..29] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K [--over]] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]|--poses [--baby]|--strides [--baby]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --scan: the
 ## scanner on the wheel, on the finger, and pointed at a grown one, a baby and an egg. With --faces:
@@ -34,6 +34,8 @@ var variety := false
 var beside := -1
 var side_on := false
 var dark := false
+# With --with: the other kind stands behind the kind in question, and there is a thing of the room behind the last of them
+var over := false
 var bare := false
 var per_row := 4
 var turned := 0.0
@@ -98,6 +100,8 @@ func _initialize() -> void:
 			turned = deg_to_rad(float(arg.trim_prefix("--turn=")))
 		if arg == "--xray":
 			bare = true
+		if arg == "--over":
+			over = true
 		if arg == "--dark":
 			dark = true
 		if arg == "--walk":
@@ -639,6 +643,9 @@ func _run_variety() -> void:
 			sun.light_energy = 0.45
 			main.add_child(sun)
 			sun.look_at_from_position(Vector3(0.5, 2.0, 4.0), Vector3(0, 0.4, 0))
+		if over:
+			main.place_decor(Decor.Kind.PUMPKIN, Vector3(2.0 / per_row + 0.1, 0, 1.45))
+			main.place_decor(Decor.Kind.FERN, Vector3(-2.0 / per_row - 0.25, 0, 1.4))
 		var all := main.pets()
 		for frame in 80:
 			for i in all.size():
@@ -647,6 +654,9 @@ func _run_variety() -> void:
 					pet.age = 0.0
 					pet.grow = pet.size_goal()
 				pet.position = Vector3((i - (per_row - 1) * 0.5) * 4.0 / per_row, 0, 1.9)
+				if over and i % 2 == 1:
+					# (the other kind stood behind the one before it, to be seen through it or not)
+					pet.position = Vector3((i - 1 - (per_row - 1) * 0.5) * 4.0 / per_row + 0.15, 0, 1.3)
 				pet.yaw = PI * 0.5 if side_on else turned
 				pet.velocity = Vector3.ZERO
 				pet.fight_cooldown = 99.0
@@ -663,7 +673,7 @@ func _run_variety() -> void:
 		sheet.blit_rect(shot, strip, Vector2i(0, strip.size.y * row))
 		main.queue_free()
 		await _wait(0.2)
-	var tag := "%s%s%s%s%s%s" % ["_with%d" % beside if beside >= 0 else "", "_side" if side_on else "", "_turn%d" % roundi(rad_to_deg(turned)) if turned != 0.0 else "", "_baby" if baby else "", "_dark" if dark else "", "_xray" if bare else ""]
+	var tag := "%s%s%s%s%s%s%s" % ["_with%d" % beside if beside >= 0 else "", "_over" if over else "", "_side" if side_on else "", "_turn%d" % roundi(rad_to_deg(turned)) if turned != 0.0 else "", "_baby" if baby else "", "_dark" if dark else "", "_xray" if bare else ""]
 	sheet.resize(sheet.get_width() * 2, sheet.get_height() * 2, Image.INTERPOLATE_NEAREST)
 	sheet.save_png("%s/k%d_variety%s.png" % [out, kind, tag])
 	quit()

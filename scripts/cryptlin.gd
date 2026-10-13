@@ -595,6 +595,8 @@ var scan_skin: ShaderMaterial
 var brain_at := Vector3.ZERO
 var insides: Array[Node3D] = []
 var skin := {}
+# What one that can be seen through is made of (see Ps1.ghost): nothing, for all but the kangaroo
+var phantom: Array[ShaderMaterial] = []
 var stomach: Node3D
 var stomach_fill: MeshInstance3D
 var heart: MeshInstance3D
@@ -2933,14 +2935,22 @@ func _build_kangaroo(chub: float, ear_len: float) -> void:
 	brain_at = Vector3(0, 0.13, 0.0)
 	crown = Vector3(0, 0.23, -0.01)
 	# Ash, with a little light of its own, so that it is never quite dark; what is painted on it
-	# is no more than a shade of that
+	# is no more than a shade of that. And it is only half there: the room shows through it, least
+	# through its face and most through its feet and the end of its tail (see ghost.gdshader).
+	# Its eyes are the one solid thing about it.
 	var ghost := fur_colour * 0.68
-	fur = Ps1.mat(ghost, 0.16, 0.6)
+	fur = Ps1.ghost(ghost, 0.4, 0.6)
+	var face := Ps1.ghost(ghost, 0.4, 0.6, 0.12)
 	if marks[0] != Mark.PLAIN or marks[2] != Mark.PLAIN:
-		fur.set_shader_parameter("tex", coat(marks, fur_colour, 0.35))
-		fur.set_shader_parameter("gain", COAT_GAIN)
-	pale = Ps1.mat(fur_colour.lerp(Color(0.95, 0.98, 1.0), 0.5) * 0.8, 0.2, 0.6)
-	dark = Ps1.mat(fur_colour * Color(0.4, 0.44, 0.52), 0.1, 0.5)
+		for coated: ShaderMaterial in [fur, face]:
+			coated.set_shader_parameter("tex", coat(marks, fur_colour, 0.35))
+			coated.set_shader_parameter("gain", COAT_GAIN)
+	var ashen := fur_colour.lerp(Color(0.95, 0.98, 1.0), 0.5) * 0.8
+	pale = Ps1.ghost(ashen, 0.45, 0.6)
+	var muzzle := Ps1.ghost(ashen, 0.45, 0.6, 0.12)
+	dark = Ps1.ghost(fur_colour * Color(0.4, 0.44, 0.52), 0.3, 0.5)
+	var nose := Ps1.ghost(Color(0.05, 0.04, 0.06), 0.0, 0.0, 0.2)
+	phantom = [fur, face, pale, muzzle, dark, nose]
 	for side: float in [-1.0, 1.0]:
 		# A big haunch, a long shank folded under it, and a foot as long as the shank
 		var leg := _pivot(self, Vector3(0.13 * chub * side, 0.3, -0.05))
@@ -2976,19 +2986,29 @@ func _build_kangaroo(chub: float, ear_len: float) -> void:
 
 	# A long neck, and a long narrow head carried high
 	neck = _pivot(torso, Vector3(0, neck_y, 0.11))
-	_part(neck, _capsule(0.055, 0.2), fur, Vector3(0, -0.02, -0.02), Vector3.ONE, Vector3(0.25, 0, 0))
-	_part(neck, _sphere(), fur, Vector3(0, 0.12, 0.0), Vector3(0.12, 0.115, 0.135))
-	_part(neck, _sphere(), fur, Vector3(0, 0.085, 0.14), Vector3(0.076, 0.066, 0.13))
-	_part(neck, _sphere(), pale, Vector3(0, 0.058, 0.15), Vector3(0.06, 0.042, 0.11))
+	_part(neck, _capsule(0.055, 0.2), face, Vector3(0, -0.02, -0.02), Vector3.ONE, Vector3(0.25, 0, 0))
+	_part(neck, _sphere(), face, Vector3(0, 0.12, 0.0), Vector3(0.12, 0.115, 0.135))
+	_part(neck, _sphere(), face, Vector3(0, 0.085, 0.14), Vector3(0.076, 0.066, 0.13))
+	_part(neck, _sphere(), muzzle, Vector3(0, 0.058, 0.15), Vector3(0.06, 0.042, 0.11))
 	_part(neck, _sphere(), black, Vector3(0, 0.1, 0.265), Vector3(0.03, 0.022, 0.018))
 	for side: float in [-1.0, 1.0]:
 		var ear := _pivot(neck, Vector3(0.075 * side, 0.2, -0.04))
-		_part(ear, _sphere(), fur, Vector3(0, ear_len * 0.3, 0), Vector3(0.05, ear_len * 0.34, 0.022))
+		_part(ear, _sphere(), face, Vector3(0, ear_len * 0.3, 0), Vector3(0.05, ear_len * 0.34, 0.022))
 		_part(ear, _sphere(), dark, Vector3(0, ear_len * 0.3, 0.014), Vector3(0.028, ear_len * 0.24, 0.012))
 		ears.append(ear)
 		_eye(Vector3(0.096 * side, 0.15, 0.075), 0.044)
 	mouth_node = _pivot(neck, Vector3(0, 0.045, 0.23))
-	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.035, 0.022, 0.035))
+	_part(mouth_node, _sphere(), nose, Vector3.ZERO, Vector3(0.035, 0.022, 0.035))
+	# What is half there throws no shadow
+	for mi in find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+# How much of a body that can be seen through is there, from all of it at 1 to none at 0 (and
+# nothing to one that is solid)
+func thin(much: float) -> void:
+	for stuff in phantom:
+		stuff.set_shader_parameter("fade", much)
 
 
 # A wing of bare skin for the kongamato, hung on `parent` at `at`: an arm out to the wrist, one
@@ -3476,7 +3496,7 @@ func _build_emote() -> void:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	mat.no_depth_test = true
-	mat.render_priority = 4
+	mat.render_priority = 8
 	emote = _part(self, QuadMesh.new(), mat, Vector3.ZERO)
 	emote.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	emote.visible = false
@@ -5821,6 +5841,11 @@ func _animate(delta: float) -> void:
 
 	if xrayed:
 		_show_insides()
+	if not phantom.is_empty():
+		# How much of it is there goes by where on it a place is, wherever it has got to
+		var root := global_transform.translated(Vector3(0, lift, 0)).affine_inverse()
+		for stuff in phantom:
+			stuff.set_shader_parameter("root", root)
 	if bubble.visible:
 		bubble.global_basis = world.camera.global_basis
 		bubble.position.y = top_y + stand + hover + 0.35 + sin(anim_t * 2.0) * 0.03

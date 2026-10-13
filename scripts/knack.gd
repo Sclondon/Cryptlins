@@ -390,6 +390,7 @@ func over() -> void:
 		missile = null
 	if pet.kind == Cryptlin.Kind.KANGAROO:
 		pet.visible = true
+		pet.thin(1.0)
 	if pet.kind == Cryptlin.Kind.KONGAMATO and tipped != 0.0:
 		tipped = 0.0
 		if is_instance_valid(mark):
@@ -1995,6 +1996,8 @@ func _vanish(delta: float) -> void:
 			var rise := minf(pet.state_time / 0.42, 1.0)
 			height = 1.15 * pet.grow * sin(rise * PI * 0.5)
 			pet.velocity = (pet.target - pet.position).normalized() * 1.3
+			# There is less of it the higher it gets, its eyes last of all
+			pet.thin(1.0 - smoothstep(0.2, 0.8, rise))
 			if rise >= 1.0:
 				# And at the top of it, gone
 				world.crumbs(pet.body_centre(), mist)
@@ -2022,7 +2025,10 @@ func _vanish(delta: float) -> void:
 			pet.eye_goal = 1.3
 			spun += delta * pet.gravity
 			height = maxf(height - spun * delta, 0.0)
+			# Its eyes are there first, and the rest of it comes back on the way down
+			pet.thin(smoothstep(0.0, 0.4, pet.state_time))
 			if height <= 0.0:
+				pet.thin(1.0)
 				pet.squash_v = 3.6
 				world.sfx.play("thud", 1.3, -8.0)
 				world.crumbs(pet.global_position + Vector3(0, 0.05, 0), Den.DUST)

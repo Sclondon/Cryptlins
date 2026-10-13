@@ -95,6 +95,23 @@ func _looks(pet: Cryptlin) -> void:
 		for x in Cryptlin.COAT:
 			shades[tex.get_pixel(x, y).to_html(false)] = true
 	check(shades.size() >= 2 and tex.get_pixel(3, 2) == tex.get_pixel(Cryptlin.COAT - 4, 2), "a marked coat is painted in more than one shade, the same on both sides")
+	# Only the phantom kangaroo can be seen through, and all of it but its eyes
+	var thin := 0
+	var solid := 0
+	for mi: MeshInstance3D in pet.find_children("*", "MeshInstance3D", true, false):
+		var stuff := mi.material_override as ShaderMaterial
+		if stuff != null and stuff.shader == Ps1.GHOST:
+			thin += 1
+		elif stuff != null and stuff.shader in [Ps1.LIT, Ps1.FUR]:
+			solid += 1
+	if k == Cryptlin.Kind.KANGAROO:
+		check(thin > 20 and solid == pet.eyes.size() and pet.eye_mats[0].shader == Ps1.LIT, "it can be seen through, all but its eyes (%d parts, %d solid)" % [thin, solid])
+		pet.xray(true)
+		check((pet.torso.get_child(0) as MeshInstance3D).material_override == pet.scan_skin, "under the scanner it is an outline like the rest")
+		pet.xray(false)
+		check(((pet.torso.get_child(0) as MeshInstance3D).material_override as ShaderMaterial).shader == Ps1.GHOST, "and is seen through again after")
+	else:
+		check(thin == 0 and pet.phantom.is_empty(), "nothing of it can be seen through")
 
 
 # One from under the ground: it digs a great deal, whatever the floor, is at home in a dim room
@@ -478,7 +495,7 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 	check(not pet.knack.ready(), "it does not do it again at once")
 	await _until(func() -> bool: return mate.state != Cryptlin.State.SPELL and mate.state != Cryptlin.State.FLOUNDER and pet.lift <= 0.0 and main.weird <= 0.0, 900)
 	await _frames(90)
-	var clean := main.weird <= 0.0 and is_zero_approx(pet.dive) and is_zero_approx(pet.torso.position.x) and pet.skin.is_empty() and mate.skin.is_empty() and pet.visible and mate.visible and main.flicker <= 0.0
+	var clean: bool = main.weird <= 0.0 and is_zero_approx(pet.dive) and is_zero_approx(pet.torso.position.x) and pet.skin.is_empty() and mate.skin.is_empty() and pet.visible and mate.visible and main.flicker <= 0.0 and (pet.phantom.is_empty() or pet.phantom[0].get_shader_parameter("fade") == 1.0)
 	check(clean and pet.lift <= 0.05 and mate.lift <= 0.05 and mate.health >= 100.0 and not main.would_pair(pet, mate), "and when it is over nothing is left changed, and nobody the worse")
 	main._clear_toys()
 	main.remove_decor(skull)

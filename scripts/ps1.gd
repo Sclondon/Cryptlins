@@ -7,6 +7,8 @@ const FLAT: Shader = preload("res://shaders/ps1_flat.gdshader")
 const XRAY: Shader = preload("res://shaders/xray.gdshader")
 const ORGAN: Shader = preload("res://shaders/organ.gdshader")
 const FUR: Shader = preload("res://shaders/fur.gdshader")
+const GHOST: Shader = preload("res://shaders/ghost.gdshader")
+static var GHOST_DEPTH: ShaderMaterial = _ghost_depth()
 # The room is drawn this many pixels high (or wide, on an upright phone) and blown up
 const LINES := 240.0
 
@@ -19,6 +21,29 @@ static func mat(c: Color, glow := 0.0, rim := 0.0, tex: Texture2D = null) -> Sha
 	m.set_shader_parameter("rim", rim)
 	if tex != null:
 		m.set_shader_parameter("tex", tex)
+	return m
+
+
+# The same for a body that can be seen through (see ghost.gdshader): `more` is how much more of
+# this part of it is there than of the rest
+static func ghost(c: Color, glow := 0.0, rim := 0.0, more := 0.0) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = GHOST
+	# (after everything else that is mixed into the picture, so that the depth it puts down
+	# first cuts nothing out of the water, the haze or the dust behind it)
+	m.render_priority = 6
+	m.next_pass = GHOST_DEPTH
+	m.set_shader_parameter("tint", c)
+	m.set_shader_parameter("glow", glow)
+	m.set_shader_parameter("rim", rim)
+	m.set_shader_parameter("more", more)
+	return m
+
+
+static func _ghost_depth() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://shaders/ghost_depth.gdshader")
+	m.render_priority = 5
 	return m
 
 
