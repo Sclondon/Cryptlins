@@ -25,6 +25,11 @@ const GROUNDS: Array[String] = ["Flagstones", "Floorboards", "Moss", "Checkers",
 # As in "it is happiest on ..."
 const GROUND_PLAIN: Array[String] = ["flagstones", "floorboards", "moss", "checkered tiles", "dirt", "sand", "gravel"]
 const SCAN_SECONDS := 9.0
+# The colour of each ground, for what gets dug out of it
+const GROUND_TINTS: Array[Color] = [
+	Color(0.4, 0.4, 0.42), Color(0.4, 0.28, 0.16), Color(0.2, 0.34, 0.14), Color(0.5, 0.5, 0.5),
+	Color(0.3, 0.2, 0.13), Color(0.62, 0.52, 0.34), Color(0.4, 0.4, 0.42),
+]
 
 # Half the room's width and depth: walls left, right and behind, and you in front. The room is
 # cut to the screen (see _fit): wide and low on a wide one, narrow, deep and tall on an upright
@@ -63,6 +68,8 @@ var leaving := false
 var ball: Ball
 var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
+# What the cryptlin has left on the floor (see Mess)
+var messes: Array[Mess] = []
 var nest: Node3D
 var nest_pos := Vector3(-1.6, 0, -1.2)
 
@@ -74,6 +81,7 @@ var born := 0.0
 var saved_warmth := 0.0
 var saved_needs := {}
 var saved_decor: Array = []
+var saved_mess: Array = []
 # How long the game was shut, for the cryptlin to live through when it is put back in the room
 var away := 0.0
 var _muted_at_start := false
@@ -158,6 +166,10 @@ func _ready() -> void:
 	for d: Variant in saved_decor:
 		if d is Dictionary and int(d.get("k", -1)) >= 0 and int(d["k"]) < Decor.IDS.size():
 			_stand(int(d["k"]), Vector3(float(d.get("x", 0.0)), 0, float(d.get("z", 0.0))), float(d.get("r", 0.0)))
+	for m: Variant in saved_mess:
+		if m is Dictionary and int(m.get("k", -1)) >= 0 and int(m["k"]) < Mess.LASTS.size():
+			var laid := _lay_mess(int(m["k"]), Vector3(float(m.get("x", 0.0)), 0, float(m.get("z", 0.0))), float(m.get("t", 0.0)), Color.html(str(m.get("c", "4d331a"))), float(m.get("s", 1.0)))
+			laid.visible = laid.gone() < 1.0
 	get_viewport().size_changed.connect(_fit)
 	_fit()
 	if OS.has_feature("web") and str(JavaScriptBridge.eval("window.location.search", true)).contains("dev"):
@@ -436,7 +448,8 @@ func grew_up() -> void:
 
 
 # How well the room suits a cryptlin, 0 to 100: the ground and the lamp it wants, the things
-# it likes to have about (and not the one it hates), not being left with bare floor, and water
+# it likes to have about (and not the one it hates), not being left with bare floor or in its
+# own mess, and water
 # if it is one that needs it
 func comfort_of(who: Cryptlin) -> float:
 	var c := 35.0
@@ -455,7 +468,12 @@ func comfort_of(who: Cryptlin) -> float:
 	# A kind that lives in water is never at home without a pool to get into
 	if who.needs_water():
 		c += 14.0 if decor_of(Decor.Kind.POOL) != null else -24.0
-	return clampf(c + mini(others, 3) * 4.0, 0.0, 100.0)
+	# What it has left lying about spoils the place for it: droppings most, puddles a little
+	var foul := 0.0
+	for m in messes:
+		if m.kind != Mess.Kind.HEAP:
+			foul += 9.0 if m.kind == Mess.Kind.DROPPING else 3.0
+	return clampf(c + mini(others, 3) * 4.0 - minf(foul, 36.0), 0.0, 100.0)
 
 
 # ---------------------------------------------------------------- the room's things
@@ -741,12 +759,100 @@ func somewhere_to_go(who: Cryptlin) -> Decor:
 	return fine.pick_random() if not fine.is_empty() else null
 
 
+# ---------------------------------------------------------------- what it leaves on the floor
+
+# A dropping, a puddle or a dug heap, left at a place by a cryptlin `ago` seconds since
+func leave_mess(kind: int, at: Vector3, who: Cryptlin, ago := 0.0) -> Mess:
+	var tint := who.dropping_colour()
+	if kind == Mess.Kind.PUDDLE:
+		tint = Color(0.62, 0.58, 0.2)
+	elif kind == Mess.Kind.HEAP:
+		tint = GROUND_TINTS[floor_style]
+	return _lay_mess(kind, at, Time.get_unix_time_from_system() - ago, tint, who.grow)
+
+
+func _lay_mess(kind: int, at: Vector3, when: float, tint: Color, big: float) -> Mess:
+	var m := Mess.new(kind, when, tint, big)
+	add_child(m)
+	m.position = in_room(Vector3(at.x, 0, at.z), 0.15)
+	m.rotation.y = randf() * TAU
+	messes.append(m)
+	return m
+
+
+# The keeper clears one up
+func clear_mess(m: Mess) -> void:
+	crumbs(m.position + Vector3(0, 0.08, 0), m.tint)
+	sfx.play("click", 1.4, -4.0)
+	messes.erase(m)
+	m.queue_free()
+	save_game()
+
+
+func droppings() -> int:
+	var n := 0
+	for m in messes:
+		if m.kind == Mess.Kind.DROPPING:
+			n += 1
+	return n
+
+
+# The mess under a finger (not a heap of earth, which is nothing to clear), or null
+func _mess_at(at: Vector2) -> Mess:
+	for m in messes:
+		if m.kind != Mess.Kind.HEAP and _ray_hits(at, m.position + Vector3(0, 0.06, 0), 0.24):
+			return m
+	return null
+
+
+# Where a cryptlin goes to do its business: a grown one as far as it can get from its nest and
+# anything to eat, in a corner or behind something; a baby more or less where it stands
+func toilet_spot(who: Cryptlin) -> Vector3:
+	if who.is_baby():
+		var a := randf() * TAU
+		return in_room(who.position + Vector3(cos(a), 0, sin(a)) * randf_range(0.2, 0.6), 0.3)
+	var spots: Array[Vector3] = []
+	for x: float in [-1.0, 1.0]:
+		for z: float in [-1.0, 0.05]:
+			spots.append(in_room(Vector3(9.0 * x, 0, 9.0 * z), 0.4))
+	for d in decors:
+		spots.append(in_room(d.position + Vector3(0, 0, -d.radius - 0.35), 0.4))
+	var best := spots[0]
+	var best_room := -INF
+	for s in spots:
+		var room := s.distance_to(nest_pos) + randf_range(0.0, 0.8)
+		for food in snacks:
+			room = minf(room, s.distance_to(food.position))
+		for d in decors:
+			if s.distance_to(d.position) < d.radius:
+				room -= 9.0
+		if room > best_room:
+			best_room = room
+			best = s
+	return best
+
+
+# Whether a place is inside one of the shelters
+func sheltered(at: Vector3) -> bool:
+	for d in decors:
+		if d.hollow and at.distance_to(d.position) < d.radius:
+			return true
+	return false
+
+
+# How long since a finger last touched anything, in seconds
+func left_alone() -> float:
+	return clock - maxf(press_time, release_time)
+
+
 # ---------------------------------------------------------------- the lamp
 
 func set_lamp(mode: int) -> void:
 	lamp_mode = mode
 	light_dragging = false
 	sfx.play("click", 0.8 if light_on else 0.6)
+	if pet != null:
+		pet.caught()
 	if pet != null and not leaving and light_on:
 		var right := lamp_mode == pet.fav_lamp
 		pet.look_over(pet.position, 1 if right else 0, "lamp" if right else "")
@@ -1057,6 +1163,8 @@ func _reshape(room: Vector2, lamp: Vector3) -> void:
 		d.position = in_room(d.position, d.radius * 0.6)
 	if ball != null:
 		ball.position = in_room(ball.position, Ball.R)
+	for m in messes:
+		m.position = in_room(m.position, 0.15)
 	for s in snacks:
 		s.position = in_room(s.position, 0.2)
 	if egg != null:
@@ -1477,6 +1585,12 @@ func _process(delta: float) -> void:
 		mat.albedo_color.a = clampf(0.6 - grown, 0.0, 0.5)
 		ripple.visible = grown < 0.6
 
+	# Puddles dry up and heaps settle
+	for m in messes.duplicate():
+		if m.gone() >= 1.0:
+			messes.erase(m)
+			m.queue_free()
+
 	_aim_camera()
 
 	save_timer += delta
@@ -1784,7 +1898,10 @@ func _release() -> void:
 				egg.tap()
 				Input.vibrate_handheld(20)
 		Grab.FLOOR:
-			if quick and not light_dragging_was and pet != null:
+			var mess := _mess_at(press_at) if quick and not light_dragging_was else null
+			if mess != null:
+				clear_mess(mess)
+			elif quick and not light_dragging_was and pet != null:
 				var there := _floor_at(press_at, 0.0, 0.35)
 				pet.call_to(there)
 				ripple.position = Vector3(there.x, 0.02, there.z)
@@ -1834,6 +1951,9 @@ func save_game() -> void:
 	var things: Array = []
 	for d in decors:
 		things.append({"k": d.kind, "x": d.position.x, "z": d.position.z, "r": d.rotation.y})
+	var left: Array = []
+	for m in messes:
+		left.append({"k": m.kind, "x": m.position.x, "z": m.position.z, "t": m.made, "c": m.tint.to_html(false), "s": m.size})
 	file.store_string(JSON.stringify({
 		"v": 2,
 		"name": pet_name,
@@ -1847,6 +1967,7 @@ func save_game() -> void:
 		"nest": nest_style,
 		"nest_at": [nest_pos.x, nest_pos.z],
 		"decor": things,
+		"mess": left,
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
 		"known": known,
@@ -1878,6 +1999,8 @@ func _load_game() -> bool:
 		nest_pos = in_room(Vector3(float(d["nest_at"][0]), 0, float(d["nest_at"][1])), 0.6)
 	if d.get("decor") is Array:
 		saved_decor = d["decor"]
+	if d.get("mess") is Array:
+		saved_mess = d["mess"]
 	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
 	if d.get("known") is Dictionary:
 		known = d["known"]

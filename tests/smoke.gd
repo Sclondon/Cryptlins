@@ -193,7 +193,7 @@ func _run() -> void:
 	check(pet.belly > 55.0, "eating fills its belly (%.0f)" % pet.belly)
 	await _until(func() -> bool: return _settled(pet), 600)
 	pet.belly = 30.0
-	await _slide(_on_shelf(food), _screen(Vector3(-1.0, 0.9, 0.5)), 8, _on_shelf(food) - Vector2(0, 160))
+	await _slide(_on_shelf(food), _screen(Vector3(-1.0, 0.9, 0.5)), 24, _on_shelf(food) - Vector2(0, 160))
 	check(main.snacks.size() == 1 and main.snacks[0].position.x < -0.5, "dragged up off the shelf, it drops where you let go")
 	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500), "and is eaten too")
 
@@ -305,6 +305,9 @@ func _run() -> void:
 	pet = main.pet
 	check(pet.belly < 15.0, "left for a day and a half, it is starving (%.0f)" % pet.belly)
 	check(not pet.is_baby() and is_equal_approx(pet.grow, pet.adult_size), "and has grown up, %.2f times the usual size" % pet.adult_size)
+	# (what it left on the floor in that time is cleared away, so as not to be underfoot for what follows)
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
 
 	# Tastes: its favourite food, the one it cannot stand, and its favourite toy
 	pet.set_needs({"belly": 40.0, "fun": 50.0, "energy": 90.0, "love": 40.0})
@@ -323,6 +326,7 @@ func _run() -> void:
 	check(main.shelf.marks.get(Items.id_of("food", pet.fav_food)) == "heart" and main.shelf.marks.get(Items.id_of("food", pet.yuck_food)) == "cross", "the shelf marks what it loves and what it hates")
 	await _until(func() -> bool: return _settled(pet), 600)
 	pet.energy = 90.0
+	pet.set_needs({"fun": 20.0, "bowel": 0.0, "bladder": 0.0})
 	main.play_ball(pet.fav_toy)
 	check(main.ball != null and main.ball.kind == pet.fav_toy, "the %s comes out" % Ball.PLAIN[pet.fav_toy])
 	check(await _until(func() -> bool: return main.known.get("toy", false), 2400), "and turns out to be its favourite")
@@ -373,6 +377,7 @@ func _run() -> void:
 		probe.free()
 		if not is_shelter:
 			continue
+		pet.set_needs({"belly": 80.0, "energy": 90.0, "bowel": 0.0, "bladder": 0.0})
 		var hole := main.place_decor(k, Vector3(-1.1, 0, -0.8))
 		await _until(func() -> bool: return _settled(pet), 900)
 		pet.position = Vector3(1.2, 0, 0.9)
@@ -418,6 +423,74 @@ func _run() -> void:
 	await _tap(_on_shelf(Items.id_of("ground", pet.fav_ground)))
 	check(main.floor_style == pet.fav_ground, "a tray of %s changes the floor" % Den.GROUND_PLAIN[pet.fav_ground])
 	check(await _until(func() -> bool: return main.known.get("ground", false), 600), "which is the ground it is happiest on")
+
+	# What goes in comes out: some hours after a meal it goes off and leaves a dropping
+	await _until(func() -> bool: return _settled(pet), 900)
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	pet._enter(Cryptlin.State.IDLE, 0.5)
+	pet.set_needs({"belly": 40.0, "energy": 95.0, "fun": 80.0, "digest": 0.0, "bowel": 0.0, "bladder": 0.0})
+	var clean := main.comfort_of(pet)
+	main.feed((pet.yuck_food + 1) % Snack.NAMES.size())
+	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500) and pet.digest > 50.0, "what it eats has to come out")
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._wear(5.0 * 3600.0, false, 1.0, false)
+	check(pet.bowel >= 100.0 and pet.bladder >= 100.0, "five hours on, it needs to go")
+	pet.set_needs({"belly": 90.0, "energy": 95.0, "fun": 80.0, "bladder": 0.0})
+	check(await _until(func() -> bool: return main.droppings() == 1, 1500), "and goes off and leaves a dropping")
+	var dropping: Mess = main.messes.back()
+	check(dropping.position.distance_to(main.nest_pos) > 0.8, "well away from its nest")
+	check(main.comfort_of(pet) < clean - 5.0, "which spoils the place for it")
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 6.0)
+	pet.position = Den.in_room(dropping.position + Vector3(-1.6 if dropping.position.x > 0.0 else 1.6, 0, 0), 0.4)
+	await _frames(2)
+	await _tap(_screen(dropping.position + Vector3(0, 0.06, 0)))
+	check(main.droppings() == 0 and main.comfort_of(pet) > clean - 0.1, "a tap clears it up, and it is at home again")
+	pet._enter(Cryptlin.State.IDLE, 0.5)
+	pet.bladder = 100.0
+	check(await _until(func() -> bool: return main.messes.size() == 1 and main.messes[0].kind == Mess.Kind.PUDDLE, 1500), "it pees too, and leaves a puddle")
+	main.messes[0].made -= Mess.LASTS[Mess.Kind.PUDDLE]
+	await _frames(3)
+	check(main.messes.is_empty(), "which dries up by itself in an hour")
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet.set_needs({"belly": 100.0, "energy": 95.0, "digest": 100.0, "bowel": 0.0, "bladder": 0.0})
+	await _come_back_after(6.0 * 3600.0)
+	pet = main.pet
+	check(main.droppings() == 1, "left alone for six hours after a meal, there is a dropping waiting")
+	await _restart()
+	pet = main.pet
+	check(main.droppings() == 1, "and it is still there next time")
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+
+	# A grown one left to itself may take a fancy to its nest, and stops dead if it is seen at it
+	await _until(func() -> bool: return _settled(pet), 900)
+	pet.set_needs({"belly": 90.0, "energy": 95.0, "fun": 80.0, "bowel": 0.0, "bladder": 0.0})
+	main.nest_pos = Vector3(-0.8, 0, 0.6)
+	main.move_nest(main.nest_pos)
+	pet._enter(Cryptlin.State.FOND)
+	check(await _until(func() -> bool: return pet.state == Cryptlin.State.FOND and pet.step == 1, 900) and pet.position.distance_to(main.nest_pos) < 0.4, "a grown one gets over-fond of its nest")
+	await _frames(20)
+	await _tap(_screen(pet.body_centre()))
+	check(pet.state == Cryptlin.State.FOND and pet.step == 2 and pet.feeling == Cryptlin.Feeling.SCARED, "a tap and it stops dead, mortified")
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet.age = 0.0
+	pet.fond_cooldown = 0.0
+	pet._enter(Cryptlin.State.FOND)
+	check(pet.state != Cryptlin.State.FOND and not pet._fancies(), "a baby never does")
+	pet.age = Cryptlin.GROW_AGE
+	pet.grow = pet.adult_size
+
+	# Odds and ends it gets up to
+	for doing: int in [Cryptlin.State.SCRATCH, Cryptlin.State.STRETCH, Cryptlin.State.DIG, Cryptlin.State.SPIN, Cryptlin.State.GAZE]:
+		pet._enter(doing)
+		await _frames(40)
+		check(pet.state == doing, "it can %s" % Cryptlin.State.keys()[doing].to_lower())
+		check(await _until(func() -> bool: return pet.state != doing, 600), "  and stops again")
+	check(main.messes.size() == 1 and main.messes[0].kind == Mess.Kind.HEAP and main.comfort_of(pet) > clean - 0.1, "digging leaves a heap of earth, which is no mess")
+	main.messes[0].made -= Mess.LASTS[Mess.Kind.HEAP]
+	await _frames(3)
 
 	# The scanner
 	await _until(func() -> bool: return _settled(pet), 900)

@@ -12,11 +12,11 @@ const CARE := "It lives by the clock on the wall, whether you are here or not.
 
 Feed it once or twice a day. A full belly lasts most of a day.
 
-Play with it when it is bored.
+Play with it when it is bored. It takes a day or two to grow up.
 
 It sleeps when it is worn out. Put the lamp out at night and it goes to its nest.
 
-It takes a day or two to grow up.
+It leaves droppings. Tap one to clear it up: they spoil the place for it. Puddles dry by themselves.
 
 The scanner on the shelf shows what is going on inside it: how full its stomach is, how rested and how amused it is, how fond of you, and whether it likes its home."
 const SHELF := "Everything you have is on the shelf. Slide it sideways to see the rest.

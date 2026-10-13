@@ -1,7 +1,8 @@
 class_name Egg
 extends Node3D
 ## The egg a cryptlin comes out of. Lamplight warms it slowly and a rubbing finger warms it fast;
-## it cracks twice on the way and hatches when it is warm through. Its shell tells you what is inside.
+## it cracks twice on the way and hatches when it is warm through. What is painted on its shell
+## tells you what is inside.
 
 signal cracked(stage: int)
 signal hatched
@@ -16,7 +17,7 @@ const SHELLS: Array[Color] = [
 	Color(0.42, 0.52, 0.3), Color(0.34, 0.28, 0.21), Color(0.56, 0.5, 0.4), Color(0.4, 0.4, 0.44), Color(0.3, 0.36, 0.3),
 	Color(0.26, 0.44, 0.24), Color(0.22, 0.36, 0.44), Color(0.36, 0.36, 0.38), Color(0.2, 0.2, 0.24),
 	Color(0.14, 0.2, 0.22), Color(0.18, 0.4, 0.42), Color(0.2, 0.32, 0.26), Color(0.62, 0.52, 0.4), Color(0.78, 0.6, 0.85),
-	Color(0.68, 0.14, 0.1), Color(0.55, 0.45, 0.32), Color(0.42, 0.48, 0.46), Color(0.62, 0.72, 0.82), Color(0.13, 0.11, 0.12),
+	Color(0.68, 0.14, 0.1), Color(0.55, 0.45, 0.32), Color(0.1, 0.14, 0.22), Color(0.62, 0.72, 0.82), Color(0.13, 0.11, 0.12),
 ]
 const MARKS: Array[Color] = [
 	Color(0.2, 0.3, 0.15), Color(0.2, 0.16, 0.12), Color(0.5, 0.18, 0.1), Color(0.6, 0.58, 0.56), Color(0.45, 0.14, 0.1),
@@ -25,10 +26,18 @@ const MARKS: Array[Color] = [
 	Color(0.9, 0.87, 0.78), Color(0.9, 0.87, 0.8), Color(0.4, 1.0, 0.5), Color(0.95, 0.97, 1.0), Color(0.62, 0.1, 0.08),
 ]
 const TITLES: Array[String] = [
-	"A mossy egg", "A hairy egg", "A speckled egg", "A silk-wound egg", "A spiny egg",
-	"A slimy egg", "A cold, wet egg", "A stone egg", "An antlered egg",
-	"A weed-hung egg", "A scaly egg", "A clutched egg", "A hatted egg", "A glimmering egg",
-	"A toadstool egg", "A downy egg", "A humming egg", "A frosted egg", "A collared egg",
+	"A mossy egg", "A streaky egg", "A speckled egg", "A silk-wound egg", "A thorn-patterned egg",
+	"A slimy egg", "A rippled egg", "A stone egg", "A frost-bitten egg",
+	"A weed-streaked egg", "A scaly egg", "A sucker-ringed egg", "A red-capped egg", "A glimmering egg",
+	"A toadstool egg", "A dappled egg", "A starry egg", "A frosted egg", "An ember-veined egg",
+]
+# How much of its own light each shell gives off, and how wide and how tall it is next to the usual
+const GLOWS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.35, 0.0, 0.3]
+const SHAPES: Array[Vector2] = [
+	Vector2(1.0, 1.0), Vector2(1.06, 1.04), Vector2(0.96, 0.98), Vector2(0.95, 1.06), Vector2(0.94, 1.04),
+	Vector2(1.06, 0.94), Vector2(1.0, 1.06), Vector2(1.08, 0.96), Vector2(0.92, 1.08),
+	Vector2(0.96, 1.06), Vector2(1.02, 1.0), Vector2(1.06, 0.98), Vector2(1.04, 0.94), Vector2(0.9, 0.96),
+	Vector2(1.08, 0.92), Vector2(1.0, 0.94), Vector2(0.94, 1.08), Vector2(1.08, 1.06), Vector2(1.04, 1.0),
 ]
 
 var world: Den
@@ -46,6 +55,8 @@ var t := 0.0
 var hatching := -1.0
 var shell: Node3D
 var cracks: Array[Node3D] = []
+# Where the blotches on its shell are, for the kinds that have them: across, down, and how big
+var blots: Array[Vector3] = []
 var peek: MeshInstance3D
 var shards: CPUParticles3D
 
@@ -56,149 +67,18 @@ func _ready() -> void:
 	scale = Vector3.ONE * SIZE
 	shell = Node3D.new()
 	add_child(shell)
-	var base := Ps1.mat(SHELLS[kind])
-	var mark := Ps1.mat(MARKS[kind])
+	# The shell is a plain egg, a little rounder or taller by its kind, told apart by what is
+	# painted on it
+	shell.scale = Vector3(SHAPES[kind].x, SHAPES[kind].y, SHAPES[kind].x)
+	blots.clear()
+	for i in 12:
+		blots.append(Vector3(rng.randi() % 64, rng.randi_range(3, 28), rng.randf_range(2.0, 4.5)))
+	var img := Image.create(64, 32, false, Image.FORMAT_RGB8)
+	for y in 32:
+		for x in 64:
+			img.set_pixel(x, y, _paint(x, y))
+	var base := Ps1.mat(Color.WHITE, GLOWS[kind], 0.0, ImageTexture.create_from_image(img))
 	_part(Ps1.ball(), base, CENTRE, RADII)
-	var point := CylinderMesh.new()
-	point.top_radius = 0.0
-	point.bottom_radius = 1.0
-	point.height = 1.0
-	point.radial_segments = 5
-	match kind:
-		Cryptlin.Kind.GREMLIN:
-			# Warts
-			for i in 8:
-				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.9, 1.1))
-				_part(Ps1.ball(), mark, at, Vector3.ONE * rng.randf_range(0.035, 0.07))
-		Cryptlin.Kind.SQUATCH:
-			# Hanks of hair all over, lying downwards
-			for i in 16:
-				var around := TAU * i / 16.0 + rng.randf_range(-0.15, 0.15)
-				var hair := _part(point, mark if i % 2 == 0 else base, _on(around, rng.randf_range(-0.7, 1.0)))
-				hair.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, 2.5) * Basis.from_scale(Vector3(0.05, rng.randf_range(0.1, 0.16), 0.03))
-		Cryptlin.Kind.COCKATRICE:
-			# Speckles
-			for i in 14:
-				var at := _on(rng.randf_range(-1.6, 1.6), rng.randf_range(-0.9, 1.2))
-				_spot(mark, at, rng.randf_range(0.02, 0.045))
-		Cryptlin.Kind.MOTHMAN:
-			# Wound round with silk
-			for i in 5:
-				var band := _part(Ps1.ball(), mark, CENTRE + Vector3(0, -0.22 + i * 0.11, 0), Vector3.ONE)
-				var wide := cos(asin((-0.22 + i * 0.11) / HEIGHT)) * WIDTH + 0.006
-				band.basis = Basis.from_euler(Vector3(rng.randf_range(-0.25, 0.25), 0, rng.randf_range(-0.25, 0.25))) * Basis.from_scale(Vector3(wide, 0.016, wide))
-		Cryptlin.Kind.CHUPACABRA:
-			# Spines all round, thickest at the top
-			for i in 9:
-				var around := TAU * i / 9.0
-				var up := 0.15 + (i % 3) * 0.4
-				var root := _on(around, up)
-				var spike := _part(point, mark, root + _normal(root) * 0.07)
-				spike.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, PI * 0.5 - up) * Basis.from_scale(Vector3(0.045, 0.2, 0.045))
-		Cryptlin.Kind.FROGMAN:
-			# Wet blotches
-			for i in 7:
-				_spot(mark, _on(rng.randf_range(-1.5, 1.5), rng.randf_range(-0.8, 1.1)), rng.randf_range(0.04, 0.075))
-		Cryptlin.Kind.NESSIE:
-			# Ripples
-			for i in 3:
-				var band := _part(Ps1.ball(), mark, CENTRE + Vector3(0, -0.12 + i * 0.12, 0), Vector3.ONE)
-				var wide := cos(asin((-0.12 + i * 0.12) / HEIGHT)) * WIDTH + 0.005
-				band.basis = Basis.from_scale(Vector3(wide, 0.012 + i * 0.004, wide))
-		Cryptlin.Kind.BOLTER:
-			# Chips of rock stuck in it
-			var chip := BoxMesh.new()
-			for i in 9:
-				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.8, 1.1))
-				_part(chip, mark if i % 2 == 0 else base, at, Vector3(0.09, 0.06, 0.08) * rng.randf_range(0.7, 1.3), Vector3(rng.randf(), rng.randf(), rng.randf()) * 2.0)
-		Cryptlin.Kind.WENDIGO:
-			# Two prongs of bone on top, and frost
-			for side: float in [-1.0, 1.0]:
-				_part(point, mark, CENTRE + Vector3(0.1 * side, 0.4, 0), Vector3(0.03, 0.26, 0.03), Vector3(0, 0, -0.45 * side))
-				_part(point, mark, CENTRE + Vector3(0.17 * side, 0.4, 0), Vector3(0.02, 0.12, 0.02), Vector3(0, 0, -1.2 * side))
-			var frost := Ps1.mat(Color(0.5, 0.6, 0.68))
-			for i in 6:
-				_spot(frost, _on(rng.randf_range(-1.5, 1.5), rng.randf_range(-0.9, 0.2)), rng.randf_range(0.03, 0.06))
-		Cryptlin.Kind.KELPIE:
-			# Waterweed draped over it from the top, still dripping
-			var wrack := Ps1.mat(Color(0.24, 0.44, 0.16))
-			for i in 9:
-				var around := TAU * i / 9.0 + rng.randf_range(-0.2, 0.2)
-				var long := rng.randf_range(0.2, 0.34)
-				var at := _on(around, 1.25 - long * 1.6)
-				var weed := _part(point, mark if i % 2 == 0 else wrack, at + _normal(at) * 0.012)
-				weed.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, 2.75) * Basis.from_scale(Vector3(0.045, long, 0.02))
-			for i in 3:
-				_part(Ps1.ball(), Ps1.mat(Color(0.5, 0.75, 0.85), 0.3), _on(-0.6 + i * 0.6, -0.5 + (i % 2) * 0.3), Vector3(0.018, 0.03, 0.018))
-		Cryptlin.Kind.MERFOLK:
-			# Scales in rows, each lapped over the one below, and a fin on top
-			for row in 5:
-				var up := -0.75 + row * 0.42
-				for i in 8:
-					var at := _on(TAU * (i + 0.5 * (row % 2)) / 8.0, up)
-					var lap := _part(Ps1.ball(), mark if (i + row) % 2 == 0 else base, at)
-					lap.basis = Basis.looking_at(-_normal(at)).scaled_local(Vector3(0.075, 0.085, 0.014))
-			_part(point, Ps1.mat(Color(0.7, 0.34, 0.24)), CENTRE + Vector3(0, 0.4, -0.02), Vector3(0.016, 0.16, 0.09), Vector3(-0.4, 0, 0))
-		Cryptlin.Kind.SPAWN:
-			# Feelers have it by the bottom, suckers out
-			for i in 5:
-				var around := TAU * i / 5.0 + 0.3
-				var reach := 0.3 + (i % 2) * 0.4
-				for j in 5:
-					var at := _on(around + j * 0.09, -1.1 + (reach + 1.1) * j / 4.0)
-					_part(Ps1.ball(), mark, at, Vector3.ONE * (0.062 - j * 0.008))
-		Cryptlin.Kind.GNOME:
-			# It has its hat on already
-			_part(point, mark, CENTRE + Vector3(0.01, 0.5, 0), Vector3(0.2, 0.46, 0.2), Vector3(0.08, 0, -0.1))
-			var clay := Ps1.mat(Color(0.46, 0.34, 0.24))
-			for i in 6:
-				_spot(clay, _on(rng.randf_range(-1.6, 1.6), rng.randf_range(-0.9, 0.3)), rng.randf_range(0.02, 0.04))
-		Cryptlin.Kind.FAE:
-			# It gives off a light, and motes of it hang about the shell
-			base.set_shader_parameter("glow", 0.45)
-			var mote := Ps1.mat(MARKS[kind], 1.0)
-			for i in 9:
-				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.8, 1.2))
-				_part(Ps1.ball(), mote, at + _normal(at) * rng.randf_range(0.0, 0.09), Vector3.ONE * rng.randf_range(0.014, 0.026))
-		Cryptlin.Kind.FUNGUS:
-			# A toadstool's spots, and a frill of gills round the bottom
-			for i in 9:
-				_spot(mark, _on(TAU * i / 9.0 + rng.randf_range(-0.25, 0.25), rng.randf_range(-0.3, 1.15)), rng.randf_range(0.04, 0.07))
-			_part(Ps1.ball(), Ps1.mat(Color(0.8, 0.76, 0.64)), CENTRE + Vector3(0, -0.27, 0), Vector3(0.24, 0.07, 0.24))
-		Cryptlin.Kind.JACKALOPE:
-			# Down all over, and a scut of it behind
-			for i in 14:
-				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.9, 1.2))
-				_part(Ps1.ball(), base if i % 3 == 0 else mark, at, Vector3.ONE * rng.randf_range(0.035, 0.06))
-			_part(Ps1.ball(), mark, _on(PI, -0.5), Vector3.ONE * 0.09)
-		Cryptlin.Kind.ALIEN:
-			# Smooth as glass, with a band of lights round it that no bird put there
-			var band := _part(Ps1.ball(), Ps1.mat(Color(0.18, 0.2, 0.22)), CENTRE, Vector3(WIDTH + 0.006, 0.03, WIDTH + 0.006))
-			band.rotation.z = 0.2
-			for i in 8:
-				var around := TAU * i / 8.0
-				_part(Ps1.ball(), Ps1.mat(mark.get_shader_parameter("tint"), 1.0), CENTRE + Basis(Vector3.BACK, 0.2) * Vector3(sin(around), 0, cos(around)) * (WIDTH + 0.012), Vector3.ONE * 0.026)
-		Cryptlin.Kind.YETI:
-			# Snow on top, icicles under it, and frost the rest of the way down
-			_part(Ps1.ball(), mark, CENTRE + Vector3(0, 0.25, 0), Vector3(0.2, 0.13, 0.2))
-			for i in 7:
-				var around := TAU * i / 7.0 + rng.randf_range(-0.2, 0.2)
-				var root := _on(around, 0.75)
-				_part(point, Ps1.mat(Color(0.75, 0.88, 1.0), 0.15), root + _normal(root) * 0.01 + Vector3(0, -0.05, 0), Vector3(0.022, rng.randf_range(0.08, 0.15), 0.022), Vector3(PI, 0, 0))
-			for i in 6:
-				_spot(mark, _on(rng.randf_range(-1.5, 1.5), rng.randf_range(-0.9, 0.2)), rng.randf_range(0.03, 0.055))
-		Cryptlin.Kind.CERBERUS:
-			# A studded collar round its middle, and three coals glowing through the shell
-			var band := _part(Ps1.ball(), mark, CENTRE + Vector3(0, -0.03, 0), Vector3(WIDTH + 0.008, 0.035, WIDTH + 0.008))
-			band.rotation.x = 0.12
-			for i in 8:
-				var around := TAU * i / 8.0
-				var ring := Basis(Vector3.RIGHT, 0.12) * Vector3(sin(around), 0, cos(around))
-				var stud := _part(point, Ps1.mat(Color(0.85, 0.82, 0.72)), CENTRE + Vector3(0, -0.03, 0) + ring * (WIDTH + 0.03))
-				stud.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(0.025, 0.06, 0.025))
-			var ember := Ps1.mat(Color(1.0, 0.4, 0.1), 0.9)
-			for i in 3:
-				_spot(ember, _on(-0.5 + i * 0.5, 0.75 - absf(i - 1.0) * 0.12), 0.022)
 
 	# The cracks, made ahead of time and shown as it warms
 	var black := Ps1.flat(Color(0.02, 0.01, 0.02))
@@ -249,10 +129,115 @@ func _part(mesh: Mesh, mat: Material, at: Vector3, size := Vector3.ONE, turn := 
 	return mi
 
 
-# A flat mark lying on the shell
-func _spot(mat: Material, at: Vector3, size: float) -> void:
-	var spot := _part(Ps1.ball(), mat, at)
-	spot.basis = Basis.looking_at(-_normal(at)).scaled_local(Vector3(size, size * 1.2, 0.008))
+# The colour of one dot of the shell's picture, 64 round by 32 from top to bottom
+func _paint(x: int, y: int) -> Color:
+	var shell_colour := SHELLS[kind]
+	var mark := MARKS[kind]
+	# A scatter that looks like chance and is the same every time
+	var chance := (x * 37 + y * 101 + x * y * 7) % 23
+	match kind:
+		Cryptlin.Kind.GREMLIN:
+			# Moss in patches, and the odd wart
+			if _blot(x, y) < 1.0:
+				return mark
+			return shell_colour.darkened(0.35) if chance == 0 else shell_colour
+		Cryptlin.Kind.SQUATCH:
+			# Streaked from top to bottom like wet hair
+			return mark if (x * 5 + (y / 4) * 7) % 4 == 0 else (shell_colour.lightened(0.12) if (x + y / 5) % 5 == 0 else shell_colour)
+		Cryptlin.Kind.COCKATRICE:
+			return mark if chance < 2 else shell_colour
+		Cryptlin.Kind.MOTHMAN:
+			# Wound round and round with silk
+			return mark if (y + x / 3) % 5 == 0 else shell_colour
+		Cryptlin.Kind.CHUPACABRA:
+			# Rows of thorns, drawn on
+			return mark if absi(x % 8 - 4) < (y % 10) - 5 else shell_colour
+		Cryptlin.Kind.FROGMAN:
+			# Wet blotches, with a shine on each
+			var wet := _blot(x, y)
+			if wet < 0.35:
+				return mark.lightened(0.3)
+			return mark if wet < 1.3 else shell_colour
+		Cryptlin.Kind.NESSIE:
+			# Ripples
+			return mark if (y + int(sin(x * 0.4) * 2.0) + 32) % 6 == 0 else shell_colour
+		Cryptlin.Kind.BOLTER:
+			# Grey stone in slabs, cracked across and pitted
+			if chance == 0:
+				return mark
+			return shell_colour.lerp(shell_colour.lightened(0.14), float((x / 9 + y / 7) % 2)) if (x + y / 2) % 9 != 0 else mark
+		Cryptlin.Kind.WENDIGO:
+			# Bone-pale at the crown, and frost creeping up from under it
+			if y < 5 + (x * 3) % 3:
+				return mark
+			return Color(0.5, 0.6, 0.68) if y > 13 and chance < y - 13 else shell_colour
+		Cryptlin.Kind.KELPIE:
+			# Weed hanging down it from the top, each strand its own length
+			var strand := 9 + (x / 3 * 11) % 16
+			if y < strand and x % 3 != 2:
+				return mark if (x / 3) % 2 == 0 else mark.lightened(0.18)
+			return Color(0.4, 0.6, 0.7) if chance == 0 else shell_colour
+		Cryptlin.Kind.MERFOLK:
+			# Scales, each lapped over the one below
+			var row := y / 6
+			var along := (x + (row % 2) * 4) % 8 - 4
+			var edge := Vector2(along, y % 6).length()
+			return mark if edge > 3.2 and edge < 4.4 else (shell_colour.lightened(0.15) if edge < 1.6 else shell_colour)
+		Cryptlin.Kind.SPAWN:
+			# Rings like the marks of suckers, in wandering rows
+			var ring := Vector2((x + (y / 8) * 3) % 8 - 4, (y + int(sin(x * 0.2) * 2.0) + 32) % 8 - 4).length()
+			return mark if ring > 1.6 and ring < 2.8 else shell_colour
+		Cryptlin.Kind.GNOME:
+			# Clay below, and a red cap painted on above with a stitched edge
+			var brim := 11 + int(sin(x * 0.6) * 1.5)
+			if y < brim:
+				return mark
+			if y == brim + 1 and x % 3 != 0:
+				return Color(0.9, 0.86, 0.74)
+			return shell_colour.darkened(0.25) if chance == 0 else shell_colour
+		Cryptlin.Kind.FAE:
+			# Soft colours running into one another, and sparks
+			if chance == 0 or (chance == 11 and x % 2 == 0):
+				return mark
+			return shell_colour.lerp(Color(0.6, 0.8, 0.95), sin(x * 0.3 + y * 0.25) * 0.5 + 0.5)
+		Cryptlin.Kind.FUNGUS:
+			# A toadstool's spots
+			return mark if _blot(x, y) < 0.9 else shell_colour
+		Cryptlin.Kind.JACKALOPE:
+			# Dappled like a leveret, paler underneath
+			if y > 22 + (x * 5) % 3:
+				return mark
+			return shell_colour.lightened(0.22) if _blot(x, y) < 0.7 or chance < 2 else shell_colour
+		Cryptlin.Kind.ALIEN:
+			# The night sky, with a row of lights round the middle that no bird put there
+			if y == 16 and x % 8 < 2:
+				return mark
+			if chance == 0:
+				return Color(0.95, 0.95, 0.8)
+			return shell_colour.lerp(Color(0.2, 0.12, 0.3), sin(x * 0.2 + y * 0.3) * 0.5 + 0.5)
+		Cryptlin.Kind.YETI:
+			# Snow on top, and frost the rest of the way down
+			if y < 9 + (x * 7) % 4:
+				return mark
+			return mark.lerp(shell_colour, 0.4) if chance < 3 else shell_colour
+		Cryptlin.Kind.CERBERUS:
+			# Black, with fire showing through the cracks in it
+			var vein := absi(y - 16 - (absi(x % 16 - 8) - 4))
+			if vein == 0 or (x % 16 == 5 and y > 6 and y < 13) or (x % 16 == 12 and y > 19 and y < 27):
+				return Color(1.0, 0.5, 0.12)
+			return mark.darkened(0.5) if vein == 1 else shell_colour
+	return shell_colour
+
+
+# How near a dot of the picture is to the middle of the nearest blotch, in blotch-widths
+# (under 1 is inside it); the picture joins up round the back
+func _blot(x: int, y: int) -> float:
+	var nearest := INF
+	for b in blots:
+		var across := absf(wrapf(x - b.x, -32.0, 32.0))
+		nearest = minf(nearest, Vector2(across, (y - b.y) * 1.6).length() / b.z)
+	return nearest
+
 
 
 # A point on the shell: `around` is the angle from the front, `up` the angle above the middle
