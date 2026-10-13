@@ -34,6 +34,9 @@ const NOTES: Array[String] = [
 	"walks straight through a thing in the room as if it were not there, and does not look back",
 	"snatches the toy or a bit of food and takes it up out of reach. It brings it down again when it has made its point",
 	"takes a long run at flying, gets off the floor for a moment and comes down in a heap, none the worse",
+	"lets out a sour green mist from under its skirt, and any of the others standing in it comes over queasy until it clears",
+	"goes up into the vent and screams down it, which makes the others jump. It comes out black with soot and shakes it off",
+	"spits. It does no harm to anything, but it leaves a yellow puddle for the broom",
 ]
 # How likely it is to take a turn at it, next to the 34 of wandering off
 const WEIGHT := 7.0
@@ -42,6 +45,10 @@ const REST := Vector2(45.0, 110.0)
 const STONE := Color(0.42, 0.42, 0.44)
 # What the merling sings, as how high each note is next to the first
 const TUNE: Array[float] = [1.0, 1.19, 1.33, 1.5, 1.33, 1.19, 1.0, 0.89, 1.0, 1.33, 1.19, 1.0]
+# The mist of the Flatwoods monster, the soot in the flue, and what the death worm spits
+const MIST := Color(0.5, 0.78, 0.26)
+const SOOT := Color(0.05, 0.05, 0.055)
+const SPIT := Color(0.86, 0.8, 0.12)
 
 var pet: Cryptlin
 # What it has picked to work its knack on: a thing, or another of them
@@ -72,6 +79,12 @@ var minds: Array[MeshInstance3D] = []
 # the boar has gone in its tumble
 var far := Vector3.ZERO
 var spun := 0.0
+# The mist the Flatwoods monster has let out; the soot on the Jersey devil, and whether it is
+# out of sight up the vent; and what the death worm has spat, while it is in the air
+var fog: Node3D
+var soot: ShaderMaterial
+var hid := false
+var gob: MeshInstance3D
 
 
 func _init(whose: Cryptlin) -> void:
@@ -125,6 +138,12 @@ func ready() -> bool:
 			return _loot() != null and pet.energy > 25.0
 		Cryptlin.Kind.BOAR:
 			return pet.energy > 30.0 and Den.wade(pet.position) <= 0.0
+		Cryptlin.Kind.FLATWOODS:
+			return Den.wade(pet.position) <= 0.0
+		Cryptlin.Kind.DEVIL:
+			return pet.energy > 25.0 and Den.wade(pet.position) <= 0.0 and Den.wade(Den.in_room(_vent(), 0.4)) <= 0.0
+		Cryptlin.Kind.WORM:
+			return Den.wade(pet.position) <= 0.0 and _puddles() < 2
 	return false
 
 
@@ -200,6 +219,12 @@ func begin() -> void:
 			# (the long way of the room, from whichever end it is nearer)
 			pet.target = pet._footing(Vector3(Den.half.x * (0.8 if pet.position.x > 0.0 else -0.8), 0, pet.position.z), 0.5)
 			spun = 0.0
+		Cryptlin.Kind.DEVIL:
+			var under := _vent()
+			pet.target = pet._footing(Vector3(under.x, 0, under.z + 0.5), 0.4)
+			height = 0.0
+		Cryptlin.Kind.WORM:
+			pet.target = _spittoon()
 		Cryptlin.Kind.KELPIE:
 			victim = _dupe()
 			if victim != null:
@@ -255,6 +280,12 @@ func tick(delta: float) -> void:
 			_snatch(delta)
 		Cryptlin.Kind.BOAR:
 			_charge(delta)
+		Cryptlin.Kind.FLATWOODS:
+			_mist(delta)
+		Cryptlin.Kind.DEVIL:
+			_flue(delta)
+		Cryptlin.Kind.WORM:
+			_spit(delta)
 		_:
 			finish()
 
@@ -298,6 +329,14 @@ func over() -> void:
 	if stone != null:
 		stone = null
 		pet._unghost()
+	if fog != null:
+		fog.queue_free()
+		fog = null
+	_clean()
+	if hid:
+		hid = false
+		pet.visible = true
+	_swallow()
 	spell = ""
 	caster = null
 
@@ -375,6 +414,19 @@ func spelled(delta: float) -> void:
 				pet.gaze = caster.global_position + Vector3(0, caster.top() * 0.7, 0)
 			if pet._steer(pet.target, Cryptlin.WALK * 0.7, delta, 0.12):
 				pet.state_len = minf(pet.state_len, pet.state_time + 0.6)
+		"queasy":
+			# Green about the gills: it stands and sways with its eyes half shut until it passes
+			pet._halt(delta)
+			pet.eye_goal = 0.45
+			pet.droop_goal = 0.9
+			pet.mouth_goal = 0.3 + 0.25 * maxf(sin(pet.state_time * 4.0), 0.0)
+			pet.wag = 0.0
+			pet.nod = 0.22
+			pet.roll_goal = sin(pet.state_time * 2.1) * 0.28
+			pet.wiggle = sin(pet.state_time * 2.7) * 0.07
+			if pet.state_time < delta * 1.5:
+				pet.feel(Cryptlin.Feeling.DISGUSTED, pet.state_len)
+				pet._cry("whimper", 0.8, -6.0)
 	if pet.state_time > pet.state_len:
 		var was := spell
 		pet._enter(Cryptlin.State.IDLE, 1.0)
@@ -1488,3 +1540,250 @@ func _charge(delta: float) -> void:
 			if pet.state_time > 1.9:
 				pet._cry("grumble", 1.2)
 				finish()
+
+
+# The Flatwoods monster lets out its mist: it draws itself up and hisses, a sour green fog rolls
+# out over the floor from under its skirt, and any of the others standing in it comes over
+# queasy until it clears
+func _mist(delta: float) -> void:
+	var world := pet.world
+	pet._halt(delta)
+	pet.gaze = world.camera.global_position
+	pet.eye_goal = 1.3
+	pet.blink = 1.0
+	for eye in pet.eye_mats:
+		eye.set_shader_parameter("glow", 0.85 + minf(pet.state_time, 1.0) * 1.1)
+	if pet.step == 0:
+		# It draws itself up, with its hands out
+		pet.arm_goal = Vector3(-0.45, 0.0, 0.5)
+		pet.nod = -0.12
+		if pet.state_time < delta * 1.5:
+			world.sfx.play("sweep", 0.45, -3.0)
+		if pet.state_time > 0.9:
+			fog = Node3D.new()
+			world.add_child(fog)
+			fog.position = Vector3(pet.position.x, 0, pet.position.z)
+			var haze := ShaderMaterial.new()
+			haze.shader = Track.FROST
+			haze.set_shader_parameter("tint", MIST)
+			haze.set_shader_parameter("depth", 0.2)
+			for i in 6:
+				var around := TAU * i / 6.0
+				var wisp := Ps1.part(fog, Ps1.ball(), haze, Vector3(cos(around), 0.0, sin(around)) * 0.55 + Vector3(0, 0.09 + 0.04 * (i % 2), 0), Vector3(0.6, 0.13, 0.6))
+				wisp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			fog.scale = Vector3.ONE * 0.1
+			_next()
+		return
+	# Out it comes, and lies round it for a while before it thins
+	pet.arm_goal = Vector3(-0.2, 0.0, 0.9)
+	pet.mouth_goal = 0.7
+	pet.wiggle = sin(pet.state_time * 3.0) * 0.03
+	var wide := clampf(pet.state_time / 0.9, 0.1, 1.0) * clampf((3.4 - pet.state_time) / 0.5, 0.0, 1.0)
+	fog.scale = Vector3(wide * pet.grow, minf(wide * 1.5, 1.0), wide * pet.grow)
+	fog.rotation.y = pet.state_time * 0.5
+	if _beat(0.45, delta) and pet.state_time < 2.6:
+		var where := randf() * TAU
+		world.crumbs(pet.global_position + Vector3(cos(where) * 0.5, 0.12, sin(where) * 0.5), MIST)
+		world.sfx.play("sweep", randf_range(0.4, 0.5), -12.0)
+	if pet.state_time > 0.6 and pet.state_time < 2.6:
+		done = true
+		for other in world.pets():
+			if other != pet and other.position.distance_to(pet.position) < 1.5 * pet.grow + 0.2:
+				other.knack.bewitch("queasy", pet, 3.6)
+	if pet.state_time > 3.4:
+		finish()
+
+
+# The Jersey devil goes up into the vent in the back wall, and screams down it. The others jump.
+# Then it comes out again black with soot from its horns to its hooves, flutters down, and
+# shakes it off
+func _flue(delta: float) -> void:
+	var world := pet.world
+	var vent := _vent()
+	match pet.step:
+		0:
+			pet.gaze = vent
+			if pet._steer(pet.target, Cryptlin.RUN * 0.8, delta, 0.25) or pet.state_time > 7.0:
+				height = 0.0
+				pet._cry("chirp", 0.8)
+				_next()
+			return
+		1:
+			# Up the wall on its wings, and in through the bars
+			pet.gaze = vent
+			pet._face(Vector3(vent.x, 0, vent.z - 1.0), delta)
+			var up := vent.y - pet.centre_y * pet.grow
+			height = move_toward(height, up, delta * 1.7)
+			var under := Vector3(pet.position.x, 0, pet.position.z).move_toward(Vector3(vent.x, 0, vent.z + 0.3), delta * 0.8)
+			pet.position.x = under.x
+			pet.position.z = under.z
+			if height >= up:
+				world.crumbs(vent + Vector3(0, 0, 0.1), SOOT)
+				world.sfx.play("knock", 0.7, -6.0)
+				pet.visible = false
+				hid = true
+				_next()
+		2:
+			# Gone, but not quiet: the scream comes down the flue, and soot after it
+			if pet.state_time > 0.5 and not done:
+				done = true
+				world.sfx.play("whimper", 2.3 * pet.voice, 2.0)
+				world.sfx.play("squeak", 0.5 * pet.voice, 0.0)
+				for other in world.pets():
+					if other != pet and other.state in Cryptlin.INTERRUPTIBLE and other.lift <= 0.05 and not other.airborne:
+						other.hop(2.3)
+						other.feel(Cryptlin.Feeling.SCARED, 2.5)
+						other.glance_time = 1.5
+						other.glance_point = vent
+			if pet.state_time > 0.5 and _beat(0.22, delta):
+				world.sfx.play("whimper", randf_range(1.7, 2.1) * pet.voice, -8.0 - pet.state_time * 5.0)
+				world.crumbs(vent + Vector3(randf_range(-0.3, 0.3), -0.2, 0.1), SOOT)
+			if pet.state_time > 1.9:
+				pet.visible = true
+				hid = false
+				soot = Ps1.mat(SOOT, 0.0, 0.15)
+				pet._ghost(pet, soot)
+				# (its eyes are what still shows of it)
+				for eye in pet.eyes:
+					for ball: MeshInstance3D in eye.get_children():
+						ball.material_override = pet.skin[ball]
+						pet.skin.erase(ball)
+				world.crumbs(vent + Vector3(0, 0, 0.15), SOOT)
+				pet.yaw = 0.0
+				# (it comes down in the light, where it can be seen for what it is)
+				for spot: Vector3 in [Vector3(vent.x * 0.3, 0, 0.5), Vector3(-0.7, 0, 0.6), Vector3(0.1, 0, 1.2), Vector3(vent.x * 0.3, 0, -0.5)]:
+					far = pet._footing(spot, 0.4)
+					if world.pets().all(func(other: Cryptlin) -> bool: return other == pet or other.position.distance_to(far) > 0.8):
+						break
+				_next()
+		3:
+			# Out and down into the light, a good deal blacker than it went in
+			pet.gaze = world.camera.global_position
+			pet.eye_goal = 1.3
+			height = move_toward(height, 0.0, delta * 1.25)
+			var down := Vector3(pet.position.x, 0, pet.position.z).move_toward(far, delta * 2.0)
+			pet.position.x = down.x
+			pet.position.z = down.z
+			if height <= 0.0:
+				pet.lift = 0.0
+				pet.flying = false
+				pet.squash_v = 2.5
+				_next()
+				return
+		4:
+			# It coughs, and shakes itself clean
+			pet._halt(delta)
+			pet.gaze = world.camera.global_position
+			pet.eye_goal = 0.5
+			if pet.state_time < 1.1:
+				pet.mouth_goal = 0.8
+				pet.nod = 0.25 * absf(sin(pet.state_time * 12.0))
+				if _beat(0.35, delta):
+					pet._cry("chomp", 1.5, -6.0)
+					world.crumbs(pet.mouth_node.global_position, SOOT)
+			else:
+				pet.wiggle = sin(pet.state_time * 28.0) * 0.16
+				if _beat(0.2, delta):
+					world.crumbs(pet.global_position + Vector3(randf_range(-0.2, 0.2), pet.top() * randf_range(0.3, 0.9), 0.1), SOOT)
+			if pet.state_time > 2.1:
+				_clean()
+				pet._cry("chirp", 1.1)
+				finish()
+			return
+	pet._halt(delta)
+	pet.lift = height
+	pet.flying = true
+
+
+# Where the vent is: the middle of it, on the back wall
+func _vent() -> Vector3:
+	return Vector3(Den.half.x - 1.0, Den.lamp_at.y - 0.9, -Den.half.y + 0.02)
+
+
+# The soot comes off the Jersey devil, and it is its own colour again
+func _clean() -> void:
+	if soot != null:
+		soot = null
+		pet._unghost()
+
+
+# The Mongolian death worm spits: it rears its front end with a crackle of sparks in its mouth,
+# and a gob of something yellow goes across the room and lands in a puddle. It does no harm to
+# anything, and whichever of the others is nearest where it lands gets out of the way
+func _spit(delta: float) -> void:
+	var world := pet.world
+	pet._halt(delta)
+	pet._face(pet.target, delta)
+	pet.gaze = pet.target + Vector3(0, 0.3, 0)
+	var lips := pet.mouth_node.global_position
+	match pet.step:
+		0:
+			pet.nod = -0.55 * clampf(pet.state_time / 0.5, 0.0, 1.0)
+			pet.mouth_goal = 1.0
+			for eye in pet.eye_mats:
+				eye.set_shader_parameter("glow", 0.85 + pet.state_time * 1.6)
+			if _beat(0.16, delta):
+				world.crumbs(lips + Vector3(randf_range(-0.05, 0.05), randf_range(0.0, 0.08), 0), SPIT.lightened(0.4))
+				world.sfx.play("click", randf_range(1.2, 1.9), -6.0)
+			if pet.state_time > 1.3:
+				gob = Ps1.part(world, Ps1.ball(), Ps1.mat(SPIT, 0.6), lips, Vector3.ONE * 0.055 * pet.grow)
+				far = lips
+				pet.squash_v = 3.2
+				world.sfx.play("snap", 1.7, -4.0)
+				_next()
+		1:
+			pet.nod = -0.3
+			pet.mouth_goal = 0.6
+			var gone := minf(pet.state_time / 0.6, 1.0)
+			if is_instance_valid(gob):
+				gob.position = far.lerp(pet.target, gone) + Vector3(0, sin(gone * PI) * 0.55, 0)
+			if gone >= 1.0:
+				_swallow()
+				world._lay_mess(Mess.Kind.PUDDLE, pet.target, Time.get_unix_time_from_system(), SPIT, pet.grow * 0.85)
+				world.crumbs(pet.target + Vector3(0, 0.06, 0), SPIT)
+				world.sfx.play("thud", 1.7, -8.0)
+				for other in world.pets():
+					if other != pet and other.state in Cryptlin.INTERRUPTIBLE and other.lift <= 0.05 and not other.airborne and other.position.distance_to(pet.target) < 0.8:
+						other.hop(2.0)
+						other.feel(Cryptlin.Feeling.DISGUSTED, 2.5)
+				done = true
+				_next()
+		2:
+			# And is satisfied
+			pet.mouth_goal = 0.25 + 0.35 * absf(sin(pet.state_time * 9.0))
+			pet.wag = 9.0
+			if pet.state_time > 1.0:
+				pet._cry("grumble", 1.3)
+				finish()
+
+
+# What the worm has spat is gone out of the air
+func _swallow() -> void:
+	if is_instance_valid(gob):
+		gob.queue_free()
+	gob = null
+
+
+# Somewhere for the worm to spit: a bit of dry floor a little way off in front of it, and not
+# where one of the others is standing
+func _spittoon() -> Vector3:
+	var world := pet.world
+	var spot := pet.position
+	for i in 8:
+		var way := pet.yaw + randf_range(-0.9, 0.9) * (1.0 + i * 0.4)
+		spot = Den.on_dry(pet.position + Vector3(sin(way), 0, cos(way)) * randf_range(0.9, 1.3), 0.3, 0.2)
+		var clear := spot.distance_to(pet.position) > 0.6
+		for other in world.pets():
+			clear = clear and (other == pet or other.position.distance_to(spot) > 0.45)
+		if clear:
+			break
+	return spot
+
+
+# How many puddles are lying in the room: the worm leaves off when there are a couple
+func _puddles() -> int:
+	var count := 0
+	for m in pet.world.messes:
+		if m.kind == Mess.Kind.PUDDLE:
+			count += 1
+	return count

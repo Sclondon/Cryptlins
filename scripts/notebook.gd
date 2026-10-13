@@ -99,6 +99,9 @@ const KIND_NOTES: Array[String] = [
 	"A pair of white legs with a lump of a head on top and no arms at all. It walks as if on stilts, and it would sooner stand than sit.",
 	"A monkey with wings, and some of them come in a jacket or a little round hat. Quick and loud, and up on top of things.",
 	"A stout boar with tusks, and wings a size too small for it. It flies a little, with effort, and trots the rest. It roots.",
+	"Tall, in a dark skirt like pleated tin that goes down to the floor, with a round red face set in a hood the shape of the ace of spades. It does not walk, it glides, and it hisses.",
+	"The head of a horse on a long neck, the wings of a bat, the legs of a goat and a fork to its tail. Quick and loud, and it flies when it cares to.",
+	"A fat red worm, all rings, with a round mouth full of teeth at one end and no eyes anywhere. It crawls, and it digs.",
 ]
 # And on each nature (Cryptlin.NATURES): each of them has two
 const NATURE_NOTES: Array[String] = [

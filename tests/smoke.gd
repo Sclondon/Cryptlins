@@ -430,6 +430,10 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 	# (hungry enough to want what is lying there, for the one that fetches it with its knack)
 	if pet.kind == Cryptlin.Kind.FROGMAN:
 		pet.belly = 60.0
+	if pet.kind == Cryptlin.Kind.WORM:
+		# (and a clean floor, for the one that will not add to two puddles)
+		for m: Mess in main.messes.filter(func(left: Mess) -> bool: return left.kind == Mess.Kind.PUDDLE):
+			main.clear_mess(m)
 	pet.knack.again = 0.0
 	check(pet.knack.ready(), "with what it needs to hand, it is ready to do it")
 	var turns := 0
@@ -451,6 +455,19 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 	pet._enter(Cryptlin.State.TRICK)
 	var came_off := await _until(func() -> bool: return pet.state != Cryptlin.State.TRICK, 1800)
 	check(came_off and pet.knack.done, "it does it: it %s" % Knack.NOTES[pet.kind])
+	if pet.kind == Cryptlin.Kind.FLATWOODS:
+		check(mate.state == Cryptlin.State.SPELL and mate.knack.spell == "queasy" and pet.knack.fog == null, "the one beside it is left queasy for a moment, and the mist is gone")
+	if pet.kind == Cryptlin.Kind.DEVIL:
+		check(pet.visible and pet.knack.soot == null and pet.lift <= 0.0 and pet.position.z > -Den.half.y + 1.0, "it is back out of the vent, down in the light, and has shaken the soot off")
+	if pet.kind == Cryptlin.Kind.WORM:
+		var spat := main.messes.filter(func(left: Mess) -> bool: return left.kind == Mess.Kind.PUDDLE)
+		check(spat.size() == 1 and spat[0].position.distance_to(pet.position) > 0.5 and spat[0].position.distance_to(mate.position) > 0.4 and pet.knack.gob == null, "what it spat is a puddle on the floor a little way off, and not on the one beside it")
+		main.leave_mess(Mess.Kind.PUDDLE, Vector3(1.8, 0, 1.6), mate)
+		pet.knack.again = 0.0
+		check(not pet.knack.ready() and not pet.eyes[0].visible and not pet.needs_water(), "it leaves off while there are two puddles lying, it has no eyes to be seen, and it is no water kind")
+		for m: Mess in main.messes.filter(func(left: Mess) -> bool: return left.kind == Mess.Kind.PUDDLE):
+			main.clear_mess(m)
+		pet.knack.again = 60.0
 	check(pet.me.known.get("knack", false) and main.notebook._notes(pet).contains(Knack.NOTES[pet.kind]), "and once seen it is written in the notebook")
 	check(not pet.knack.ready(), "it does not do it again at once")
 	await _until(func() -> bool: return mate.state != Cryptlin.State.SPELL and mate.state != Cryptlin.State.FLOUNDER and pet.lift <= 0.0 and main.weird <= 0.0, 900)

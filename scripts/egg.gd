@@ -19,6 +19,7 @@ const SHELLS: Array[Color] = [
 	Color(0.14, 0.2, 0.22), Color(0.18, 0.4, 0.42), Color(0.2, 0.32, 0.26), Color(0.62, 0.52, 0.4), Color(0.78, 0.6, 0.85),
 	Color(0.68, 0.14, 0.1), Color(0.55, 0.45, 0.32), Color(0.1, 0.14, 0.22), Color(0.62, 0.72, 0.82), Color(0.13, 0.11, 0.12),
 	Color(0.36, 0.27, 0.2), Color(0.88, 0.88, 0.84), Color(0.2, 0.2, 0.5), Color(0.4, 0.28, 0.18),
+	Color(0.1, 0.19, 0.16), Color(0.33, 0.16, 0.13), Color(0.62, 0.1, 0.08),
 ]
 const MARKS: Array[Color] = [
 	Color(0.2, 0.3, 0.15), Color(0.2, 0.16, 0.12), Color(0.5, 0.18, 0.1), Color(0.6, 0.58, 0.56), Color(0.45, 0.14, 0.1),
@@ -26,6 +27,7 @@ const MARKS: Array[Color] = [
 	Color(0.1, 0.32, 0.2), Color(0.5, 0.75, 0.7), Color(0.4, 0.3, 0.46), Color(0.66, 0.1, 0.08), Color(1.0, 0.95, 0.7),
 	Color(0.9, 0.87, 0.78), Color(0.9, 0.87, 0.8), Color(0.4, 1.0, 0.5), Color(0.95, 0.97, 1.0), Color(0.62, 0.1, 0.08),
 	Color(0.17, 0.12, 0.09), Color(0.3, 0.32, 0.38), Color(0.92, 0.72, 0.22), Color(0.16, 0.1, 0.07),
+	Color(0.8, 0.14, 0.1), Color(0.82, 0.76, 0.62), Color(0.3, 0.04, 0.05),
 ]
 const TITLES: Array[String] = [
 	"A mossy egg", "A streaky egg", "A speckled egg", "A silk-wound egg", "A thorn-patterned egg",
@@ -33,15 +35,17 @@ const TITLES: Array[String] = [
 	"A weed-streaked egg", "A scaly egg", "A sucker-ringed egg", "A red-capped egg", "A glimmering egg",
 	"A toadstool egg", "A dappled egg", "A starry egg", "A frosted egg", "An ember-veined egg",
 	"A tunnelled egg", "A long-shanked egg", "A gold-braided egg", "A bristly egg",
+	"A spade-marked egg", "A hoof-printed egg", "A banded egg",
 ]
 # How much of its own light each shell gives off, and how wide and how tall it is next to the usual
-const GLOWS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.35, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0]
+const GLOWS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.35, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 const SHAPES: Array[Vector2] = [
 	Vector2(1.0, 1.0), Vector2(1.06, 1.04), Vector2(0.96, 0.98), Vector2(0.95, 1.06), Vector2(0.94, 1.04),
 	Vector2(1.06, 0.94), Vector2(1.0, 1.06), Vector2(1.08, 0.96), Vector2(0.92, 1.08),
 	Vector2(0.96, 1.06), Vector2(1.02, 1.0), Vector2(1.06, 0.98), Vector2(1.04, 0.94), Vector2(0.9, 0.96),
 	Vector2(1.08, 0.92), Vector2(1.0, 0.94), Vector2(0.94, 1.08), Vector2(1.08, 1.06), Vector2(1.04, 1.0),
 	Vector2(1.08, 0.95), Vector2(0.9, 1.1), Vector2(0.98, 1.02), Vector2(1.1, 0.95),
+	Vector2(0.94, 1.1), Vector2(0.98, 1.04), Vector2(1.0, 1.1),
 ]
 
 var world: Den
@@ -256,6 +260,27 @@ func _paint(x: int, y: int) -> Color:
 			if (x * 7 + (y / 3) * 13) % 11 == 0:
 				return mark
 			return shell_colour.lightened(0.28) if (x + int(sin(y * 0.5) * 1.5) + 64) % 16 < 3 else shell_colour
+		Cryptlin.Kind.FLATWOODS:
+			# Dark and pleated like its skirt, with the ace of spades in red round the middle
+			var across := absi((x + 16) % 32 - 16)
+			if y >= 6 and y <= 19 and across <= mini((y - 6) * 3 / 5, 7) and not (y == 19 and across < 2):
+				return mark
+			if (y >= 19 and y <= 23 and across <= 1) or (y == 24 and across <= 3):
+				return mark
+			return shell_colour.lightened(0.14) if x % 4 == 0 else shell_colour
+		Cryptlin.Kind.DEVIL:
+			# The prints of a cloven hoof going up and round it, as on a roof after snow
+			var row := y / 8
+			var across := (x + row * 5) % 12 - 6
+			var down := y % 8
+			if down >= 2 and down <= 5 and (absi(across) == 2 or (absi(across) == 1 and down >= 3)):
+				return mark
+			return shell_colour.darkened(0.25) if chance == 0 else shell_colour
+		Cryptlin.Kind.WORM:
+			# Red, in rings from one end to the other
+			if y % 5 == 0:
+				return mark
+			return shell_colour.lightened(0.16) if y % 5 == 2 else shell_colour
 	return shell_colour
 
 
