@@ -1,28 +1,43 @@
 class_name Shelf
 extends Control
-## Everything the keeper has, as the things themselves, floating in a row along the bottom of
-## the screen with the room showing between them. The row slides sideways under a finger. Den
-## reads the touches and asks this which item is where. It is its own little 3D scene with
-## nothing behind it, drawn small and blown up like the room.
+## The shelf of things, which is a wheel: everything the keeper has, as the things themselves,
+## riding the rim of a big wheel whose hub is below the bottom of the screen. Only the top of the
+## rim shows: the middle thing highest and nearest, its neighbours lower and turned away, the
+## rest sinking off the bottom corners. A finger turns it. No wheel is drawn, only the floating
+## things, with the room showing between them. Den reads the touches and asks this which item is
+## where. It is its own little 3D scene with nothing behind it, drawn small and blown up like
+## the room.
 
+# How far apart two neighbours ride along the rim, and how much further where the group changes
+const PITCH := 0.92
 const GAP := 0.4
 const TALL := 1.15
+# How far below the top edge the middle thing hangs, and how far the rim has dropped by the time
+# it reaches the side of the screen (which makes the wheel as big as the screen is wide)
+const CREST := 0.52
+const SINK := 1.1
+# How far out from the rim a finger still counts as on the wheel
+const REACH := 0.56
+# How far round from the top a thing has gone under, and is not drawn
+const UNDER := 1.7
 # Screen units to one pixel of the shelf's picture
 const COARSE := 2.0
 
 var view: SubViewport
 var camera: Camera3D
 var overlay: Control
-var row: Node3D
+var rim: Node3D
 var ids: Array[String] = []
+# How far round the rim each thing rides, counted in neighbours from the first
 var spots: Array[float] = []
-var holders: Array[Node3D] = []
+var stands: Array[Node3D] = []
 # By item id: "heart" or "cross" for what is known of the cryptlin's tastes, how many are left of
 # things that get used up, and which are out in the tank just now
 var marks := {}
 var counts := {}
 var out := {}
-var scroll := 0.0
+# Which spot is at the top of the wheel, and how fast that is changing
+var turn := 0.0
 var speed := 0.0
 var held := false
 var t := 0.0
@@ -47,14 +62,15 @@ func _ready() -> void:
 	camera.size = TALL
 	camera.near = 0.1
 	camera.far = 20.0
+	camera.position = Vector3(0, 0, 4.0)
 	view.add_child(camera)
 	var sun := DirectionalLight3D.new()
 	sun.light_color = Color(1.0, 0.93, 0.8)
 	sun.light_energy = 1.25
 	view.add_child(sun)
 	sun.look_at_from_position(Vector3(-2, 4, 5), Vector3.ZERO)
-	row = Node3D.new()
-	view.add_child(row)
+	rim = Node3D.new()
+	view.add_child(rim)
 
 	var post := ShaderMaterial.new()
 	post.shader = load("res://shaders/ps1_float.gdshader")
@@ -76,30 +92,32 @@ func _ready() -> void:
 	_fit()
 
 
-# Puts these items on the shelf, in this order, with a gap wherever the group changes
+# Puts these items on the wheel, in this order, with a gap wherever the group changes
 func stock(items: Array[String]) -> void:
 	if items == ids:
 		return
-	for h in holders:
-		h.queue_free()
-	holders.clear()
+	for s in stands:
+		s.queue_free()
+	stands.clear()
 	spots.clear()
 	ids = items.duplicate()
-	var x := 0.0
+	var at := 0.0
 	var group := ""
 	for id in ids:
 		var g: String = Items.find(id)["group"]
 		if group != "":
-			x += 1.0 + (GAP if g != group else 0.0)
+			at += 1.0 + (GAP if g != group else 0.0)
 		group = g
-		var holder := Items.model(id)
+		# The stand rides the rim; the thing hangs in it by its middle, free to turn
 		var stand := Node3D.new()
-		stand.position.x = x
-		stand.add_child(holder)
-		row.add_child(stand)
-		holders.append(stand)
-		spots.append(x)
+		var spin := Node3D.new()
+		spin.add_child(Items.model(id))
+		stand.add_child(spin)
+		rim.add_child(stand)
+		stands.append(stand)
+		spots.append(at)
 	_limit()
+	_place()
 
 
 func _fit() -> void:
@@ -114,43 +132,81 @@ func _unit() -> float:
 	return maxf(size.y, 1.0) / TALL
 
 
-func _span() -> float:
-	return size.x / _unit()
+# The wheel's radius: big enough that the rim leaves the screen by its bottom corners
+func _radius() -> float:
+	var half := size.x * 0.5 / _unit()
+	return maxf((half * half + SINK * SINK) / (2.0 * SINK), 1.6)
 
 
+# The angle between two neighbours on the rim
+func _step() -> float:
+	return PITCH / _radius()
+
+
+# How far round from the top an item is just now, clockwise
+func _angle(i: int) -> float:
+	return (spots[i] - turn) * _step()
+
+
+# The hub, in this control's own space: below the bottom edge
+func _hub() -> Vector2:
+	return Vector2(size.x * 0.5, (CREST + _radius()) * _unit())
+
+
+# Where an item is just now (the middle of it), in this control's own space
+func _seat(i: int) -> Vector2:
+	var a := _angle(i)
+	return _hub() + Vector2(sin(a), -cos(a)) * _radius() * _unit()
+
+
+# How big an item is drawn: the lower it has sunk, the further off and the smaller
+func _size_at(a: float) -> float:
+	return 1.14 - 0.4 * clampf(_radius() * (1.0 - cos(a)) / TALL, 0.0, 1.0)
+
+
+# It stops with the first thing at the top one way, and the last the other
 func _limit() -> void:
 	if spots.is_empty():
 		return
-	var low := spots[0] - 0.7
-	var high := spots[spots.size() - 1] + 0.7 - _span()
-	if high < low:
-		# Everything fits: keep it in the middle
-		low = (low + high) * 0.5
-		high = low
-	if scroll < low or scroll > high:
+	var last := spots[spots.size() - 1]
+	if turn < 0.0 or turn > last:
 		speed = 0.0
-	scroll = clampf(scroll, low, high)
+	turn = clampf(turn, 0.0, last)
+
+
+# The item nearest to somewhere on the rim
+func _nearest(spot: float) -> int:
+	var best := -1
+	for i in spots.size():
+		if best < 0 or absf(spots[i] - spot) < absf(spots[best] - spot):
+			best = i
+	return best
 
 
 func can_scroll(way: float) -> bool:
 	if spots.is_empty():
 		return false
 	if way < 0.0:
-		return scroll > spots[0] - 0.65
-	return scroll < spots[spots.size() - 1] + 0.65 - _span()
+		return turn > 0.3
+	return turn < spots[spots.size() - 1] - 0.3
 
 
-# The item under a point on the screen, or "" for none
+# The item under a point on the screen, or "" for none: the one whose place on the rim is
+# nearest, which gives the few at the top a wide target each
 func item_at(at: Vector2) -> String:
-	var x := scroll + (at.x - global_position.x) / _unit()
-	for i in spots.size():
-		if absf(spots[i] - x) < 0.5:
-			return ids[i]
-	return ""
+	if spots.is_empty():
+		return ""
+	var from_hub := at - global_position - _hub()
+	var spot := turn + atan2(from_hub.x, -from_hub.y) / _step()
+	var i := _nearest(spot)
+	return ids[i] if absf(spots[i] - spot) < 0.5 + GAP * 0.5 else ""
 
 
+# Whether a point on the screen is on the wheel: what is above the rim is the room
 func has_point(at: Vector2) -> bool:
-	return visible and get_global_rect().has_point(at)
+	if not visible or not get_global_rect().has_point(at):
+		return false
+	return (at - global_position).distance_to(_hub()) < (_radius() + REACH) * _unit()
 
 
 func grab() -> void:
@@ -158,10 +214,10 @@ func grab() -> void:
 	speed = 0.0
 
 
-# Slid along by a finger that moved this far across the screen
+# Turned by a finger that moved this far across the screen
 func drag(by: float, delta: float) -> void:
-	var moved := -by / _unit()
-	scroll += moved
+	var moved := -by / _unit() / PITCH
+	turn += moved
 	if delta > 0.0:
 		speed = lerpf(speed, moved / delta, 0.5)
 	_limit()
@@ -171,61 +227,92 @@ func let_go() -> void:
 	held = false
 
 
-# Slides along until this item is in view (for the tests, and for showing off something new)
+# Turns until this item is at the top (for the tests, and for showing off something new)
 func show_item(id: String) -> void:
 	var i := ids.find(id)
 	if i >= 0:
-		scroll = spots[i] - _span() * 0.5
+		turn = spots[i]
 		speed = 0.0
-		_limit()
+		_place()
 
 
 func _process(delta: float) -> void:
 	t += delta
-	if not held and absf(speed) > 0.01:
-		scroll += speed * delta
-		speed = move_toward(speed, 0.0, delta * (3.0 + absf(speed) * 2.0))
-		_limit()
-	camera.position = Vector3(scroll + _span() * 0.5, 1.25, 3.0)
-	camera.rotation = Vector3(-0.3, 0, 0)
-	# Each thing turns a little and bobs where it hangs, to show its shape
-	for i in holders.size():
-		holders[i].rotation.y = 0.35 + sin(t * 0.9 + i * 1.7) * 0.4
-		holders[i].position.y = 0.06 + sin(t * 1.3 + i * 2.3) * 0.03
+	if not held and not spots.is_empty():
+		if absf(speed) > 0.5:
+			turn += speed * delta
+			speed = move_toward(speed, 0.0, delta * (3.0 + absf(speed) * 2.0))
+			_limit()
+		else:
+			# Let go, it runs down and comes to rest with a thing at the top
+			speed = 0.0
+			turn = lerpf(turn, spots[_nearest(turn)], 1.0 - exp(-delta * 9.0))
+	_place()
 	overlay.queue_redraw()
 
 
-# What is drawn sharp over the picture: the marks, and a hint of more either side
+# Stands each thing where it rides just now: leaning with the rim, turned away from the middle,
+# tipped a little towards the eye to show its top, and bobbing where it hangs to show its shape
+func _place() -> void:
+	var radius := _radius()
+	var hub := Vector3(0, TALL * 0.5 - CREST - radius, 0)
+	for i in stands.size():
+		var a := _angle(i)
+		var stand := stands[i]
+		# (what has gone under is not drawn: there is more than one turn of the wheel of it)
+		stand.visible = absf(a) < UNDER
+		if not stand.visible:
+			continue
+		stand.position = hub + Vector3(sin(a) * radius, cos(a) * radius, cos(a))
+		stand.basis = (Basis(Vector3.BACK, -a) * Basis(Vector3.RIGHT, 0.3)).scaled(Vector3.ONE * _size_at(a))
+		var spin: Node3D = stand.get_child(0)
+		spin.position.y = -0.3 + sin(t * 1.3 + i * 2.3) * 0.03
+		spin.rotation.y = 0.35 + a * 0.9 + sin(t * 0.9 + i * 1.7) * 0.35
+
+
+# What is drawn sharp over the picture: the marks, each going round with its thing, and a hint
+# of more either side
 func _paint() -> void:
 	var w := overlay.size.x
 	var h := overlay.size.y
 	var font := get_theme_default_font()
-	var unit := _unit()
 	for i in ids.size():
-		var x := (spots[i] - scroll) * unit
-		if x < -unit or x > w + unit:
+		if not stands[i].visible:
+			continue
+		var at := _seat(i)
+		var reach := _unit() * _size_at(_angle(i))
+		if at.x < -reach or at.x > w + reach or at.y > h + reach:
 			continue
 		var id := ids[i]
 		if out.get(id, false):
-			overlay.draw_circle(Vector2(x, h - 9.0), 4.0, Icons.AMBER)
+			overlay.draw_circle(at + Vector2(0, reach * 0.46), 4.0, Icons.AMBER)
 		if marks.has(id):
-			Icons.paint(overlay, marks[id], Vector2(x + unit * 0.3, h * 0.2), h * 0.085)
+			Icons.paint(overlay, marks[id], at + Vector2(reach * 0.3, -reach * 0.3), h * 0.085)
 		if counts.has(id):
-			overlay.draw_string_outline(font, Vector2(x + unit * 0.14, h - 8.0), "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0, 0, 0, 0.8))
-			overlay.draw_string(font, Vector2(x + unit * 0.14, h - 8.0), "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Icons.BONE)
+			var corner := at + Vector2(reach * 0.14, reach * 0.42)
+			overlay.draw_string_outline(font, corner, "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0, 0, 0, 0.8))
+			overlay.draw_string(font, corner, "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Icons.BONE)
 	for way: float in [-1.0, 1.0]:
 		if can_scroll(way):
-			var c := Vector2(14.0 if way < 0.0 else w - 14.0, h * 0.5)
+			var c := Vector2(w * 0.5 + way * (w * 0.5 - 14.0), h * 0.3)
 			overlay.draw_colored_polygon(PackedVector2Array([c + Vector2(7 * way, 0), c + Vector2(-5 * way, -10), c + Vector2(-5 * way, 10)]), Color(Icons.AMBER, 0.55))
 
 
-# Where on the screen an item stands (the middle of it), sliding the shelf along first if it is out of view
+# Where on the screen an item is just now (the middle of it), or off the screen if it is not on
+# the top half of the wheel
+func where(id: String) -> Vector2:
+	var i := ids.find(id)
+	return global_position + _seat(i) if i >= 0 and absf(_angle(i)) < UNDER else Vector2(-1, -1)
+
+
+# Where on the screen an item is, turning the wheel to bring it to the top first if it is not
+# among the few up there that a finger can get at whole
 func point_of(id: String) -> Vector2:
 	var i := ids.find(id)
 	if i < 0:
 		return Vector2(-1, -1)
-	var x := (spots[i] - scroll) * _unit()
-	if x < _unit() * 0.5 or x > size.x - _unit() * 0.5:
+	var at := _seat(i)
+	var room := _unit() * 0.4
+	if at.x < room or at.x > size.x - room or at.y > size.y - room:
 		show_item(id)
-		x = (spots[i] - scroll) * _unit()
-	return global_position + Vector2(x, size.y * 0.5)
+	return where(id)

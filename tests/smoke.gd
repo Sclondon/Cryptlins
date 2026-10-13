@@ -191,7 +191,12 @@ func _screen(world: Vector3) -> Vector2:
 	return root.get_final_transform() * main.screen_of(world)
 
 
-# Where an item stands on the shelf, as window pixels
+# A place on the game's own screen, as window pixels
+func _px(at: Vector2) -> Vector2:
+	return root.get_final_transform() * at
+
+
+# Where an item rides on the wheel, as window pixels (turned to the top first if it is not in reach)
 func _on_shelf(id: String) -> Vector2:
 	return root.get_final_transform() * main.shelf.point_of(id)
 
@@ -232,6 +237,95 @@ func _slide(from: Vector2, to: Vector2, steps := 8, via := Vector2.INF) -> void:
 		_drag(start.lerp(to, float(i + 1) / steps), (to - start) / steps)
 		await _frames(1)
 	_touch(to, false)
+	await _frames(2)
+
+
+# The thing furthest round the wheel to one side whose middle is still on the screen
+func _outermost(side: float) -> String:
+	var screen := Rect2(Vector2.ZERO, main.get_viewport().get_visible_rect().size).grow(-8.0)
+	var far := ""
+	for id in main.shelf.ids:
+		var at := main.shelf.where(id)
+		if screen.has_point(at) and (far == "" or (at.x - main.shelf.where(far).x) * side > 0.0):
+			far = id
+	return far
+
+
+# The wheel of things on a screen of this shape: every thing comes round to the top and answers
+# there, so does every other that shows at the time, it stops at both ends, runs on when
+# flicked, and a finger can tap and drag the ones furthest down the sides
+func _wheel(pet: Cryptlin, shape: String) -> void:
+	var shelf := main.shelf
+	var screen := Rect2(Vector2.ZERO, main.get_viewport().get_visible_rect().size)
+	var top := shelf.global_position + Vector2(shelf.size.x * 0.5, Shelf.CREST * shelf.size.y / Shelf.TALL)
+	var first: String = shelf.ids[0]
+	var last: String = shelf.ids[shelf.ids.size() - 1]
+	var lost: Array[String] = []
+	var fewest := 99
+	var most := 0
+	for id in shelf.ids:
+		shelf.show_item(id)
+		if shelf.where(id).distance_to(top) > 1.0:
+			lost.append(id)
+		var showing := 0
+		for other in shelf.ids:
+			var at := shelf.where(other)
+			if screen.has_point(at):
+				showing += 1
+				if not shelf.has_point(at) or shelf.item_at(at) != other:
+					lost.append("%s by %s" % [other, id])
+		if id != first and id != last:
+			fewest = mini(fewest, showing)
+		most = maxi(most, showing)
+	check(lost.is_empty(), "%s: each of the %d things comes to the top of the wheel, and every one that shows answers to a finger where it rides %s" % [shape, shelf.ids.size(), lost])
+	check(fewest >= 3 and (most <= 5 or not main.tall_room), "%s: %d to %d of them show at a time" % [shape, fewest, most])
+	check(not shelf.has_point(Vector2(top.x, shelf.global_position.y - 4.0)) and shelf.has_point(Vector2(top.x, screen.size.y - 4.0)) and shelf.item_at(Vector2(top.x, screen.size.y - 4.0)) == last, "%s: above it is the room, and all the way down under the top one is still that one" % shape)
+
+	# Both ends: swept as far as it will go, it stops with the first thing at the top, or the last
+	var sweep := Vector2(minf(screen.size.x * 0.4, 420.0), 0)
+	shelf.show_item(shelf.ids[3])
+	for i in 4:
+		await _slide(_px(top - sweep * 0.5), _px(top + sweep * 0.5))
+	await _frames(90)
+	check(is_zero_approx(shelf.turn) and shelf.where(first).distance_to(top) < 1.0 and not shelf.can_scroll(-1.0) and shelf.can_scroll(1.0), "%s: swept one way it stops with the first thing (the %s) at the top" % [shape, first])
+	await _tap(_px(top))
+	check(main.scanning, "%s: where a tap uses it" % shape)
+	main.stop_scan()
+	shelf.show_item(shelf.ids[shelf.ids.size() - 4])
+	for i in 4:
+		await _slide(_px(top + sweep * 0.5), _px(top - sweep * 0.5))
+	await _frames(90)
+	check(is_equal_approx(shelf.turn, shelf.spots[shelf.spots.size() - 1]) and shelf.where(last).distance_to(top) < 1.0 and not shelf.can_scroll(1.0) and shelf.can_scroll(-1.0), "%s: swept the other way it stops with the last (the %s) at the top" % [shape, last])
+	await _tap(_px(top))
+	check(last == "notebook" and main.notebook.visible, "%s: which is the notebook, and a tap opens it" % shape)
+	main.notebook.close()
+	await _frames(2)
+
+	# A flick: it runs on after the finger has gone, and comes to rest with a thing at the top
+	shelf.show_item("rock")
+	var was := shelf.turn
+	await _slide(_px(top + sweep * 0.3), _px(top - sweep * 0.3), 4)
+	var let_go := shelf.turn
+	await _frames(12)
+	var ran := shelf.turn - let_go
+	check(let_go > was + 0.5 and ran > 0.3, "%s: a sideways drag turns it (%.1f things), and flicked it runs on (%.1f more)" % [shape, let_go - was, ran])
+	check(await _until(func() -> bool: return absf(shelf.turn - shelf.spots[shelf._nearest(shelf.turn)]) < 0.01, 300), "%s: and comes to rest with a thing at the top" % shape)
+
+	# The ones furthest down either side that still show: a tap on one, and the other dragged up
+	# (with the wheel turned so that both are food, which is easy to tell has come in)
+	pet.belly = 100.0
+	shelf.show_item("ball")
+	var left := _outermost(-1.0)
+	var down := (shelf.where(left).y - top.y) / shelf._unit()
+	await _tap(_px(shelf.where(left)))
+	check(Items.find(left)["group"] == "food" and main.snacks.size() == 1 and main.snacks[0].kind == Items.find(left)["n"], "%s: a tap on the last one showing on the left (the %s, %.2f of a thing lower than the top) drops it in" % [shape, left, down])
+	shelf.show_item("scanner")
+	var right := _outermost(1.0)
+	var from := _px(shelf.where(right))
+	await _slide(from, _screen(Vector3(0.4, 0.8, 0.3)), 16, from - Vector2(0, 190))
+	check(Items.find(right)["group"] == "food" and main.snacks.size() == 2 and main.snacks[1].kind == Items.find(right)["n"] and is_zero_approx(shelf.turn), "%s: the last one showing on the right (the %s) comes up off the wheel on a finger, and the wheel has not turned" % [shape, right])
+	main._clear_toys()
+	pet._enter(Cryptlin.State.IDLE, 0.2)
 	await _frames(2)
 
 
@@ -378,6 +472,20 @@ func _run() -> void:
 	pet.belly = 30.0
 	pet._enter(Cryptlin.State.IDLE, 0.2)
 	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500) and pet.belly > 50.0, "and is eaten")
+
+	# The wheel of things, on a wide screen and on an upright phone
+	await _until(func() -> bool: return _settled(pet), 600)
+	var screen := root.size
+	root.size = Vector2i(1280, 720)
+	await _frames(5)
+	check(not main.tall_room and main.shelf.size.x > 1200.0, "laid flat, the room is the wide one")
+	await _wheel(pet, "wide")
+	root.size = Vector2i(540, 1170)
+	await _frames(5)
+	check(main.tall_room and main.shelf.size.x < 800.0, "stood upright, it is the tall one")
+	await _wheel(pet, "upright")
+	root.size = screen
+	await _frames(5)
 
 	# The ball
 	pet.fun = 20.0

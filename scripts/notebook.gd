@@ -1,6 +1,6 @@
 class_name Notebook
 extends PanelContainer
-## The keeper's notebook, opened from the shelf. Everything the game has to say in words is in
+## The keeper's notebook, opened from the wheel of things. Everything the game has to say in words is in
 ## here: a page on each egg and cryptlin in the room and what has been found out about it (and
 ## one kept for each that has died), how
 ## to look after them, what a finger can do, and the few odds and ends (the sound).
@@ -9,7 +9,7 @@ const INK := Color(0.17, 0.14, 0.2)
 const FAINT := Color(0.17, 0.14, 0.2, 0.55)
 const PAPER := Color(0.87, 0.82, 0.68)
 # The pages that come after the one for each of those in the room
-const TITLES: Array[String] = ["Looking after them", "The shelf", "Hands", "Odds and ends"]
+const TITLES: Array[String] = ["Looking after them", "The wheel", "Hands", "Odds and ends"]
 const CARE := "They live by the clock on the wall, whether you are here or not.
 
 Feed each once or twice a day. A full belly lasts most of a day. Food is for whoever gets to it first.
@@ -26,20 +26,20 @@ Two grown ones that are fond of each other, fed and at home may pair off, and so
 
 One left hungry for days sickens, and in the end dies.
 
-The scanner on the shelf shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, how well it is, and whether it likes its home. Drag it up onto the one you mean."
-const SHELF := "Everything you have is on the shelf. Slide it sideways to see the rest.
+The scanner on the wheel shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, how well it is, and whether it likes its home. Drag it up onto the one you mean."
+const SHELF := "Everything you have rides a wheel at the bottom of the screen, the scanner first and this notebook last. Turn it sideways to see the rest.
 
-Tap a thing to put it in, or drag it up off the shelf and let go where you want it.
+Tap a thing to put it in, or drag it up off the wheel and let go where you want it.
 
 An egg is one more for the room, which holds four.
 
 Food gets eaten. Toys get thrown: pick one up and throw it again.
 
-Rocks, logs and the like stay put. Drag them about, or back down to the shelf to put them away. They will sit on them, drink from them, wade in them and hide in them.
+Rocks, logs and the like stay put. Drag them about, or back down to the wheel to put them away. They will sit on them, drink from them, wade in them and hide in them.
 
 A tray of ground changes the floor. A nest changes their bed.
 
-Every cryptlin has its own idea of a good home, and one room cannot please them all. The marks on the shelf are what you know of the one you last touched."
+Every cryptlin has its own idea of a good home, and one room cannot please them all. The marks on the wheel are what you know of the one you last touched."
 const HANDS := "Tap the floor to call them.
 
 Hold and drag on the floor to swing the lamp. They chase the light.

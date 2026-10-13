@@ -2214,7 +2214,7 @@ func _input(event: InputEvent) -> void:
 		hover_point = _floor_at(event.position)
 		hover_time = clock
 	elif event is InputEventMouseButton and event.pressed and shelf.has_point(event.position) and not _modal():
-		# A mouse wheel over the shelf slides it along
+		# A mouse wheel over the wheel of things turns it
 		if event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_LEFT]:
 			shelf.drag(90.0, 0.05)
 		elif event.button_index in [MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_RIGHT]:
@@ -2341,11 +2341,11 @@ func _snack_at(at: Vector2) -> Snack:
 	return null
 
 
-# A finger that came down on the shelf: sideways slides it, upwards pulls the thing off it
+# A finger that came down on the wheel of things: sideways turns it, upwards pulls the thing off it
 func _drag_shelf(e: InputEventScreenDrag) -> void:
 	var gone := e.position - press_at
-	# Up over the shelf's edge, and not plainly a sideways swipe that strayed: the thing comes too
-	if e.position.y < shelf.global_position.y - 6.0 and shelf_item != "" and owns(shelf_item) and absf(gone.x) < maxf(absf(gone.y) * 2.5, 90.0):
+	# Up off the wheel, and not plainly a sideways swipe that strayed: the thing comes too
+	if not shelf.has_point(e.position) and gone.y < -24.0 and shelf_item != "" and owns(shelf_item) and absf(gone.x) < maxf(absf(gone.y) * 2.5, 90.0):
 		shelf.let_go()
 		_pull(shelf_item, e.position)
 	elif sliding:

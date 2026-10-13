@@ -50,19 +50,22 @@ bored, sleepy, grumpy, scared, sad, disgusted, poorly). What it shows you of its
 
 ## The room and the things in it
 
-Everything the keeper has floats in a row along the bottom of the screen, as the things themselves: the scanner
-first, then food, toys, the egg, things for the room, nests and trays of ground, and the notebook last. Slide the row
-sideways to see the rest.
-Tap a thing to use it, or drag it up off the row and let go where you want it.
+Everything the keeper has rides a wheel at the bottom of the screen, as the things themselves: the hub is below the
+screen, so only the top of the rim shows, with the middle thing highest and nearest, its neighbours lower and turned
+away, and the rest sinking off the bottom corners. No wheel is drawn: only the floating things, with the room showing
+between them. The scanner is first, then food, toys, the egg, things for the room, nests and trays of ground, and the
+notebook last. A sideways drag turns it, and a flick keeps it running; it stops at the first thing and at the last,
+and comes to rest with a thing at the top.
+Tap a thing to use it, or drag it up off the wheel and let go where you want it.
 
 | Thing | What it does |
 | --- | --- |
-| **Notebook** (N) | The only words in the game: a page on each egg and cryptlin in the room (leaf through them; a cryptlin can be renamed or let go from its own), how to look after them, the row of things, what a finger can do, and the odds and ends (the sound). |
+| **Notebook** (N) | The only words in the game: a page on each egg and cryptlin in the room (leaf through them; a cryptlin can be renamed or let go from its own), how to look after them, the wheel of things, what a finger can do, and the odds and ends (the sound). |
 | **Egg** | One more for the room, of a kind that is not there already. The room holds four, eggs and cryptlins together; with four in it the egg only clicks. |
 | **Scanner** (X) | Held up to one of them for a few seconds (dragged up onto it; or tapped, when it goes to the one last touched, or else the one nearest the middle): its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and notes for how well it is and how at home. Works on an egg too. |
 | **Food**: bone (F), toadstool, candy corn, fish, beetle, berries | It runs over and eats what you drop, loves its favourite, and spits out the one it can't stand. |
 | **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Pick the toy up with a finger and it jumps for it; let go to throw. |
-| **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the row to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
+| **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the wheel to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
 | **Shelters**: cave, barrel, hollow stump, rag tent, crate, flowerpot | Things it can get inside: it hides in one to watch you, and would sooner have its nest there. |
 | **Pool** | A pond in a ring of stones. The water kinds (frogman, Loch Ness monster, kelpie, merling, Cthulhu spawn) are not at home without one: they wade in up to the middle of their own accord, and beg for water (a drop in the thought bubble) when there is none. The rest take it or leave it. |
 | **Nests**: rags, twigs, cushion, cardboard box | Its bed. Drag it where you like; it may well drag it somewhere else. |
@@ -91,13 +94,13 @@ over-fond of its nest the way a dog does of a cushion, and is mortified if it is
 
 ## More than one
 
-The room holds up to four, eggs and cryptlins together. A new game starts with one egg; the **egg** on the row of
+The room holds up to four, eggs and cryptlins together. A new game starts with one egg; the **egg** on the wheel of
 things drops in another (played by itself there is no end of them; inside a page with a shop an egg is stock, used
 up when it is laid). Each has its own name, needs, age, natures, tastes and idea of a good home, so one room cannot
 please them all. Food dropped in is for whoever gets there first: a greedy or a bold one pushes in, a shy one hangs
 back, two at one bit of food share it bite by bite, and one that will not eat a thing leaves it for the others. More
 than one will chase a toy. They walk round each other as they do round the things in the room, and sleep side by
-side in the one nest. The marks on the row of things are what is known of the one last tapped or scanned.
+side in the one nest. The marks on the wheel of things are what is known of the one last tapped or scanned.
 
 Each pair has a **standing** with one another, kept in the save: what each thinks of the other, a little either side
 of indifferent to begin with by how their natures suit (opposites grate, a grumpy one is hard going, a nature in
@@ -127,8 +130,8 @@ itself about with its head down, and the poorly face goes up over it. Nothing sa
 
 At no health it dies. It lies down where it is and goes still; a moment later a pale ghost of it gets up, drifts up
 and out through the ceiling, and a small **grave marker** with a band of its own colour stands where it lay. The
-marker is a thing in the room like any other (drag it about, drag it down to the row to put it away, tap it there to
-bring it back out; the others will go and sit by it) but it is never bought or sold: it is on the row only while one
+marker is a thing in the room like any other (drag it about, drag it down to the wheel to put it away, tap it there to
+bring it back out; the others will go and sit by it) but it is never bought or sold: it is on the wheel only while one
 is put away. Its page stays in the notebook, after those of the living and marked as gone: what it was, how long it
 lived, and what was ever found out about it. One that died while the game was shut is found lying there when it is
 
@@ -154,7 +157,8 @@ head for its kind. It wears the coat of the other parent, markings and all, and 
 from one of them; the rest of its look and its tastes come from a seed mixed out of both of theirs. Its page in the notebook names its parents.
 next opened, and goes then. Nothing dies of old age.
 Phone-first: on an upright phone the room is narrow, deep and tall with the lamp near the top of the screen, the
-row of things is bigger, touch targets are generous, and nothing needs a keyboard or hover.
+wheel of things is bigger and shows three to five of them at a time, touch targets are generous, and nothing needs a
+keyboard or hover.
 
 Each cryptlin is shaped by its kind and a seed, both kept in the save, and no two of a kind come out alike:
 
@@ -194,7 +198,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   of each of the others, by their ids), `parents` and `parent_names`, `fur`, `nature` and `looks` (what it has from them),
   `paired` and `expecting` (when it last paired off, and the egg due as a result); `gone` holds the same for those
   that have died, with `died` and `lived`, and `markers` the grave markers that are put away.
-- `scripts/shelf.gd`: the row of things along the bottom, its own little 3D picture with nothing behind it.
+- `scripts/shelf.gd`: the wheel of things along the bottom, its own little 3D picture with nothing behind it.
   `scripts/items.gd` lists what can be on it; inside a site that keeps a shop, only what comes free and what has been
   bought.
 - `scripts/decor.gd`: the things that stand in the room (shelters and the pool among them) and the nests.
@@ -225,6 +229,6 @@ them out.
 
 ```
 godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), or one sheet of twelve of the kind, each of another seed
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 ```

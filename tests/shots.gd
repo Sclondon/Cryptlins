@@ -8,6 +8,7 @@ extends SceneTree
 ## the front under an even light (or side on, as babies, in the dark, or as the scanner shows
 ## them; fewer to a row with --per, for the wide ones; turned any way with --turn; with --with=K every
 ## other one is of kind K, to see two kinds side by side).
+## With --wheel: the wheel of things at both of its stops and part of the way round.
 
 # The save this run uses: one for each kind and shape of screen, so that several can be run at once
 var save := "user://shots_test.json"
@@ -29,6 +30,7 @@ var dark := false
 var bare := false
 var per_row := 4
 var turned := 0.0
+var wheel := false
 
 
 func _initialize() -> void:
@@ -63,6 +65,8 @@ func _initialize() -> void:
 			bare = true
 		if arg == "--dark":
 			dark = true
+		if arg == "--wheel":
+			wheel = true
 		if arg == "--portrait":
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
@@ -92,6 +96,8 @@ func _initialize() -> void:
 	root.add_child(main)
 	if many:
 		_run_many.call_deferred()
+	elif wheel:
+		_run_wheel.call_deferred()
 	elif ui_only:
 		_run_ui.call_deferred()
 	elif faces_only:
@@ -205,6 +211,42 @@ func _run_ui() -> void:
 	main.dev_toggle()
 	await _wait(0.3)
 	await _snap("u12_dev")
+	quit()
+
+
+# The wheel of things: at its first stop, part of the way round, between two things with a
+# finger on it, at its last stop, and as it is inside a page with a shop
+func _run_wheel() -> void:
+	await _wait(1.0)
+	var pet := main.who().pet
+	pet.set_needs({"belly": 60.0, "fun": 70.0, "energy": 80.0, "love": 55.0, "age": Cryptlin.GROW_AGE})
+	pet.position = Vector3(0.3, 0, 0.2)
+	pet._enter(Cryptlin.State.STARE)
+	main.place_decor(Decor.Kind.ROCK, Vector3(1.2, 0, -0.9))
+	main.who().known = {"food": true, "yuck": true, "toy": true}
+	main._sync()
+	main.shelf.show_item("scanner")
+	await _wait(1.0)
+	await _snap("w1_first")
+	main.shelf.show_item("ball")
+	await _wait(0.5)
+	await _snap("w2_toys")
+	main.shelf.show_item("log")
+	main.shelf.grab()
+	main.shelf.drag(-main.shelf._unit() * Shelf.PITCH * 0.5, 0.0)
+	await _wait(0.5)
+	await _snap("w3_between")
+	main.shelf.let_go()
+	main.shelf.show_item("notebook")
+	await _wait(0.5)
+	await _snap("w4_last")
+	# Inside a page with a shop: only what comes free and what was bought, and how many are left
+	main.embedded = true
+	main.stock = {"fish": 3, "candy": 1, "egg": 2, "cave": 1}
+	main._sync()
+	main.shelf.show_item("fish")
+	await _wait(0.5)
+	await _snap("w5_shop")
 	quit()
 
 
