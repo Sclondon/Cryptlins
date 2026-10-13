@@ -12,13 +12,17 @@ var save := "user://smoke_test.json"
 var main: Den
 var failures := 0
 var kind := 0
+# Something more to tell this run's save by (--tag=), for two checkouts of the game run at once
+var tag := ""
 
 
 func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--kind="):
 			kind = int(arg.trim_prefix("--kind="))
-	save = "user://smoke_test_%d.json" % kind
+		if arg.begins_with("--tag="):
+			tag = "_" + arg.trim_prefix("--tag=")
+	save = "user://smoke_test_%d%s.json" % [kind, tag]
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
 	main = _start()
 	_run.call_deferred()
@@ -526,6 +530,62 @@ func _toys() -> void:
 	main._sync()
 	pet.ball_cooldown = 0.0
 	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
+# The notebook on a wide screen and on an upright phone, with four in the room, long names and
+# everything found out: it keeps inside the screen with a margin all round, every leaf's words
+# fit the leaf with nothing cut off, between them the leaves of a chapter hold every word of it,
+# and it is set in its own typewriter face
+func _pages() -> void:
+	var book := main.notebook
+	var was := root.size
+	var names := {}
+	for r in main.residents:
+		names[r] = r.name
+		r.name = "Bartholomew Mog"
+		if r.pet != null:
+			for what: String in ["food", "yuck", "toy", "ground", "lamp", "water", "knack", "decor-" + Decor.IDS[r.pet.hate_decor]]:
+				r.known[what + "?"] = r.known.get(what, false)
+				r.known[what] = true
+	check(book.heading.get_theme_font("font") == Notebook.FACE and book.body.get_theme_font("font") == Notebook.FACE and FileAccess.file_exists("res://fonts/SpecialElite-LICENSE.txt"), "the notebook is set in its own face, whose licence is kept with it")
+	for shape: Vector2i in [Vector2i(1280, 720), Vector2i(540, 1170), Vector2i(720, 720)]:
+		root.size = shape
+		await _frames(5)
+		var screen := Rect2(Vector2.ZERO, main.get_viewport().get_visible_rect().size)
+		book.open_at(0)
+		await _frames(2)
+		var inside := screen.grow(-Notebook.EDGE + 0.5).encloses(book.get_global_rect())
+		var spilt: Array[String] = []
+		var words := {}
+		for i in book.pages():
+			await _frames(2)
+			var frame := book.leaf.get_global_rect()
+			var fits := book.body.get_minimum_size().y <= frame.size.y + 0.5 and book.body.get_visible_line_count() == book.body.get_line_count() and book.get_global_rect().grow(1.0).encloses(frame)
+			for part: Control in [book.heading, book.rename, book.sound, book.folio]:
+				fits = fits and (not part.is_visible_in_tree() or book.get_global_rect().encloses(part.get_global_rect()))
+			inside = inside and screen.grow(-Notebook.EDGE + 0.5).encloses(book.get_global_rect())
+			if not fits:
+				spilt.append("%d (%s)" % [i + 1, book.heading.text])
+			words[book.chapter] = str(words.get(book.chapter, "")) + book.body.text.replace("\n", " ") + " "
+			book.turn(1)
+		var whole := true
+		for which in book.chapters():
+			whole = whole and str(words.get(which, "")).replace(" ", "") == book.said(which).replace("\n", "").replace(" ", "")
+		check(inside, "%d by %d: the notebook keeps inside the screen, with a margin all round" % [shape.x, shape.y])
+		check(spilt.is_empty() and whole, "  and each of its %d leaves holds its words whole, with none lost between them %s" % [book.pages(), spilt])
+		check(book.pages() >= book.chapters() and (shape.y > 1000 or book.pages() > book.chapters()), "  a chapter too long for one leaf runs over onto the next (%d leaves for %d chapters)" % [book.pages(), book.chapters()])
+	for r in main.residents:
+		r.name = names[r]
+		for what: String in r.known.keys():
+			if what.ends_with("?"):
+				r.known[what.trim_suffix("?")] = r.known[what]
+				r.known.erase(what)
+		for what: String in r.known.keys():
+			if not r.known[what]:
+				r.known.erase(what)
+	root.size = was
+	await _frames(5)
+	book.open_at(0)
 
 
 # The broom: always on the wheel and nobody's to buy; a tap on a mess does nothing to it; the
@@ -1462,12 +1522,16 @@ func _run() -> void:
 	# The notebook
 	await _tap(_on_shelf("notebook"))
 	check(main.notebook.visible and main.notebook.heading.text == "Smoke", "a tap on the notebook opens it at the cryptlin's page")
-	check(main.notebook.body.text.contains(Snack.PLURALS[pet.fav_food]) and main.notebook.body.text.contains(pet.nature_name()), "which says what has been found out")
+	check(main.notebook.said().contains(Snack.PLURALS[pet.fav_food]) and main.notebook.said().contains(pet.nature_name()), "which says what has been found out")
 	main.use("bone")
 	check(main.snacks.is_empty(), "nothing on the shelf answers while it is open")
+	var turned := {}
 	for i in main.notebook.pages() - 1:
 		main.notebook.turn(1)
+		turned[main.notebook.heading.text] = true
 		check(main.notebook.body.text.length() > 60, "page %d: %s" % [i + 2, main.notebook.heading.text])
+	check(Notebook.TITLES.all(func(title: String) -> bool: return turned.has(title)) and main.notebook.said(main.notebook.chapters() - 3).contains("broom") and main.notebook.said(main.notebook.chapters() - 3).contains("Toys do not last"), "every chapter comes round, and the one on the wheel has the broom and toys wearing out in it")
+	await _pages()
 	main.notebook.close()
 
 	# The room is kept
@@ -1528,7 +1592,7 @@ func _run() -> void:
 	await _until(func() -> bool: return main.residents[0].egg.landed and main.residents[1].egg.landed, 400)
 	check(main.residents[0].egg.position.distance_to(main.residents[1].egg.position) > 0.5, "clear of the first")
 	await _tap(_on_shelf("notebook"))
-	check(main.notebook.pages() == Notebook.TITLES.size() + 2 and main.notebook.heading.text == "An egg", "the notebook has a page for each")
+	check(main.notebook.chapters() == Notebook.TITLES.size() + 2 and main.notebook.heading.text == "An egg", "the notebook has a page for each")
 	main.notebook.close()
 	for r in main.residents:
 		r.egg.warmth = 100.0
@@ -1822,7 +1886,7 @@ func _run() -> void:
 	await _tap(_on_shelf("egg"))
 	check(main.residents.size() == Den.MAX_RESIDENTS, "and the room refuses a fifth")
 	await _tap(_on_shelf("notebook"))
-	check(main.notebook.pages() == Notebook.TITLES.size() + 4, "the notebook has a page for each of the four")
+	check(main.notebook.chapters() == Notebook.TITLES.size() + 4, "the notebook has a page for each of the four")
 	main.notebook.close()
 
 	# Letting one go, from its page in the notebook: no egg comes in its place
@@ -1862,9 +1926,8 @@ func _run() -> void:
 	var ghost := third.get_instance_id()
 	check(await _until(func() -> bool: return not is_instance_id_valid(ghost), 1200), "and out through the ceiling")
 	main.notebook.open()
-	main.notebook.page = 2
-	main.notebook.refresh()
-	check(main.notebook.pages() == Notebook.TITLES.size() + 3 and main.notebook.heading.text == late + ", gone" and main.notebook.body.text.contains("It lived") and not main.notebook.let_go.visible, "its page stays in the notebook, marked as gone")
+	main.notebook.open_at(2)
+	check(main.notebook.chapters() == Notebook.TITLES.size() + 3 and main.notebook.heading.text == late + ", gone" and main.notebook.said().contains("It lived") and not main.notebook.let_go.visible, "its page stays in the notebook, marked as gone")
 	main.notebook.close()
 	check(main.toast.text.findn("gone") < 0 and main.toast.text.findn(late) < 0, "nothing is written on the screen about it")
 	# And here in front of the keeper, by the same wearing away
@@ -2011,7 +2074,7 @@ func _run() -> void:
 	check(young.kind in [one.kind, mate.kind] and young.parents == [one.me.id, mate.me.id] and young.id != one.me.id and young.id != mate.me.id, "of the kind of one of its parents, with both of them written down")
 	main.chosen = young
 	main.notebook.open()
-	check(main.notebook.body.text.contains(one.me.name) and main.notebook.body.text.contains(mate.me.name), "and named on its page in the notebook")
+	check(main.notebook.said().contains(one.me.name) and main.notebook.said().contains(mate.me.name), "and named on its page in the notebook")
 	main.notebook.close()
 	# One asleep by an egg keeps it warm
 	var brooded := young.egg.warmth

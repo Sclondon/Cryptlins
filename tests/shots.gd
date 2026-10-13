@@ -21,6 +21,8 @@ var out := "user://shots"
 var portrait := false
 var look := 0
 var kind := 0
+# Something more to tell this run's save by (--tag=), for two checkouts of the game run at once
+var tag := ""
 var ui_only := false
 var scan_only := false
 var egg_only := false
@@ -52,6 +54,8 @@ func _initialize() -> void:
 			look = int(arg.trim_prefix("--seed="))
 		if arg.begins_with("--kind="):
 			kind = int(arg.trim_prefix("--kind="))
+		if arg.begins_with("--tag="):
+			tag = "_" + arg.trim_prefix("--tag=")
 		if arg == "--egg":
 			egg_only = true
 		if arg == "--baby":
@@ -97,7 +101,7 @@ func _initialize() -> void:
 		if arg == "--portrait":
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
-	save = "user://shots_test_%d%s.json" % [kind, "_p" if portrait else ""]
+	save = "user://shots_test_%d%s%s.json" % [kind, "_p" if portrait else "", tag]
 	DisplayServer.window_set_size(Vector2i(540, 1170) if portrait else Vector2i(1280, 720))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
 	if variety:
@@ -249,7 +253,7 @@ func _run_ui() -> void:
 	main.notebook.turn(1)
 	await _wait(0.2)
 	await _snap("u9_care")
-	main.notebook.turn(main.notebook.pages() - 2)
+	main.notebook.open_at(main.notebook.chapters() - 1)
 	await _wait(0.2)
 	await _snap("u10_odds")
 	main.notebook.close()
@@ -569,12 +573,13 @@ func _run_many() -> void:
 	main.chosen = all[0].me
 	main.notebook.open()
 	for i in main.notebook.everyone().size():
+		main.notebook.open_at(i)
 		await _wait(0.3)
 		await _snap("m6_page%d" % i)
-		main.notebook.turn(1)
+	main.notebook.open_at(main.notebook.everyone().size())
 	await _wait(0.3)
 	await _snap("m7_care")
-	main.notebook.turn(Notebook.TITLES.size() - 1)
+	main.notebook.open_at(main.notebook.chapters() - 1)
 	await _wait(0.3)
 	await _snap("m8_odds")
 	quit()
