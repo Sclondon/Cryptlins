@@ -32,6 +32,7 @@ eggs are all plain eggs, a little rounder or taller by their kind; what is paint
 | Starry | **alien** | A head too big for its body, long thin hands, and two black eyes with a light far down in each. Stares most of all. |
 | Frosted | **yeti** | A snow-ape's cub: white and shaggy, with a blue face, hands and feet, and arms it could trip over. Heavy, deep-voiced, hungry. |
 | Ember-veined | **Cerberus** | Three heads on one pup. The middle one leads and the other two follow it round. Always hungry. |
+| Tunnelled | **mole person** | One of the people from under the ground: stout and velvety, with spade hands far too big for it, a pink star for a nose and tiny pale eyes. Slow and short-sighted (it does not see a toy or the moving light until they are close), hides readily, and digs far more than the rest, whatever the floor, though it likes dirt best. Wants the lamp low, is as happy with it off, and is never at ease under the bright one. |
 
 It hatches a **baby**: small, big-headed and squeaky. After a day and a half it grows up, to a size of its own (0.8
 to 1.3 times the usual).
@@ -173,7 +174,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
 
 ## How it works
 
-- `scripts/cryptlin.gd`: the creature. `KINDS` holds what sets the nineteen kinds apart in behaviour (and which
+- `scripts/cryptlin.gd`: the creature. `KINDS` holds what sets the twenty kinds apart in behaviour (and which
   live in water), and there is one `_build_<kind>()` for each body; they all fill the same rig (two leg pivots, two
   arms, ears, eyes, mouth, tail, and for some a pair of wings that beat by themselves or two more heads that follow
   the first), so the brain and the animation are shared. Its body is spheres, capsules and cones under a few pivots;
@@ -222,7 +223,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), or one sheet of twelve of the kind, each of another seed
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 ```

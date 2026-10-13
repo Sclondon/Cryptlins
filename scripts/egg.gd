@@ -18,26 +18,30 @@ const SHELLS: Array[Color] = [
 	Color(0.26, 0.44, 0.24), Color(0.22, 0.36, 0.44), Color(0.36, 0.36, 0.38), Color(0.2, 0.2, 0.24),
 	Color(0.14, 0.2, 0.22), Color(0.18, 0.4, 0.42), Color(0.2, 0.32, 0.26), Color(0.62, 0.52, 0.4), Color(0.78, 0.6, 0.85),
 	Color(0.68, 0.14, 0.1), Color(0.55, 0.45, 0.32), Color(0.1, 0.14, 0.22), Color(0.62, 0.72, 0.82), Color(0.13, 0.11, 0.12),
+	Color(0.36, 0.27, 0.2),
 ]
 const MARKS: Array[Color] = [
 	Color(0.2, 0.3, 0.15), Color(0.2, 0.16, 0.12), Color(0.5, 0.18, 0.1), Color(0.6, 0.58, 0.56), Color(0.45, 0.14, 0.1),
 	Color(0.5, 0.6, 0.3), Color(0.5, 0.66, 0.7), Color(0.2, 0.2, 0.22), Color(0.85, 0.82, 0.72),
 	Color(0.1, 0.32, 0.2), Color(0.5, 0.75, 0.7), Color(0.4, 0.3, 0.46), Color(0.66, 0.1, 0.08), Color(1.0, 0.95, 0.7),
 	Color(0.9, 0.87, 0.78), Color(0.9, 0.87, 0.8), Color(0.4, 1.0, 0.5), Color(0.95, 0.97, 1.0), Color(0.62, 0.1, 0.08),
+	Color(0.17, 0.12, 0.09),
 ]
 const TITLES: Array[String] = [
 	"A mossy egg", "A streaky egg", "A speckled egg", "A silk-wound egg", "A thorn-patterned egg",
 	"A slimy egg", "A rippled egg", "A stone egg", "A frost-bitten egg",
 	"A weed-streaked egg", "A scaly egg", "A sucker-ringed egg", "A red-capped egg", "A glimmering egg",
 	"A toadstool egg", "A dappled egg", "A starry egg", "A frosted egg", "An ember-veined egg",
+	"A tunnelled egg",
 ]
 # How much of its own light each shell gives off, and how wide and how tall it is next to the usual
-const GLOWS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.35, 0.0, 0.3]
+const GLOWS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.35, 0.0, 0.3, 0.0]
 const SHAPES: Array[Vector2] = [
 	Vector2(1.0, 1.0), Vector2(1.06, 1.04), Vector2(0.96, 0.98), Vector2(0.95, 1.06), Vector2(0.94, 1.04),
 	Vector2(1.06, 0.94), Vector2(1.0, 1.06), Vector2(1.08, 0.96), Vector2(0.92, 1.08),
 	Vector2(0.96, 1.06), Vector2(1.02, 1.0), Vector2(1.06, 0.98), Vector2(1.04, 0.94), Vector2(0.9, 0.96),
 	Vector2(1.08, 0.92), Vector2(1.0, 0.94), Vector2(0.94, 1.08), Vector2(1.08, 1.06), Vector2(1.04, 1.0),
+	Vector2(1.08, 0.95),
 ]
 
 var world: Den
@@ -226,6 +230,12 @@ func _paint(x: int, y: int) -> Color:
 			if vein == 0 or (x % 16 == 5 and y > 6 and y < 13) or (x % 16 == 12 and y > 19 and y < 27):
 				return Color(1.0, 0.5, 0.12)
 			return mark.darkened(0.5) if vein == 1 else shell_colour
+		Cryptlin.Kind.MOLE:
+			# Packed earth with stones in it, and the dark runs of tunnels through it
+			var run := (y + int(sin(x * 0.35 + (y / 11) * 2.0) * 3.0) + 32) % 11
+			if run == 0 or (run == 1 and x % 7 < 4):
+				return mark
+			return Color(0.55, 0.5, 0.44) if chance == 0 else (shell_colour.lightened(0.1) if chance < 4 else shell_colour)
 	return shell_colour
 
 

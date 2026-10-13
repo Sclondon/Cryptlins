@@ -3,7 +3,7 @@ extends SceneTree
 ## the pool and the kinds that need one,
 ## the lamp, petting, calling, sleep, time passing while away, the scanner, the notebook and
 ## sending it off for a new egg.
-## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]
+## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]
 ## (touches are sent as window pixels, like a real finger)
 
 # The save this run uses: one for each kind, so that several can be run at once
@@ -90,6 +90,35 @@ func _looks(pet: Cryptlin) -> void:
 	check(shades.size() >= 2 and tex.get_pixel(3, 2) == tex.get_pixel(Cryptlin.COAT - 4, 2), "a marked coat is painted in more than one shade, the same on both sides")
 
 
+# One from under the ground: it digs a great deal, whatever the floor, is at home in a dim room
+# and not under the bright lamp, and does not see far
+func _digger(pet: Cryptlin) -> void:
+	var was := main.floor_style
+	var digs := [0, 0]
+	for hard in 2:
+		main.set_ground(0 if hard == 1 else 4)
+		for i in 200:
+			pet.belly = 90.0
+			pet.fun = 90.0
+			pet.energy = 90.0
+			pet.beg_cooldown = 99.0
+			pet._enter(Cryptlin.State.IDLE, 1.0)
+			pet._decide()
+			if pet.state == Cryptlin.State.DIG:
+				digs[hard] += 1
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+	pet.beg_cooldown = 0.0
+	main.set_ground(was)
+	check(digs[0] > 40 and digs[1] > 15, "it digs a great deal on dirt and has a go at flagstones too (%d and %d times in 200)" % digs)
+	var comfort := {}
+	for mode: int in [Den.Lamp.BRIGHT, Den.Lamp.LOW, Den.Lamp.OFF]:
+		main.lamp_mode = mode
+		comfort[mode] = main.comfort_of(pet)
+	main.lamp_mode = Den.Lamp.BRIGHT
+	check(pet.fav_lamp == Den.Lamp.LOW and comfort[Den.Lamp.LOW] > comfort[Den.Lamp.BRIGHT] + 20.0 and comfort[Den.Lamp.OFF] > comfort[Den.Lamp.BRIGHT] + 20.0, "it wants the lamp low or off, and is not at ease under the bright one")
+	check(pet._sees(pet.position + Vector3(0.5, 0, 0)) and not pet._sees(pet.position + Vector3(2.0, 0, 0)), "and it does not see far")
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -168,6 +197,8 @@ func _content(one: Cryptlin, mate: Cryptlin) -> void:
 		p.grow = p.adult_size
 		p.fav_ground = main.floor_style
 		p.fav_lamp = main.lamp_mode
+		# (one from underground is made easy about the lamp, like the rest)
+		p.likes.erase("dim")
 		p.hate_decor = Decor.Kind.DISH
 		p.comfort = main.comfort_of(p)
 		p.fight_cooldown = 9999.0
@@ -229,6 +260,8 @@ func _run() -> void:
 	check(pet.legs.size() == 2 and pet.eyes.size() >= 1, "a cryptlin is built")
 	check(pet.nature != pet.nature2 and pet.nature_name().contains(", "), "with two natures (%s)" % pet.nature_name())
 	_looks(pet)
+	if pet.likes.has("dig"):
+		_digger(pet)
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name
@@ -351,6 +384,9 @@ func _run() -> void:
 	check(pet.state == Cryptlin.State.COME, "a tap on the floor calls it")
 	check(await _until(func() -> bool: return pet.position.distance_to(spot) < 0.5, 600), "and it comes")
 	var far := Vector3(-0.9, 0, 0.5) if pet.position.x > 0.0 else Vector3(0.9, 0, 0.5)
+	# (near enough to see, for one that does not see far)
+	if pet.likes.has("sight"):
+		far = Vector3(spot.x * 0.15, 0, 0.6)
 	_touch(_screen(far), true)
 	await _frames(30)
 	check(main.light_dragging, "a finger held on the floor takes the lamp")

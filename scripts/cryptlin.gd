@@ -14,12 +14,15 @@ enum State {
 # The cryptids they are the young of
 enum Kind {
 	GREMLIN, SQUATCH, COCKATRICE, MOTHMAN, CHUPACABRA, FROGMAN, NESSIE, BOLTER, WENDIGO,
-	KELPIE, MERFOLK, SPAWN, GNOME, FAE, FUNGUS, JACKALOPE, ALIEN, YETI, CERBERUS,
+	KELPIE, MERFOLK, SPAWN, GNOME, FAE, FUNGUS, JACKALOPE, ALIEN, YETI, CERBERUS, MOLE,
 }
 
 # What sets the kinds apart besides their looks: pace on the ground, appetite, how fast they tire,
 # the spring in their hop, the pitch of their voice, and what they like to do with a free moment.
-# The ones marked "water" live in it, and are not at home without a pool to wade in.
+# The ones marked "water" live in it, and are not at home without a pool to wade in. "dig" is how
+# much more than the rest one digs (and it will dig any floor); "dim" is one from underground,
+# as happy with the lamp off as low and unhappy under the bright one; "sight" is how far one that
+# is short-sighted can see a toy or the moving light.
 const KINDS: Array[Dictionary] = [
 	{"title": "gremlin", "pace": 1.0, "hunger": 1.0, "tire": 1.0, "spring": 1.0, "voice": 1.0, "lurk": 1.0, "zoom": 1.0, "dance": 1.0, "stare": 1.0},
 	{"title": "squatchling", "pace": 0.85, "hunger": 1.25, "tire": 1.1, "spring": 0.7, "voice": 0.55, "lurk": 2.2, "zoom": 0.5, "dance": 1.1, "stare": 1.4},
@@ -40,6 +43,7 @@ const KINDS: Array[Dictionary] = [
 	{"title": "alien", "pace": 0.95, "hunger": 0.9, "tire": 0.8, "spring": 1.1, "voice": 1.7, "lurk": 1.0, "zoom": 0.8, "dance": 0.8, "stare": 2.6},
 	{"title": "yeti", "pace": 0.85, "hunger": 1.4, "tire": 1.0, "spring": 0.7, "voice": 0.5, "lurk": 1.6, "zoom": 0.6, "dance": 1.0, "stare": 1.2},
 	{"title": "Cerberus", "pace": 1.15, "hunger": 1.7, "tire": 1.0, "spring": 1.1, "voice": 0.7, "lurk": 0.7, "zoom": 1.6, "dance": 0.9, "stare": 1.3},
+	{"title": "mole person", "pace": 0.72, "hunger": 1.2, "tire": 1.0, "spring": 0.6, "voice": 0.65, "lurk": 2.8, "zoom": 0.4, "dance": 0.7, "stare": 0.5, "dig": 5.0, "dim": true, "sight": 1.3},
 ]
 # What the numbers in saves from before this list stood for (gremlin, bogle, spook, flit)
 const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MOTHMAN]
@@ -102,7 +106,7 @@ const FOOD_LIKES: Array[Array] = [
 	[Snack.Kind.FISH, Snack.Kind.BERRIES], [Snack.Kind.FISH, Snack.Kind.BEETLE], [Snack.Kind.FISH, Snack.Kind.BONE],
 	[Snack.Kind.TOADSTOOL, Snack.Kind.BERRIES], [Snack.Kind.BERRIES, Snack.Kind.CANDY], [Snack.Kind.BONE, Snack.Kind.BEETLE],
 	[Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.CANDY, Snack.Kind.BEETLE], [Snack.Kind.BONE, Snack.Kind.BERRIES],
-	[Snack.Kind.BONE, Snack.Kind.FISH],
+	[Snack.Kind.BONE, Snack.Kind.FISH], [Snack.Kind.BEETLE, Snack.Kind.TOADSTOOL],
 ]
 const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL], [Ball.Kind.BELL, Ball.Kind.STONE],
@@ -111,7 +115,7 @@ const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.GLOW, Ball.Kind.BALL], [Ball.Kind.GLOW, Ball.Kind.STONE],
 	[Ball.Kind.BELL, Ball.Kind.STONE], [Ball.Kind.BELL, Ball.Kind.GLOW], [Ball.Kind.GLOW, Ball.Kind.STONE],
 	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL],
-	[Ball.Kind.BALL, Ball.Kind.STONE],
+	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.STONE, Ball.Kind.BELL],
 ]
 # Natures that will not go together (shy and bold, sleepy and restless, cuddly and grumpy)
 const OPPOSED: Array[Array] = [[2, 5], [3, 7], [4, 6]]
@@ -125,13 +129,13 @@ const DECOR_LIKES: Array[Array] = [
 	[Decor.Kind.FERN, Decor.Kind.ROCK], [Decor.Kind.DISH, Decor.Kind.CRYSTAL], [Decor.Kind.SKULL, Decor.Kind.CRYSTAL],
 	[Decor.Kind.PUMPKIN, Decor.Kind.LOG], [Decor.Kind.FERN, Decor.Kind.CRYSTAL], [Decor.Kind.LOG, Decor.Kind.GRAVESTONE],
 	[Decor.Kind.FERN, Decor.Kind.LOG], [Decor.Kind.CRYSTAL, Decor.Kind.SKULL], [Decor.Kind.ROCK, Decor.Kind.CAVE],
-	[Decor.Kind.SKULL, Decor.Kind.GRAVESTONE],
+	[Decor.Kind.SKULL, Decor.Kind.GRAVESTONE], [Decor.Kind.LOG, Decor.Kind.ROCK],
 ]
 const GROUND_LIKES: Array[Array] = [
 	[1, 3], [2, 4], [4, 5], [1, 3], [5, 4], [2, 4], [6, 5], [6, 0], [2, 0],
-	[6, 2], [5, 6], [5, 0], [2, 4], [2, 3], [2, 4], [4, 5], [3, 6], [6, 0], [0, 6],
+	[6, 2], [5, 6], [5, 0], [2, 4], [2, 3], [2, 4], [4, 5], [3, 6], [6, 0], [0, 6], [4, 4],
 ]
-const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2]
+const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2, 1]
 # It lives in real time, like a pet: these are hours of the clock on the wall, and they pass
 # whether or not anyone is looking. A full belly lasts most of a day, and a baby is grown in a
 # day and a half.
@@ -189,6 +193,7 @@ const FURS: Array[Array] = [
 	[Color(0.5, 0.52, 0.5), Color(0.4, 0.6, 0.36), Color(0.45, 0.55, 0.66), Color(0.56, 0.46, 0.62)],
 	[Color(0.92, 0.94, 1.0), Color(0.82, 0.9, 1.0), Color(0.95, 0.92, 0.84), Color(0.76, 0.8, 0.88)],
 	[Color(0.16, 0.15, 0.17), Color(0.3, 0.16, 0.12), Color(0.26, 0.25, 0.28), Color(0.34, 0.26, 0.18)],
+	[Color(0.2, 0.19, 0.23), Color(0.3, 0.26, 0.24), Color(0.36, 0.34, 0.37), Color(0.24, 0.22, 0.31), Color(0.4, 0.33, 0.27)],
 ]
 const EYES: Array[Array] = [
 	[Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.3), Color(1.0, 0.45, 0.7), Color(0.4, 0.95, 1.0)],
@@ -210,6 +215,7 @@ const EYES: Array[Array] = [
 	[Color(0.6, 1.0, 0.6), Color(0.7, 0.9, 1.0), Color(1.0, 1.0, 1.0), Color(1.0, 0.5, 0.9)],
 	[Color(0.5, 0.9, 1.0), Color(0.8, 1.0, 1.0), Color(1.0, 0.4, 0.3)],
 	[Color(1.0, 0.3, 0.1), Color(1.0, 0.55, 0.1), Color(1.0, 0.85, 0.2)],
+	[Color(1.0, 0.95, 0.85), Color(0.85, 0.95, 1.0), Color(1.0, 0.85, 0.8)],
 ]
 # A seed up to this is one from before there were more colours to draw from, and keeps to the
 # lists above so that it stays the colour it has always been; a seed over it draws from these too
@@ -234,13 +240,14 @@ const FURS_MORE: Array[Array] = [
 	[Color(0.6, 0.56, 0.44), Color(0.4, 0.5, 0.5)],
 	[Color(0.88, 0.86, 0.8), Color(0.8, 0.86, 0.9)],
 	[Color(0.22, 0.2, 0.24), Color(0.38, 0.2, 0.14)],
+	[Color(0.5, 0.46, 0.43), Color(0.15, 0.14, 0.19)],
 ]
 const EYES_MORE: Array[Array] = [
 	[Color(0.8, 0.6, 1.0)], [Color(1.0, 0.95, 0.6)], [Color(1.0, 0.45, 0.6)], [Color(1.0, 0.4, 0.0)],
 	[Color(1.0, 0.12, 0.22)], [Color(0.6, 1.0, 0.6)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.7, 0.5)],
 	[Color(0.9, 0.7, 1.0)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.5, 0.7)], [Color(0.9, 0.6, 1.0)],
 	[Color(1.0, 0.6, 0.4)], [Color(0.8, 1.0, 0.7)], [Color(1.0, 0.7, 0.5)], [Color(0.8, 1.0, 0.5)],
-	[Color(1.0, 0.8, 0.4)], [Color(0.7, 1.0, 0.8)], [Color(1.0, 0.2, 0.3)],
+	[Color(1.0, 0.8, 0.4)], [Color(0.7, 1.0, 0.8)], [Color(1.0, 0.2, 0.3)], [Color(0.9, 1.0, 0.9)],
 ]
 # How far one of a kind can be from the next in its proportions, each as the least and the most
 # of what its body was drawn at: the size of its head, of its eyes and how far apart they sit,
@@ -257,6 +264,7 @@ const SHAPES: Array[Dictionary] = [
 	{"head": [0.85, 1.22], "limb": [0.84, 1.2]}, {"limb": [0.8, 1.22]}, {}, {"head": [0.85, 1.2]},
 	{"crest": [0.6, 1.4]}, {"head": [0.85, 1.25]}, {"crest": [0.75, 1.3]}, {}, {"head": [0.86, 1.2], "crest": [0.85, 1.25]},
 	{}, {"limb": [0.8, 1.25], "eye": [0.75, 1.2]},
+	{"head": [0.88, 1.22], "eye": [0.75, 1.15], "limb": [0.85, 1.2], "crest": [0.75, 1.35], "tail": [0.6, 1.5]},
 ]
 # What can be painted on a coat, and how likely each is for most kinds
 enum Mark { PLAIN, SPOTS, PATCHES, STRIPES, BELLY, SOCKS, BLAZE, FRECKLES, POINTS }
@@ -276,6 +284,7 @@ const EXTRAS: Array[Array] = [
 	["tuft", "torn", "odd", "split"], ["tooth", "odd", "split"],
 	["whiskers", "tooth", "torn", "odd", "split", "broken"], ["odd", "split"],
 	["whiskers", "tooth", "odd", "split", "broken"], ["tooth", "torn", "odd", "split"],
+	["tuft", "whiskers", "tooth", "odd", "split"],
 ]
 
 var world: Den
@@ -535,6 +544,9 @@ static func profile(k: int, s: int) -> Dictionary:
 	var grounds: Array = GROUND_LIKES[k]
 	me["ground"] = grounds[rng.randi() % grounds.size()]
 	me["lamp"] = LAMP_LIKES[k] if rng.randf() < 0.65 else rng.randi() % 3
+	# One from underground never wants more light than its kind does, whatever was drawn
+	if KINDS[k].get("dim", false):
+		me["lamp"] = LAMP_LIKES[k]
 	# The shelters that came after the first things get their chance last of all, so that nothing
 	# drawn above changes: now and then, one of them to like as well
 	if rng.randf() < 0.45:
@@ -845,6 +857,8 @@ func _build() -> void:
 			_build_yeti(chub, rng)
 		Kind.CERBERUS:
 			_build_cerberus(chub)
+		Kind.MOLE:
+			_build_mole(chub)
 		_:
 			_build_gremlin(chub, ear_len, horns)
 
@@ -1812,6 +1826,56 @@ func _build_cerberus(chub: float) -> void:
 		heads.append(head)
 
 
+# One of the people from under the ground: stout and velvety, with spade hands far too big for
+# it, a pink star for a nose, and eyes it has little use for
+func _build_mole(chub: float) -> void:
+	neck_y = 0.38
+	head_y = 0.17
+	centre_y = 0.3
+	top_y = 0.8
+	gravity = 15.0
+	crown = Vector3(0, 0.36, -0.02)
+	# Bare skin, pink enough to show a little in the dark
+	var pink := Ps1.mat(Color(0.86, 0.48, 0.5), 0.3, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.15 * side, 0.12, 0))
+		_part(leg, _sphere(), fur, Vector3(0, -0.02, 0), Vector3(0.09, 0.08, 0.1))
+		_part(leg, _sphere(), pink, Vector3(0, -0.08, 0.07), Vector3(0.08, 0.04, 0.13))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.3, -0.02), Vector3(0.3 * chub, 0.27, 0.31 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.25, 0.17 * chub), Vector3(0.2 * chub, 0.17, 0.14))
+	tail = _pivot(torso, Vector3(0, 0.18, -0.3 * chub))
+	_part(tail, _cone(), pink, Vector3(0, 0.02, -0.06), Vector3(0.028, 0.14, 0.028), Vector3(-1.3, 0, 0))
+
+	for side: float in [-1.0, 1.0]:
+		# A short thick arm, and a hand like a spade: a broad bare palm turned out to the front
+		# and four long claws along the edge of it
+		var a := _pivot(torso, Vector3(0.27 * chub * side, 0.38, 0.1))
+		_part(a, _capsule(0.06, 0.18), fur, Vector3(0, -0.05, 0))
+		_part(a, _sphere(), pink, Vector3(0.02 * side, -0.19, 0.05), Vector3(0.14, 0.13, 0.045), Vector3(0, -0.5 * side, 0))
+		for claw in 4:
+			var across := (claw - 1.5) * 0.068
+			_part(a, _cone(), bone, Vector3(0.02 * side + across, -0.34 + absf(claw - 1.5) * 0.025, 0.05 + across * 0.5 * side), Vector3(0.026, 0.15, 0.02), Vector3(PI, 0, across * 2.0))
+		_swell(a, 1, Vector3(0, -0.08, 0.02), Vector3.ONE * crest)
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.1))
+	_part(neck, _sphere(), fur, Vector3(0, 0.17, 0), Vector3(0.23, 0.2, 0.23))
+	_part(neck, _sphere(), pale, Vector3(0, 0.12, 0.17), Vector3(0.1, 0.085, 0.13))
+	# The star: a ring of little feelers round the end of its snout
+	var tip := Vector3(0, 0.12, 0.3)
+	_part(neck, _sphere(), pink, tip, Vector3.ONE * 0.035)
+	for i in 8:
+		var around := TAU * i / 8.0
+		_spike(neck, pink, tip, Vector3(cos(around), sin(around), 0.45), 0.085, 0.02)
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.095 * side, 0.205, 0.195), 0.03)
+	mouth_node = _pivot(neck, Vector3(0, 0.055, 0.2))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.04))
+
+
 # One of a hound's heads, on a pivot: collar, skull, muzzle, nose, fangs and eyes. Gives back
 # its two ears, for the rig to work or not.
 func _hound_head(on: Node3D, collar: Material) -> Array[Node3D]:
@@ -2752,13 +2816,21 @@ func _interrupt() -> bool:
 		_enter(State.TOILET)
 	elif belly < 97.0 and world.snack_for(self) != null and not _hangs_back():
 		_enter(State.GO_FOOD)
-	elif world.light_dragging:
+	elif world.light_dragging and _sees(world.light_point):
 		_enter(State.CHASE_LIGHT)
-	elif world.ball != null and ball_cooldown <= 0.0 and (world.ball.held or world.ball.speed() > 1.5):
+	elif world.ball != null and ball_cooldown <= 0.0 and (world.ball.held or world.ball.speed() > 1.5) and _sees(world.ball.position):
 		_enter(State.CHASE_BALL)
 	else:
 		return false
 	return true
+
+
+# Whether something is near enough for it to see: anywhere in the room, for all but the
+# short-sighted
+func _sees(point: Vector3) -> bool:
+	if not likes.has("sight"):
+		return true
+	return Vector2(point.x - position.x, point.z - position.z).length() < float(likes["sight"])
 
 
 # Nothing pressing: pick something to do
@@ -2788,8 +2860,10 @@ func _decide() -> void:
 	# Odds and ends, by its kind and its natures
 	options[State.SCRATCH] = 5.0 * (1.6 if _is(6) else 1.0)
 	options[State.GAZE] = 4.0 * float(likes["stare"])
-	if world.floor_style >= 4 and energy > 30.0:
-		options[State.DIG] = 6.0 * (1.5 if _is(1) or _is(7) else 1.0) * (1.4 if world.floor_style == fav_ground else 1.0)
+	# Most dig only where the floor is loose; a born digger has a go at anything
+	var digger := float(likes.get("dig", 1.0))
+	if (world.floor_style >= 4 or digger > 1.0) and energy > 30.0:
+		options[State.DIG] = 6.0 * digger * (1.0 if world.floor_style >= 4 else 0.5) * (1.5 if _is(1) or _is(7) else 1.0) * (1.4 if world.floor_style == fav_ground else 1.0)
 	if tail.get_child_count() > 0 and energy > 40.0:
 		options[State.SPIN] = 3.0 * float(likes["zoom"])
 	if _fancies():

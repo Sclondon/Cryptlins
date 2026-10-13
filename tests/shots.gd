@@ -1,6 +1,6 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark]]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --faces:
 ## each of the faces that go up over its head. With --many: three of different kinds sharing the room.

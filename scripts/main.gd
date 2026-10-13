@@ -816,6 +816,9 @@ func comfort_of(who: Cryptlin) -> float:
 		c += 18.0
 	if lamp_mode == who.fav_lamp:
 		c += 12.0
+	# One from underground is as well off in the dark, and never at ease under the bright lamp
+	if who.likes.get("dim", false):
+		c += 12.0 if lamp_mode == Lamp.OFF else (-14.0 if lamp_mode == Lamp.BRIGHT else 0.0)
 	var others := 0
 	for d in decors:
 		if d.kind in who.like_decor:
