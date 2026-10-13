@@ -3,7 +3,7 @@ extends SceneTree
 ## the pool and the kinds that need one,
 ## the lamp, petting, calling, sleep, time passing while away, the scanner, the notebook and
 ## sending it off for a new egg.
-## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..22]
+## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..29]
 ## (touches are sent as window pixels, like a real finger)
 
 # The save this run uses: one for each kind, so that several can be run at once
@@ -482,6 +482,64 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 		p.ball_cooldown = 0.0
 		p.beg_cooldown = 0.0
 		p._enter(Cryptlin.State.IDLE, 1.0)
+
+
+# The kongamato's knack when there is a pool: it is ready with nothing else in the room, goes up,
+# comes down low across the water, and ends its turn standing on dry floor with nothing changed
+func _skimmer(pet: Cryptlin) -> void:
+	main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
+	await _frames(30)
+	pet.position = Den.on_dry(Vector3(-1.0, 0, 1.2), 0.4, 0.3)
+	pet.set_needs({"belly": 90.0, "energy": 90.0, "fun": 50.0, "health": 100.0, "bowel": 0.0, "bladder": 0.0})
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+	pet.knack.again = 0.0
+	check(pet.knack.ready() and pet.knack._skittle() == null, "with a pool and nothing to knock over, it is ready to skim it")
+	pet._enter(Cryptlin.State.TRICK)
+	var over_water := 0.0
+	var lowest := 9.0
+	for i in 1500:
+		await process_frame
+		if pet.state != Cryptlin.State.TRICK:
+			break
+		if Den.wade(pet.position) > 0.2:
+			over_water = maxf(over_water, Den.wade(pet.position))
+			lowest = minf(lowest, pet.position.y)
+	check(pet.knack.done and over_water > 0.3 and lowest > 0.0 and lowest < 0.6, "it comes down low over the water (%.2f out, %.2f up) and skims it" % [over_water, lowest])
+	await _frames(60)
+	check(pet.lift <= 0.05 and not pet.needs_water() and Den.wade(pet.position) <= 0.15 and is_zero_approx(pet.rotation.x), "and lands on dry floor, none the wetter")
+	main.remove_decor(main.decor_of(Decor.Kind.POOL))
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
+# The mermaid: a water kind with no legs to it, one tail that is a stub on a baby and grows, hair
+# of its own, a fish's backbone under the scanner, and on dry floor it hauls itself along
+func _halfling(pet: Cryptlin) -> void:
+	check(pet.needs_water() and pet.legs[0].get_child_count() == 0 and pet.legs[1].get_child_count() == 0 and pet.tresses != null and pet.tail.get_child_count() > 0, "it lives in water, and has hair, a tail and no legs")
+	var was := pet.get_needs()
+	pet.set_needs({"age": 0.0})
+	pet.grow = pet.size_goal()
+	await _frames(3)
+	var short := pet.stub.scale.z
+	pet.set_needs({"age": Cryptlin.GROW_AGE})
+	pet.grow = pet.size_goal()
+	await _frames(3)
+	check(short < pet.stub.scale.z * 0.8, "a baby has a stub of a tail, and grows the rest")
+	pet.set_needs(was)
+	pet.grow = pet.size_goal()
+	pet.xray(true)
+	check(pet.long_bones.size() >= 8 and pet.inside_at("brain").y > pet.inside_at("stomach").y, "under the scanner it has a backbone down its tail, with fine bones off it")
+	pet.xray(false)
+	pet.position = Vector3(-1.2, 0, 0.6)
+	pet.target = Vector3(1.3, 0, 0.9)
+	pet._enter(Cryptlin.State.WANDER)
+	var most := 0.0
+	var least := 9.0
+	for i in 90:
+		await _frames(1)
+		most = maxf(most, pet.torso.scale.z)
+		least = minf(least, pet.torso.scale.z)
+	check(most - least > 0.04 and is_zero_approx(pet.loll) and pet.heave == 0.0, "on dry floor it hauls itself along, bunching up and stretching out, with its tail down")
+	pet._enter(Cryptlin.State.IDLE, 1.0)
 
 
 # How many things there are to have on the wheel just now: all of them, but for the grave marker
@@ -1325,6 +1383,8 @@ func _run() -> void:
 		await _whale(pet)
 	if pet.podge != null:
 		await _snowball(pet)
+	if pet.stub != null:
+		await _halfling(pet)
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name
@@ -2492,5 +2552,7 @@ func _run() -> void:
 	check(await _until(func() -> bool: return main.pets().size() == 2, 900), "one of another kind hatches beside it")
 	await _until(func() -> bool: return _settled(main.residents[0].pet) and _settled(main.residents[1].pet), 600)
 	await _knack(main.residents[0].pet, main.residents[1].pet)
+	if kind == Cryptlin.Kind.KONGAMATO:
+		await _skimmer(main.residents[0].pet)
 	print("smoke: %d failure(s)" % failures)
 	quit(failures)

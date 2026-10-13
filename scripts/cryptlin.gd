@@ -17,6 +17,10 @@ enum Kind {
 	KELPIE, MERFOLK, SPAWN, GNOME, FAE, FUNGUS, JACKALOPE, ALIEN, YETI, CERBERUS, MOLE,
 	NIGHTCRAWLER, MONKEY, BOAR,
 	FLATWOODS, DEVIL, WORM,
+	YOWIE,
+	KANGAROO,
+	KONGAMATO,
+	MERMAID,
 }
 
 # What sets the kinds apart besides their looks: pace on the ground, appetite, how fast they tire,
@@ -54,6 +58,10 @@ const KINDS: Array[Dictionary] = [
 	{"title": "Flatwoods monster", "pace": 0.8, "hunger": 0.9, "tire": 0.9, "spring": 0.5, "voice": 0.6, "lurk": 1.8, "zoom": 0.4, "dance": 0.6, "stare": 1.8},
 	{"title": "Jersey devil", "pace": 1.2, "hunger": 1.3, "tire": 1.1, "spring": 1.3, "voice": 1.3, "lurk": 1.2, "zoom": 1.5, "dance": 0.9, "stare": 1.0, "fly": 0.35},
 	{"title": "Mongolian death worm", "pace": 0.7, "hunger": 1.3, "tire": 0.9, "spring": 0.4, "voice": 0.5, "lurk": 1.6, "zoom": 0.5, "dance": 0.6, "stare": 0.4, "dig": 3.0},
+	{"title": "yowie", "pace": 0.9, "hunger": 1.3, "tire": 1.0, "spring": 0.8, "voice": 0.6, "lurk": 1.7, "zoom": 0.8, "dance": 0.9, "stare": 1.2},
+	{"title": "phantom kangaroo", "pace": 1.25, "hunger": 0.9, "tire": 1.05, "spring": 1.6, "voice": 0.9, "lurk": 1.5, "zoom": 1.8, "dance": 0.8, "stare": 1.6},
+	{"title": "kongamato", "pace": 1.1, "hunger": 1.2, "tire": 1.1, "spring": 1.2, "voice": 1.5, "lurk": 1.3, "zoom": 1.4, "dance": 0.7, "stare": 1.4, "fly": 0.6},
+	{"title": "mermaid", "pace": 0.72, "hunger": 0.9, "tire": 0.9, "spring": 0.5, "voice": 1.4, "lurk": 0.8, "zoom": 0.5, "dance": 1.2, "stare": 1.5, "water": true},
 ]
 # What the numbers in saves from before this list stood for (gremlin, bogle, spook, flit)
 const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MOTHMAN]
@@ -119,7 +127,7 @@ const NATURES: Array[Dictionary] = [
 # with one, and pleased with themselves when it breaks; the rest are startled), and each kind:
 # the heavy and the fierce wear one out fast, and the slight ones slowly
 const NATURE_ROUGH: Array[float] = [1.0, 1.15, 0.8, 0.85, 0.8, 1.25, 1.3, 1.2]
-const ROUGH: Array[float] = [1.0, 1.3, 1.0, 0.8, 1.4, 0.9, 1.1, 1.6, 1.4, 1.2, 0.9, 1.1, 0.8, 0.6, 0.7, 1.0, 0.8, 1.4, 1.6, 1.1, 0.7, 1.2, 1.5, 0.9, 1.3, 1.2]
+const ROUGH: Array[float] = [1.0, 1.3, 1.0, 0.8, 1.4, 0.9, 1.1, 1.6, 1.4, 1.2, 0.9, 1.1, 0.8, 0.6, 0.7, 1.0, 0.8, 1.4, 1.6, 1.1, 0.7, 1.2, 1.5, 0.9, 1.3, 1.2, 1.35, 1.2, 1.3, 0.7]
 # The two foods and two toys each kind leans towards (Snack.Kind, Ball.Kind); one of each is its favourite
 const FOOD_LIKES: Array[Array] = [
 	[Snack.Kind.CANDY, Snack.Kind.BONE], [Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.BEETLE, Snack.Kind.BERRIES],
@@ -131,6 +139,10 @@ const FOOD_LIKES: Array[Array] = [
 	[Snack.Kind.BONE, Snack.Kind.FISH], [Snack.Kind.BEETLE, Snack.Kind.TOADSTOOL],
 	[Snack.Kind.TOADSTOOL, Snack.Kind.CANDY], [Snack.Kind.BERRIES, Snack.Kind.BEETLE], [Snack.Kind.TOADSTOOL, Snack.Kind.BEETLE],
 	[Snack.Kind.CANDY, Snack.Kind.TOADSTOOL], [Snack.Kind.BERRIES, Snack.Kind.BONE], [Snack.Kind.BEETLE, Snack.Kind.BONE],
+	[Snack.Kind.BEETLE, Snack.Kind.BONE],
+	[Snack.Kind.BERRIES, Snack.Kind.BEETLE],
+	[Snack.Kind.FISH, Snack.Kind.BEETLE],
+	[Snack.Kind.FISH, Snack.Kind.BERRIES],
 ]
 const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL], [Ball.Kind.BELL, Ball.Kind.STONE],
@@ -142,6 +154,10 @@ const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.STONE, Ball.Kind.BELL],
 	[Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.BELL, Ball.Kind.BALL], [Ball.Kind.STONE, Ball.Kind.BALL],
 	[Ball.Kind.GLOW, Ball.Kind.STONE], [Ball.Kind.BELL, Ball.Kind.BALL], [Ball.Kind.STONE, Ball.Kind.GLOW],
+	[Ball.Kind.STONE, Ball.Kind.BELL],
+	[Ball.Kind.BALL, Ball.Kind.GLOW],
+	[Ball.Kind.BELL, Ball.Kind.STONE],
+	[Ball.Kind.GLOW, Ball.Kind.BELL],
 ]
 # Natures that will not go together (shy and bold, sleepy and restless, cuddly and grumpy)
 const OPPOSED: Array[Array] = [[2, 5], [3, 7], [4, 6]]
@@ -158,14 +174,22 @@ const DECOR_LIKES: Array[Array] = [
 	[Decor.Kind.SKULL, Decor.Kind.GRAVESTONE], [Decor.Kind.LOG, Decor.Kind.ROCK],
 	[Decor.Kind.GRAVESTONE, Decor.Kind.CRYSTAL], [Decor.Kind.PUMPKIN, Decor.Kind.ROCK], [Decor.Kind.LOG, Decor.Kind.FERN],
 	[Decor.Kind.FERN, Decor.Kind.CRYSTAL], [Decor.Kind.GRAVESTONE, Decor.Kind.LOG], [Decor.Kind.SKULL, Decor.Kind.ROCK],
+	[Decor.Kind.LOG, Decor.Kind.CAVE],
+	[Decor.Kind.GRAVESTONE, Decor.Kind.FERN],
+	[Decor.Kind.DISH, Decor.Kind.ROCK],
+	[Decor.Kind.ROCK, Decor.Kind.CRYSTAL],
 ]
 const GROUND_LIKES: Array[Array] = [
 	[1, 3], [2, 4], [4, 5], [1, 3], [5, 4], [2, 4], [6, 5], [6, 0], [2, 0],
 	[6, 2], [5, 6], [5, 0], [2, 4], [2, 3], [2, 4], [4, 5], [3, 6], [6, 0], [0, 6], [4, 4],
 	[3, 0], [1, 3], [4, 2],
 	[2, 4], [5, 2], [5, 5],
+	[4, 5],
+	[5, 2],
+	[5, 6],
+	[5, 6],
 ]
-const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2, 1, 1, 0, 2, 1, 1, 2]
+const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2, 1, 1, 0, 2, 1, 1, 2, 1, 1, 2, 1]
 # It lives in real time, like a pet: these are hours of the clock on the wall, and they pass
 # whether or not anyone is looking. A full belly lasts most of a day, and a baby is grown in a
 # day and a half.
@@ -230,6 +254,10 @@ const FURS: Array[Array] = [
 	[Color(0.12, 0.22, 0.17), Color(0.15, 0.15, 0.19), Color(0.21, 0.15, 0.27), Color(0.12, 0.2, 0.25), Color(0.26, 0.15, 0.13)],
 	[Color(0.42, 0.3, 0.2), Color(0.27, 0.25, 0.28), Color(0.5, 0.23, 0.17), Color(0.21, 0.17, 0.16), Color(0.58, 0.48, 0.36)],
 	[Color(0.7, 0.1, 0.08), Color(0.6, 0.08, 0.1), Color(0.74, 0.17, 0.1), Color(0.52, 0.07, 0.07)],
+	[Color(0.66, 0.3, 0.13), Color(0.76, 0.58, 0.32), Color(0.52, 0.24, 0.12), Color(0.72, 0.44, 0.2)],
+	[Color(0.8, 0.84, 0.88), Color(0.7, 0.8, 0.86), Color(0.84, 0.83, 0.75), Color(0.7, 0.8, 0.74)],
+	[Color(0.62, 0.14, 0.1), Color(0.17, 0.15, 0.16), Color(0.52, 0.22, 0.12), Color(0.38, 0.1, 0.12)],
+	[Color(0.16, 0.5, 0.42), Color(0.14, 0.4, 0.6), Color(0.42, 0.3, 0.62), Color(0.7, 0.36, 0.42), Color(0.5, 0.56, 0.22)],
 ]
 const EYES: Array[Array] = [
 	[Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.3), Color(1.0, 0.45, 0.7), Color(0.4, 0.95, 1.0)],
@@ -258,6 +286,10 @@ const EYES: Array[Array] = [
 	[Color(1.0, 0.9, 0.3), Color(0.7, 1.0, 0.4), Color(1.0, 0.6, 0.15)],
 	[Color(1.0, 0.2, 0.12), Color(1.0, 0.5, 0.1), Color(1.0, 0.85, 0.25)],
 	[Color(1.0, 0.85, 0.2), Color(1.0, 0.6, 0.15), Color(0.85, 1.0, 0.35)],
+	[Color(1.0, 0.8, 0.25), Color(1.0, 0.55, 0.15), Color(0.85, 1.0, 0.5)],
+	[Color(1.0, 0.25, 0.15), Color(0.5, 1.0, 0.6), Color(0.6, 0.9, 1.0)],
+	[Color(1.0, 0.9, 0.2), Color(0.7, 1.0, 0.5), Color(1.0, 0.6, 0.1)],
+	[Color(0.5, 0.95, 1.0), Color(0.9, 1.0, 0.6), Color(1.0, 0.7, 0.85)],
 ]
 # A seed up to this is one from before there were more colours to draw from, and keeps to the
 # lists above so that it stays the colour it has always been; a seed over it draws from these too
@@ -289,6 +321,10 @@ const FURS_MORE: Array[Array] = [
 	[Color(0.24, 0.24, 0.12), Color(0.1, 0.12, 0.3)],
 	[Color(0.44, 0.4, 0.38), Color(0.36, 0.18, 0.24)],
 	[Color(0.62, 0.1, 0.2), Color(0.68, 0.14, 0.14)],
+	[Color(0.82, 0.68, 0.44), Color(0.44, 0.22, 0.14)],
+	[Color(0.78, 0.74, 0.86), Color(0.64, 0.72, 0.82)],
+	[Color(0.72, 0.26, 0.12), Color(0.25, 0.2, 0.25)],
+	[Color(0.2, 0.56, 0.6), Color(0.6, 0.3, 0.56)],
 ]
 const EYES_MORE: Array[Array] = [
 	[Color(0.8, 0.6, 1.0)], [Color(1.0, 0.95, 0.6)], [Color(1.0, 0.45, 0.6)], [Color(1.0, 0.4, 0.0)],
@@ -298,6 +334,10 @@ const EYES_MORE: Array[Array] = [
 	[Color(1.0, 0.8, 0.4)], [Color(0.7, 1.0, 0.8)], [Color(1.0, 0.2, 0.3)], [Color(0.9, 1.0, 0.9)],
 	[Color(0.8, 0.6, 1.0)], [Color(0.5, 0.9, 1.0)], [Color(0.6, 0.9, 1.0)],
 	[Color(0.75, 0.9, 1.0)], [Color(0.75, 1.0, 0.4)], [Color(1.0, 1.0, 0.75)],
+	[Color(1.0, 0.95, 0.7)],
+	[Color(1.0, 0.85, 0.3)],
+	[Color(0.6, 0.95, 1.0)],
+	[Color(0.7, 0.8, 1.0)],
 ]
 # How far one of a kind can be from the next in its proportions, each as the least and the most
 # of what its body was drawn at: the size of its head, of its eyes and how far apart they sit,
@@ -322,6 +362,10 @@ const SHAPES: Array[Dictionary] = [
 	{"head": [0.86, 1.2], "eye": [0.8, 1.25], "limb": [0.92, 1.1], "crest": [0.85, 1.2], "marks": [Mark.STRIPES, Mark.FRECKLES, Mark.POINTS]},
 	{"head": [0.88, 1.2], "limb": [0.85, 1.2], "crest": [0.75, 1.35], "tail": [0.7, 1.4]},
 	{"head": [0.85, 1.22], "limb": [1.0, 1.0], "tail": [0.9, 1.15], "marks": [Mark.STRIPES, Mark.BELLY, Mark.FRECKLES, Mark.POINTS]},
+	{"head": [0.88, 1.2], "eye": [0.85, 1.25], "limb": [0.88, 1.15], "crest": [0.7, 1.4]},
+	{"head": [0.88, 1.18], "eye": [0.85, 1.25], "limb": [0.9, 1.18], "ear": [0.8, 1.3], "tail": [0.85, 1.25]},
+	{"head": [0.9, 1.2], "eye": [0.8, 1.1], "limb": [0.85, 1.15], "crest": [0.6, 1.5], "tail": [0.7, 1.4]},
+	{"head": [0.9, 1.18], "eye": [0.85, 1.2], "limb": [0.95, 1.05], "crest": [0.5, 1.6], "tail": [0.85, 1.25]},
 ]
 # What can be painted on a coat, and how likely each is for most kinds
 enum Mark { PLAIN, SPOTS, PATCHES, STRIPES, BELLY, SOCKS, BLAZE, FRECKLES, POINTS }
@@ -344,6 +388,10 @@ const EXTRAS: Array[Array] = [
 	["tuft", "whiskers", "tooth", "odd", "split"],
 	["odd", "split"], ["tuft", "tooth", "torn", "odd", "split"], ["tuft", "whiskers", "torn", "odd", "split", "broken"],
 	["odd", "split"], ["tuft", "tooth", "torn", "odd", "split", "broken"], ["whiskers", "tooth"],
+	["tuft", "tooth", "odd", "split"],
+	["torn", "odd", "split"],
+	["odd", "split", "broken"],
+	["tooth", "odd", "split"],
 ]
 
 var world: Den
@@ -405,10 +453,11 @@ var gut_stretch := Vector3.ONE
 # one that drags itself along on its belly bunches up and stretches out as it goes
 var head_turn := 1.25
 var heave := 0.0
-# One that hops where the rest walk, and in what manner ("rabbit"; nothing for one that walks:
+# One that hops where the rest walk, and in what manner ("rabbit", "roo"; nothing for one that walks:
 # see _hop): how far through the hop it is on (0 between hops), how long that hop takes, how
 # high it goes and how much of a run it is, which way a clumsy one tips over in it, how far off
-# the floor it is just now, and how far what trails after it is lagging
+# the floor it is just now, how far what trails after it is lagging, and how much higher its
+# manner of hopping goes than a rabbit's
 var hops := ""
 var hop_t := 0.0
 var hop_len := 0.4
@@ -417,6 +466,7 @@ var hop_run := 0.0
 var hop_tip := 0.0
 var hop_y := 0.0
 var hop_lag := 0.0
+var hop_spring := 1.0
 # How far its legs swing at a walk, how far it folds up when it sits (not at all, for one that
 # is all legs), how far the whole of such a one comes down when it curls up to sleep, and how
 # long the bone in each leg is
@@ -455,6 +505,13 @@ var big_feet := 1.0
 var coats: Array[Array] = []
 var fluff := 0.0
 var combed := -1.0
+# A tail that is no more than a stub on a baby (the mermaid's): what carries it, and what that
+# is scaled by newly hatched; it is also what lifts out of the water behind one that is wading,
+# and how far it is lifted just now. And its hair, for the lamp to catch (see Knack._comb)
+var stub: Node3D
+var stub_young := Vector3.ONE
+var loll := 0.0
+var tresses: ShaderMaterial
 # The bones of its limbs, where they are not one short one in each: what each hangs from, how
 # long it is, where its middle is and how it is turned
 var long_bones: Array[Array] = []
@@ -1024,6 +1081,14 @@ func _build() -> void:
 			_build_devil(chub, ear_len)
 		Kind.WORM:
 			_build_worm(chub)
+		Kind.YOWIE:
+			_build_yowie(chub, rng)
+		Kind.KANGAROO:
+			_build_kangaroo(chub, ear_len)
+		Kind.KONGAMATO:
+			_build_kongamato(chub, rng)
+		Kind.MERMAID:
+			_build_mermaid(chub, rng)
 		_:
 			_build_gremlin(chub, ear_len, horns)
 
@@ -2754,6 +2819,381 @@ func _build_worm(chub: float) -> void:
 	mouth_node = _pivot(neck, front.position + Vector3(0, 0.004, 0.009))
 	mouth_node.rotation.x = -0.45
 	_part(mouth_node, _sphere(), eye_mat, Vector3.ZERO, Vector3(0.022, 0.04, 0.012))
+# The yowie, the hairy man of the Australian bush: short and very wide, all long shaggy hair the
+# colour of rust or sand, with arms so long its knuckles are on the floor, a wide flat face that
+# is mostly mouth set low between its shoulders with no neck at all, and short bandy legs on big
+# feet that turn out. It is nothing like so tall as the squatchling, and has no crest to its head.
+func _build_yowie(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.58
+	head_y = 0.1
+	centre_y = 0.4
+	top_y = neck_y + 0.3
+	gravity = 14.0
+	head_turn = 0.9
+	gut = 1.25
+	stoop = 0.12
+	arm_swing = 0.8
+	big_feet = 1.25
+	fluff = 0.7
+	brain_at = Vector3(0, 0.15, -0.01)
+	crown = Vector3(0, 0.27, 0.0)
+	var wide := lerpf(1.0, chub, 0.8) * 1.06
+	# What is its own besides: how long its hair is, and how wide its mouth
+	var long := rng.randf_range(0.085, 0.125)
+	var grin := rng.randf_range(0.85, 1.2)
+	var calm := {"hang": 1.0, "locks": 7.0, "rows": 2.0, "streak": 0.14, "root_shade": 0.14, "tip_bleach": 0.1, "edge": 0.5, "shade": 0.3}
+	# What is painted on it is faint: a paler front or a darker back to it, no more than that
+	if marks[0] != Mark.PLAIN or marks[2] != Mark.PLAIN:
+		fur.set_shader_parameter("tex", coat(marks, fur_colour, 0.4))
+	fur = _shaggy(fur_colour * 0.8, 2, long, calm)
+	var limbs := _shaggy(fur_colour * 0.66, 2, long * 0.8, calm.merged({"shade": 0.15}))
+	# (the same hair on a ball, which is drawn a quarter of the size, is four times as long)
+	var mop := _shaggy(fur_colour * 0.86, 2, long * 3.6, calm.merged({"shade": 0.12, "hang": 1.2}))
+	coats = [[fur, long], [limbs, long * 0.8], [mop, long * 3.6]]
+	var lock := Ps1.mat(fur_colour * 0.56, 0.0, 0.35)
+	# Its bare skin is dark, and its lips and the soles of its feet paler
+	var leather := (fur_colour * 0.3).lerp(Color(0.2, 0.14, 0.12), 0.5)
+	var hide := Ps1.mat(leather, 0.0, 0.3)
+	var lips := Ps1.mat(leather.lerp(Color(0.66, 0.46, 0.38), 0.55), 0.0, 0.3)
+	for side: float in [-1.0, 1.0]:
+		# Bandy legs: the thigh goes out to the knee and the shin comes in again to the ankle
+		var leg := _pivot(self, Vector3(0.16 * wide * side, 0.25, 0))
+		_part(leg, _capsule(0.095, 0.22), limbs, Vector3(0.04 * side, -0.04, 0), Vector3.ONE, Vector3(0, 0, 0.65 * side))
+		_part(leg, _capsule(0.08, 0.2), limbs, Vector3(0.055 * side, -0.15, 0), Vector3.ONE, Vector3(0, 0, -0.4 * side))
+		# Big flat feet, turned well out
+		var foot := _pivot(leg, Vector3(0.03 * side, -0.215, 0))
+		foot.rotation.y = 0.8 * side
+		foot.scale = Vector3.ONE * 0.72
+		_part(foot, _sphere(), hide, Vector3(0, 0, 0.13), Vector3(0.15, 0.055, 0.24))
+		for toe in 4:
+			_part(foot, _sphere(), lips, Vector3((toe - 1.5) * 0.085 * side, 0.005, 0.37 - absf(toe - 1.0) * 0.025), Vector3(0.055, 0.05, 0.075))
+		feet.append(foot)
+		legs.append(leg)
+		long_bones.append([leg, 0.14, Vector3(0.04 * side, -0.04, 0), Vector3(0, 0, 0.65 * side)])
+		long_bones.append([leg, 0.13, Vector3(0.055 * side, -0.15, 0), Vector3(0, 0, -0.4 * side)])
+
+	# A wide low heap of a body, widest at the hips, with the shoulders sloping straight into the head
+	torso = _pivot(self, Vector3.ZERO)
+	var heap: Array[Vector2] = [
+		Vector2(0.2, 0.13), Vector2(0.31, 0.19), Vector2(0.35, 0.31), Vector2(0.37, 0.44), Vector2(0.37, 0.55),
+		Vector2(0.3, 0.64), Vector2(0.17, 0.69), Vector2(0.0, 0.71),
+	]
+	_part(torso, _lathe(heap, 12), fur, Vector3.ZERO, Vector3(wide, 1.0, 0.78 * wide))
+	tail = _pivot(torso, Vector3(0, 0.3, -0.26))
+	for side: float in [-1.0, 1.0]:
+		# Arms that reach the floor and then some: it goes with its knuckles down
+		var a := _pivot(torso, Vector3(0.45 * wide * side, 0.56, 0.04))
+		var drop := _pivot(a, Vector3.ZERO)
+		drop.rotation.z = 0.14 * side
+		_part(drop, _capsule(0.1, 0.28), limbs, Vector3(0, -0.07, 0))
+		_part(drop, _capsule(0.085, 0.3), limbs, Vector3(0, -0.27, 0.02))
+		_part(drop, _sphere(), hide, Vector3(0, -0.455, 0.05), Vector3(0.09, 0.07, 0.105))
+		_spike(drop, lock, Vector3(0.05 * side, -0.2, -0.04), Vector3(0.5 * side, -1.0, -0.6), 0.17, 0.06)
+		arms.append(a)
+		long_bones.append([drop, 0.2, Vector3(0, -0.09, 0), Vector3.ZERO])
+		long_bones.append([drop, 0.2, Vector3(0, -0.31, 0.02), Vector3.ZERO])
+
+	# The head: a low wide mop of hair with the face looking out from under it
+	neck = _pivot(torso, Vector3(0, neck_y, 0.11))
+	_part(neck, _sphere(), mop, Vector3(0, 0.11, -0.03), Vector3(0.27, 0.2, 0.23))
+	# Its face is bare, wide and flat: small eyes set far apart, next to no nose, and under them a
+	# mouth that goes most of the way across
+	_part(neck, _sphere(), hide, Vector3(0, 0.07, 0.11), Vector3(0.215, 0.13, 0.11))
+	_part(neck, _sphere(), lips, Vector3(0, 0.02, 0.15), Vector3(0.175 * grin, 0.07, 0.085))
+	_part(neck, _sphere(), black, Vector3(0, 0.085, 0.224), Vector3(0.034, 0.018, 0.016))
+	_part(neck, _sphere(), mop, Vector3(0, 0.2, 0.1), Vector3(0.22, 0.06, 0.13))
+	# Hair hanging down either side of it, and a beard of sorts under its chin
+	var locks := neck.get_child_count()
+	for side: float in [-1.0, 1.0]:
+		_spike(neck, lock, Vector3(0.22 * side, 0.12, 0.06), Vector3(0.25 * side, -1.0, 0.05), 0.26, 0.075)
+		_spike(neck, lock, Vector3(0.1 * side, -0.02, 0.15), Vector3(0.2 * side, -1.0, 0.25), 0.14, 0.06)
+	_swell(neck, locks, Vector3(0, 0.1, 0.06), Vector3(1.0, crest, 1.0))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.105 * side, 0.125, 0.185), 0.04)
+	mouth_node = _pivot(neck, Vector3(0, 0.005, 0.232))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.13 * grin, 0.045, 0.025))
+
+
+# The phantom kangaroo, seen where no kangaroo has any business being and gone when it is looked
+# for: pale as ash and faintly lit from inside, lean and upright, with big haunches and long
+# feet, a heavy tail down behind it for a counterweight, small forepaws held up in front of its
+# chest like a boxer's, a long narrow head with tall ears, and eyes that glow. It goes on two
+# legs and only in hops (see _hop_roo).
+func _build_kangaroo(chub: float, ear_len: float) -> void:
+	hops = "roo"
+	hop_spring = 1.5
+	neck_y = 0.8
+	head_y = 0.1
+	centre_y = 0.44
+	top_y = neck_y + 0.25 + ear_len * 0.6
+	ear_splay = 0.42
+	gravity = 9.0
+	gut = 0.8
+	head_turn = 1.1
+	brain_at = Vector3(0, 0.13, 0.0)
+	crown = Vector3(0, 0.23, -0.01)
+	# Ash, with a little light of its own, so that it is never quite dark; what is painted on it
+	# is no more than a shade of that
+	var ghost := fur_colour * 0.68
+	fur = Ps1.mat(ghost, 0.16, 0.6)
+	if marks[0] != Mark.PLAIN or marks[2] != Mark.PLAIN:
+		fur.set_shader_parameter("tex", coat(marks, fur_colour, 0.35))
+		fur.set_shader_parameter("gain", COAT_GAIN)
+	pale = Ps1.mat(fur_colour.lerp(Color(0.95, 0.98, 1.0), 0.5) * 0.8, 0.2, 0.6)
+	dark = Ps1.mat(fur_colour * Color(0.4, 0.44, 0.52), 0.1, 0.5)
+	for side: float in [-1.0, 1.0]:
+		# A big haunch, a long shank folded under it, and a foot as long as the shank
+		var leg := _pivot(self, Vector3(0.13 * chub * side, 0.3, -0.05))
+		_part(leg, _sphere(), fur, Vector3(0.015 * side, 0.03, -0.01), Vector3(0.1, 0.17, 0.17), Vector3(0.5, 0, 0))
+		_part(leg, _capsule(0.04, 0.24), fur, Vector3(0, -0.15, -0.06), Vector3.ONE, Vector3(-0.55, 0, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.265, 0.07), Vector3(0.05, 0.035, 0.2))
+		legs.append(leg)
+		long_bones.append([leg, 0.2, Vector3(0, 0.0, 0.03), Vector3(0.9, 0, 0)])
+		long_bones.append([leg, 0.2, Vector3(0, -0.15, -0.06), Vector3(-0.55, 0, 0)])
+		long_bones.append([leg, 0.26, Vector3(0, -0.265, 0.07), Vector3(PI * 0.5, 0, 0)])
+
+	# A pear of a body stood nearly on end: heavy at the hips, and narrow at the chest and shoulders
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.38, -0.07), Vector3(0.19 * chub, 0.2, 0.23), Vector3(0.3, 0, 0))
+	_part(torso, _sphere(), fur, Vector3(0, 0.58, 0.03), Vector3(0.135 * chub, 0.2, 0.14), Vector3(0.3, 0, 0))
+	_part(torso, _sphere(), pale, Vector3(0, 0.5, 0.075), Vector3(0.105 * chub, 0.22, 0.1), Vector3(0.3, 0, 0))
+	# The tail: thick where it leaves the body, down to the floor behind it and along it
+	tail = _pivot(torso, Vector3(0, 0.3, -0.22))
+	var prop: Array[Vector3] = [
+		Vector3(0, 0, 0), Vector3(0, -0.08, -0.15), Vector3(0, -0.17, -0.29), Vector3(0, -0.235, -0.45), Vector3(0, -0.255, -0.62), Vector3(0, -0.25, -0.76),
+	]
+	_rope(tail, fur, prop, 0.095, 0.028)
+
+	for side: float in [-1.0, 1.0]:
+		# Forepaws a good deal too small for the rest of it, held up with the fists closed
+		var a := _pivot(torso, Vector3(0.115 * chub * side, 0.65, 0.1))
+		_part(a, _capsule(0.03, 0.15), fur, Vector3(0, -0.055, 0.01), Vector3.ONE, Vector3(-0.2, 0, 0))
+		_part(a, _capsule(0.026, 0.14), fur, Vector3(0, -0.085, 0.07), Vector3.ONE, Vector3(-2.0, 0, 0))
+		_part(a, _sphere(), dark, Vector3(0, -0.055, 0.125), Vector3(0.036, 0.036, 0.04))
+		arms.append(a)
+		long_bones.append([a, 0.11, Vector3(0, -0.055, 0.01), Vector3(-0.2, 0, 0)])
+		long_bones.append([a, 0.1, Vector3(0, -0.085, 0.07), Vector3(-2.0, 0, 0)])
+
+	# A long neck, and a long narrow head carried high
+	neck = _pivot(torso, Vector3(0, neck_y, 0.11))
+	_part(neck, _capsule(0.055, 0.2), fur, Vector3(0, -0.02, -0.02), Vector3.ONE, Vector3(0.25, 0, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.12, 0.0), Vector3(0.12, 0.115, 0.135))
+	_part(neck, _sphere(), fur, Vector3(0, 0.085, 0.14), Vector3(0.076, 0.066, 0.13))
+	_part(neck, _sphere(), pale, Vector3(0, 0.058, 0.15), Vector3(0.06, 0.042, 0.11))
+	_part(neck, _sphere(), black, Vector3(0, 0.1, 0.265), Vector3(0.03, 0.022, 0.018))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.075 * side, 0.2, -0.04))
+		_part(ear, _sphere(), fur, Vector3(0, ear_len * 0.3, 0), Vector3(0.05, ear_len * 0.34, 0.022))
+		_part(ear, _sphere(), dark, Vector3(0, ear_len * 0.3, 0.014), Vector3(0.028, ear_len * 0.24, 0.012))
+		ears.append(ear)
+		_eye(Vector3(0.096 * side, 0.15, 0.075), 0.044)
+	mouth_node = _pivot(neck, Vector3(0, 0.045, 0.23))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.035, 0.022, 0.035))
+
+
+# A wing of bare skin for the kongamato, hung on `parent` at `at`: an arm out to the wrist, one
+# long finger from there to the tip, and a single sail of skin from that back to its side, with
+# no feathers and no more fingers in it. Beaten by the rig as the others are (see _wing).
+func _sail(parent: Node3D, at: Vector3, side: float, long: float, skin: Material, spar: Material) -> void:
+	var holder := _pivot(parent, at)
+	holder.rotation.x = PI * 0.5
+	var flap := _pivot(holder, Vector3.ZERO)
+	var w := _pivot(flap, Vector3.ZERO)
+	# (and swept back a little, so that there is something of it to see from the side)
+	w.basis = Basis(Vector3.RIGHT, -PI * 0.5) * Basis(Vector3.UP, 0.4 * side)
+	flaps.append(flap)
+	var wrist := Vector3(0.34 * long * side, 0.12 * long, 0)
+	var tip := Vector3(long * side, -0.1 * long, 0)
+	_spike(w, spar, Vector3.ZERO, wrist, wrist.length(), long * 0.045, _drum(1.0, 1.0, 1.0))
+	_spike(w, spar, wrist, tip - wrist, (tip - wrist).length(), long * 0.04)
+	# (three small claws at the wrist, where the rest of its hand is)
+	for i in 3:
+		_spike(w, spar, wrist, Vector3(0.3 * side * (i - 1), 0.5, 1.0), long * 0.1, long * 0.02)
+	_part(w, _cone(), skin, Vector3(0.34 * long * side, -0.2 * long, -0.006), Vector3(0.3 * long, 0.7 * long, 0.01), Vector3(0, 0, -side * (PI * 0.5 - 0.1)))
+	_part(w, _cone(), skin, Vector3(0.6 * long * side, -0.08 * long, -0.004), Vector3(0.17 * long, 0.78 * long, 0.01), Vector3(0, 0, -side * (PI * 0.5 + 0.22)))
+
+
+# The kongamato, the breaker of boats: a small pterosaur. A long beak with teeth in it, a crest
+# sweeping back off its skull, a small body with no feathers or fur on it anywhere, wings of bare
+# leather each on one long finger, short legs, and a long thin tail with a vane at the end. Red
+# or black, with the crest and the vane in whichever of the two the rest of it is not.
+func _build_kongamato(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.48
+	head_y = 0.12
+	centre_y = 0.34
+	gravity = 9.0
+	gut = 0.62
+	head_turn = 1.1
+	flap_rate = 2.2
+	flap_reach = 0.1
+	flap_air = 4.0
+	flap_far = 5.0
+	flight = Vector2(1.9, 0.28)
+	brain_at = Vector3(0, 0.14, 0.0)
+	var long := 0.2 + 0.2 * crest * (0.45 if "broken" in extras else 1.0)
+	top_y = neck_y + 0.22 + long * 0.45
+	# Leather, not fur: a duller shine to it. Its trim is red on a dark one and near black on a red one
+	var sooty := fur_colour.v < 0.3
+	var trim_colour := Color(0.7, 0.14, 0.1) if sooty else Color(0.13, 0.1, 0.11)
+	var trim := Ps1.mat(trim_colour, 0.0, 0.2)
+	var hide := Ps1.mat(fur_colour.lerp(Color(0.75, 0.3, 0.14), 0.22) * (1.6 if sooty else 0.95), 0.0, 0.15)
+	var spar := Ps1.mat(fur_colour * 0.5, 0.0, 0.2)
+	var horn := Ps1.mat(Color(0.8, 0.66, 0.36).lerp(Color(0.9, 0.5, 0.2), rng.randf() * 0.6), 0.0, 0.3)
+	for side: float in [-1.0, 1.0]:
+		# Short legs, set wide, on three long toes
+		var leg := _pivot(self, Vector3(0.085 * chub * side, 0.2, -0.02))
+		_part(leg, _capsule(0.032, 0.2), fur, Vector3(0, -0.08, 0))
+		for toe in 3:
+			_spike(leg, horn, Vector3(0, -0.18, 0.0), Vector3(0.45 * side * (toe - 0.6), -0.1, 1.0), 0.11, 0.02)
+		legs.append(leg)
+
+	# A small keeled body, held upright, paler down the front
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.34, -0.01), Vector3(0.135 * chub, 0.19, 0.14), Vector3(0.2, 0, 0))
+	_part(torso, _sphere(), pale, Vector3(0, 0.33, 0.05), Vector3(0.1 * chub, 0.15, 0.1), Vector3(0.2, 0, 0))
+	# A long thin tail held out stiff behind it, with a vane at the end like the blade of an oar
+	tail = _pivot(torso, Vector3(0, 0.24, -0.11))
+	var whip: Array[Vector3] = [Vector3(0, 0, 0), Vector3(0, 0.02, -0.18), Vector3(0, 0.07, -0.36), Vector3(0, 0.14, -0.52)]
+	_rope(tail, fur, whip, 0.032, 0.012)
+	_part(tail, _sphere(), trim, Vector3(0, 0.17, -0.58), Vector3(0.012, 0.055, 0.08), Vector3(-0.4, 0, 0))
+
+	var span := 0.6 * lerpf(1.0, crest, 0.25)
+	for side: float in [-1.0, 1.0]:
+		_sail(torso, Vector3(0.1 * chub * side, 0.47, -0.04), side, span, hide, spar)
+		# (its arms are its wings: there is nothing else at its shoulders)
+		arms.append(_pivot(torso, Vector3(0.1 * chub * side, 0.46, 0.0)))
+
+	# The head: as long again as the body, most of it beak
+	neck = _pivot(torso, Vector3(0, neck_y, 0.04))
+	_part(neck, _capsule(0.045, 0.16), fur, Vector3(0, 0.0, -0.01), Vector3.ONE, Vector3(0.2, 0, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.13, 0.02), Vector3(0.105, 0.1, 0.135))
+	# (the beak is carried dipped, as a stork carries its bill, so that it shows from in front)
+	var bill := _pivot(neck, Vector3(0, 0.125, 0.07))
+	bill.rotation.x = 0.32
+	_spike(bill, horn, Vector3(0, 0.02, 0), Vector3(0, -0.1, 1.0), 0.48, 0.064)
+	_spike(bill, horn, Vector3(0, -0.04, 0), Vector3(0, 0.02, 1.0), 0.4, 0.04)
+	for side: float in [-1.0, 1.0]:
+		# Teeth, standing out of the sides of it
+		for i in 4:
+			_spike(bill, bone, Vector3((0.044 - i * 0.007) * side, -0.015 - i * 0.008, 0.12 + i * 0.08), Vector3(0.3 * side, -1.0, 0.1), 0.055, 0.016)
+		_eye(Vector3(0.088 * side, 0.165, 0.07), 0.036)
+	# The crest, straight back off the top of its skull
+	var blade := _pivot(neck, Vector3(0, 0.19, 0.0))
+	blade.rotation.x = -1.0
+	_part(blade, _cone(), trim, Vector3(0, long * 0.5, 0), Vector3(0.022, long, 0.085))
+	mouth_node = _pivot(bill, Vector3(0, -0.015, 0.2))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.026, 0.03, 0.17))
+
+
+# The mermaid, half and half: from the waist up a small person, with a big round head, a great
+# deal of hair down its back and a band of scales or of shell round its chest; from the waist
+# down one thick scaled fish's tail that lies along the floor behind it and ends in a wide
+# fluke. It has no legs: on dry floor it sits up on its tail and hauls itself along on its arms.
+# What varies most is its hair: the colour of it, how far down it comes, and whether there is a
+# shell or a starfish in it. A baby is round, with a stub of a tail (see `stub`).
+func _build_mermaid(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.52
+	head_y = 0.2
+	centre_y = 0.36
+	top_y = neck_y + 0.44
+	gravity = 13.0
+	gut = 0.72
+	sits = 0.3
+	arm_swing = 1.1
+	head_turn = 1.1
+	var manes: Array[Color] = [
+		Color(0.74, 0.2, 0.1), Color(0.88, 0.7, 0.28), Color(0.12, 0.1, 0.15), Color(0.9, 0.9, 0.84), Color(0.2, 0.52, 0.32),
+		Color(0.9, 0.48, 0.6), Color(0.28, 0.44, 0.8), Color(0.46, 0.26, 0.12),
+	]
+	var mane := manes[rng.randi() % manes.size()]
+	var trinket := rng.randi() % 3
+	var shell_top := rng.randf() < 0.5
+	var pallor := rng.randf()
+	tresses = Ps1.mat(mane, 0.0, 0.5)
+	var locks := Ps1.mat(mane.darkened(0.28), 0.0, 0.4)
+	# Its skin has something of the colour of its scales in it; its fins are a shade off them
+	var flesh := Ps1.mat(Color(0.86, 0.78, 0.7).lerp(Color(0.72, 0.84, 0.8), pallor).lerp(fur_colour, 0.14), 0.0, 0.3)
+	var fin := Ps1.mat(Color.from_hsv(fposmod(fur_colour.h + 0.08, 1.0), minf(fur_colour.s * 0.8, 1.0), minf(fur_colour.v * 1.5 + 0.1, 1.0)), 0.0, 0.4)
+	var shells: Array[Color] = [Color(0.86, 0.46, 0.5), Color(0.66, 0.56, 0.86), Color(0.88, 0.7, 0.36)]
+	var nacre := Ps1.mat(shells[rng.randi() % shells.size()], 0.0, 0.5)
+	for side: float in [-1.0, 1.0]:
+		# (no legs: the rig has two all the same, with nothing on them)
+		legs.append(_pivot(self, Vector3(0.07 * side, 0.1, -0.1)))
+
+	torso = _pivot(self, Vector3.ZERO)
+	# The hips, which are the thick end of the tail, sat on the floor
+	_part(torso, _sphere(), fur, Vector3(0, 0.15, -0.03), Vector3(0.18 * chub, 0.15, 0.2))
+	# The top half: a waist, and a chest in a bodice of scales or of shell
+	_part(torso, _sphere(), flesh, Vector3(0, 0.31, 0.02), Vector3(0.125 * chub, 0.14, 0.11))
+	_part(torso, _sphere(), flesh, Vector3(0, 0.44, 0.025), Vector3(0.145 * chub, 0.11, 0.108))
+	_part(torso, _sphere(), nacre if shell_top else fur, Vector3(0, 0.415, 0.027), Vector3(0.152 * chub, 0.095, 0.116))
+	# A frill of fin where the one half turns into the other
+	_part(torso, _sphere(), fin, Vector3(0, 0.25, 0.0), Vector3(0.17 * chub, 0.025, 0.16))
+	# The tail: back along the floor and round to one side of it, tapering, so that the end of it
+	# lies out beside it where it sits
+	var bend := 1.0 if int(shape["side"]) == 1 else -1.0
+	stub = _pivot(torso, Vector3(0, 0.14, -0.12))
+	stub_young = Vector3(0.62, 1.2, 0.62)
+	var length: Array[Vector3] = [Vector3(0, 0, 0), Vector3(0.05 * bend, -0.02, -0.16), Vector3(0.17 * bend, -0.04, -0.27), Vector3(0.33 * bend, -0.05, -0.31)]
+	_rope(stub, fur, length, 0.15, 0.07)
+	_part(stub, _cone(), fin, Vector3(0.03 * bend, 0.14, -0.15), Vector3(0.012, 0.14, 0.11), Vector3(-0.7, 0, 0))
+	# The end of it, which the rig swishes, and the fluke: two wide lobes lying nearly flat
+	var turn := _pivot(stub, length[3])
+	turn.rotation.y = -1.75 * bend
+	tail = _pivot(turn, Vector3.ZERO)
+	var end: Array[Vector3] = [Vector3(0, 0, 0), Vector3(0, 0.03, -0.13), Vector3(0, 0.09, -0.24)]
+	_rope(tail, fur, end, 0.07, 0.04)
+	for side: float in [-1.0, 1.0]:
+		var out := Vector3(0.8 * side, 0.25, -0.75).normalized()
+		var flat := out.cross(Vector3(0, 1.0, 0.3)).normalized()
+		var lobe := _part(tail, _cone(), fin, Vector3(0, 0.09, -0.24) + out * 0.13)
+		lobe.basis = Basis(flat * 0.1, out * 0.3, flat.cross(out) * 0.014)
+	# (under the scanner: a fish's backbone the length of it, with its fine bones standing off it)
+	for i in 3:
+		var along := length[i + 1] - length[i]
+		var facing := atan2(along.x, along.z)
+		long_bones.append([stub, along.length(), (length[i] + length[i + 1]) * 0.5, Vector3(PI * 0.5, facing, 0)])
+		for half: float in [0.3, 0.8]:
+			long_bones.append([stub, 0.19 - (i + half) * 0.04, length[i].lerp(length[i + 1], half), Vector3(0, facing, PI * 0.5)])
+	long_bones.append([tail, 0.24, Vector3(0, 0.04, -0.12), Vector3(PI * 0.5 - 0.35, 0, 0)])
+
+	for side: float in [-1.0, 1.0]:
+		# Thin arms, which are what it gets about on when it is out of the water
+		var a := _pivot(torso, Vector3(0.165 * chub * side, 0.47, 0.03))
+		_part(a, _capsule(0.034, 0.3), flesh, Vector3(0, -0.12, 0))
+		_part(a, _sphere(), flesh, Vector3(0, -0.28, 0.015), Vector3(0.045, 0.04, 0.055))
+		_part(a, _cone(), fin, Vector3(0, -0.13, -0.045), Vector3(0.01, 0.1, 0.04), Vector3(-0.5, 0, 0))
+		arms.append(a)
+		long_bones.append([a, 0.22, Vector3(0, -0.12, 0), Vector3.ZERO])
+
+	# A big round head, and the face of a small child that has seen something it wants
+	neck = _pivot(torso, Vector3(0, neck_y, 0.03))
+	_part(neck, _sphere(), flesh, Vector3(0, 0.2, 0.0), Vector3(0.2, 0.19, 0.185))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.088 * side, 0.2, 0.15), 0.056)
+		_part(neck, _sphere(), Ps1.mat(Color(0.9, 0.5, 0.5), 0.0, 0.3), Vector3(0.125 * side, 0.135, 0.13), Vector3(0.035, 0.022, 0.02))
+	# Its hair: a cap of it over the top and back of its head, a fringe, a length of it down its
+	# back (some to the shoulder, some to the floor) and a lock in front of each shoulder
+	var down := 0.22 + 0.34 * (crest - 0.5) / 1.1
+	_part(neck, _sphere(), tresses, Vector3(0, 0.235, -0.04), Vector3(0.218, 0.19, 0.2))
+	_part(neck, _sphere(), tresses, Vector3(0, 0.345, 0.09), Vector3(0.17, 0.06, 0.1), Vector3(0.5, 0, 0))
+	_part(neck, _sphere(), tresses, Vector3(0, 0.2 - down * 0.5, -0.15), Vector3(0.2, down * 0.62, 0.085), Vector3(-0.12, 0, 0))
+	_part(neck, _sphere(), locks, Vector3(0, 0.18 - down * 0.5, -0.19), Vector3(0.15, down * 0.52, 0.07), Vector3(-0.2, 0, 0))
+	for side: float in [-1.0, 1.0]:
+		_part(neck, _sphere(), locks, Vector3(0.185 * side, 0.2 - down * 0.3, 0.02), Vector3(0.055, down * 0.42 + 0.06, 0.07))
+	crown = Vector3.ZERO
+	# And in it, on one side, a scallop shell, a starfish, or nothing
+	var at := Vector3(0.15 * (1.0 if int(shape["side"]) == 1 else -1.0), 0.34, 0.1)
+	if trinket == 1:
+		_part(neck, _sphere(), nacre, at, Vector3(0.055, 0.05, 0.022), Vector3(0.3, 0.5 * signf(at.x), 0))
+		_part(neck, _sphere(), Ps1.mat(Color(0.86, 0.56, 0.6), 0.0, 0.4), at + Vector3(0, -0.035, 0.012), Vector3(0.022, 0.02, 0.016))
+	elif trinket == 2:
+		var star := Ps1.mat(Color(0.95, 0.5, 0.16), 0.0, 0.4)
+		_part(neck, _sphere(), star, at, Vector3.ONE * 0.026)
+		for i in 5:
+			_spike(neck, star, at, Vector3(sin(i * TAU / 5.0), cos(i * TAU / 5.0), 0.25), 0.065, 0.022)
+	mouth_node = _pivot(neck, Vector3(0, 0.105, 0.172))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.04, 0.025, 0.02))
 
 
 # One of a hound's heads, on a pivot: collar, skull, muzzle, nose, fangs and eyes. Gives back
@@ -5067,7 +5507,8 @@ func _hop_drive() -> float:
 # keeps the time of it: the hop begins when it wants to be moving, is short and small at a walk
 # and long and low at a run, shorter and clumsier for a baby, and ends with it down again and
 # still for a moment; what is keyed to a step (a print, the squash of landing) is keyed to coming
-# down. How it holds itself through the hop is its own manner's business: see _hop_rabbit.
+# down. How it holds itself through the hop is its own manner's business: see _hop_rabbit and
+# _hop_roo.
 func _hop(delta: float) -> void:
 	var speed := Vector2(velocity.x, velocity.z).length()
 	var young := clampf(inverse_lerp(adult_size, BABY_SIZE, grow), 0.0, 1.0)
@@ -5090,7 +5531,7 @@ func _hop(delta: float) -> void:
 	if hop_t > 0.0 and before <= 0.0:
 		hop_run = clampf((speed - 1.5) / 1.6, 0.0, 1.0)
 		hop_len = lerpf(0.44, 0.33, hop_run) * lerpf(1.0, 0.72, young)
-		hop_high = lerpf(0.12, 0.16, hop_run) * clampf(speed, 0.3, 1.0) * lerpf(1.0, randf_range(0.8, 1.7), young)
+		hop_high = lerpf(0.12, 0.16, hop_run) * clampf(speed, 0.3, 1.0) * lerpf(1.0, randf_range(0.8, 1.7), young) * hop_spring
 		hop_tip = randf_range(-0.35, 0.35) * young
 	var air := clampf(inverse_lerp(HOP_OFF, _hop_down(), hop_t), 0.0, 1.0) if hop_t > 0.0 else 0.0
 	hop_y = sin(air * PI) * hop_high
@@ -5100,6 +5541,8 @@ func _hop(delta: float) -> void:
 	match hops:
 		"rabbit":
 			_hop_rabbit(air, young)
+		"roo":
+			_hop_roo(air, young)
 
 
 # A rabbit's hop, on all fours: it bunches up on its haunches, springs off the big hind legs with
@@ -5153,6 +5596,62 @@ func _hop_rabbit(air: float, young: float) -> void:
 		ears[i].rotation.z -= side * hop_lag * 0.2 * young
 	neck.rotation.x += -pitch * 0.75 + hop_lag * 0.2
 	tail.rotation.x -= hop_lag * 0.6
+
+
+# A kangaroo's hop, upright and on two legs: it sinks on its haunches with its tail on the floor
+# behind it, springs off both feet together with its body tipped forward and its tail coming up
+# to balance it, brings its long feet through under it at the top, and comes down on them with
+# its body rocking back upright and the tail going down again. Its forepaws stay up in front of
+# its chest throughout, and its ears lag. Squared up to another of them, or to the toy, it boxes.
+func _hop_roo(air: float, young: float) -> void:
+	var down := _hop_down()
+	var lean := 0.0
+	var kick := 0.0
+	var prop := 0.0
+	var sink := 0.0
+	if airborne or (state == State.TRICK and lift > 0.05):
+		# (thrown straight up, or gone up of its own accord: feet tucked, tail streaming down)
+		kick = -0.5
+		prop = -0.35
+		lean = 0.15
+	elif hop_t <= 0.0:
+		pass
+	elif hop_t < HOP_OFF:
+		var u := hop_t / HOP_OFF
+		lean = 0.3 * u
+		sink = 0.05 * sin(u * PI)
+		kick = 0.5 * u
+		prop = -0.3 * u
+	elif hop_t < down:
+		lean = lerpf(0.3, 0.42, hop_run) - 0.2 * smoothstep(0.5, 1.0, air)
+		kick = lerpf(0.7, -0.75, smoothstep(0.1, 0.9, air))
+		prop = lerpf(0.1, 0.4, sin(air * PI)) - 0.3 * smoothstep(0.6, 1.0, air)
+	else:
+		var u := clampf((hop_t - down) / HOP_SETTLE, 0.0, 1.0)
+		lean = 0.12 * (1.0 - u)
+		sink = 0.05 * sin(u * PI)
+		kick = -0.75 * (1.0 - u)
+		prop = -0.2 * (1.0 - u)
+	torso.position.y += hop_y - sink
+	torso.rotation.x += lean
+	torso.rotation.z += hop_tip * sin(air * PI)
+	# (the tail is a prop and a counterweight, not something to wag)
+	tail.rotation.y *= 0.2
+	tail.rotation.x += prop - lean - hop_lag * 0.3 + sit * 0.2
+	neck.rotation.x -= lean * 0.8 - hop_lag * 0.15
+	var boxing := state == State.SCUFFLE or (state == State.CHASE_BALL and world.ball != null and is_instance_valid(world.ball) and world.ball.position.distance_to(position) < 0.45 * grow + 0.3)
+	for i in 2:
+		var side := -1.0 if i == 0 else 1.0
+		legs[i].position.y = hip + hop_y
+		if lift <= 0.05:
+			legs[i].rotation.x += kick + hop_tip * side * sin(air * PI)
+		elif state == State.TRICK:
+			legs[i].rotation.x = kick
+		arms[i].rotation.x += -lean * 0.6 - 0.25 * sin(air * PI)
+		if boxing:
+			arms[i].rotation.x -= 0.5 + 0.9 * maxf(sin(anim_t * 15.0 + i * PI), 0.0)
+		ears[i].rotation.x = -hop_lag * 0.8 - 0.06 * minf(Vector2(velocity.x, velocity.z).length(), 3.0)
+		ears[i].rotation.z -= side * hop_lag * 0.15 * young
 
 
 # ---------------------------------------------------------------- animation
@@ -5230,6 +5729,15 @@ func _animate(delta: float) -> void:
 		shoulders.position.y = -baby_sink * young
 		for a in arms:
 			a.scale.y = reach * lerpf(1.0, 0.72, young)
+	if stub != null:
+		stub.scale = Vector3.ONE.lerp(stub_young, young)
+		# In the water its tail comes up out of it behind, and now and then slaps down
+		var wet := clampf(-_sunk() / (0.12 * grow), 0.0, 1.0) * (1.0 - curl)
+		loll = lerpf(loll, wet, ease_slow)
+		stub.rotation.x = loll * (0.5 + 0.16 * sin(anim_t * 1.7) - 0.3 * pow(maxf(sin(anim_t * 0.9), 0.0), 8.0))
+		# And on dry floor it hauls itself along on its arms, bunching up and stretching out
+		torso.scale.z *= 1.0 + sin(phase * 2.0) * 0.1 * gait
+		torso.rotation.x -= maxf(sin(phase * 2.0), 0.0) * 0.16 * gait
 	for foot in feet:
 		foot.scale = Vector3.ONE * 0.72 * lerpf(1.0, big_feet, young)
 	if absf(young - combed) > 0.02:

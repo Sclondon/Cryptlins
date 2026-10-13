@@ -37,6 +37,10 @@ const NOTES: Array[String] = [
 	"lets out a sour green mist from under its skirt, and any of the others standing in it comes over queasy until it clears",
 	"goes up into the vent and screams down it, which makes the others jump. It comes out black with soot and shakes it off",
 	"spits. It does no harm to anything, but it leaves a yellow puddle for the broom",
+	"picks up the toy, or a stone off the floor if there is no toy, and throws it the length of the cellar with both hands",
+	"goes up in a hop and does not come down from it. It comes down somewhere else, and looks as surprised as I was",
+	"comes down in a dive and skims the pool with its beak. With no pool it knocks some small thing over on its way past, and the thing rights itself",
+	"sits up, on the rock if there is one, and combs its hair with its fingers until the lamp glints off it. The others stop and look",
 ]
 # How likely it is to take a turn at it, next to the 34 of wandering off
 const WEIGHT := 7.0
@@ -85,6 +89,14 @@ var fog: Node3D
 var soot: ShaderMaterial
 var hid := false
 var gob: MeshInstance3D
+# Where the kongamato took off from for its dive, and how far over what it has knocked is lying
+var launch := Vector3.ZERO
+var tipped := 0.0
+# The stone the yowie has scrabbled up to throw, which way it is going, and how often it has come
+# down
+var missile: MeshInstance3D
+var flung := Vector3.ZERO
+var bounces := 0
 
 
 func _init(whose: Cryptlin) -> void:
@@ -144,6 +156,14 @@ func ready() -> bool:
 			return pet.energy > 25.0 and Den.wade(pet.position) <= 0.0 and Den.wade(Den.in_room(_vent(), 0.4)) <= 0.0
 		Cryptlin.Kind.WORM:
 			return Den.wade(pet.position) <= 0.0 and _puddles() < 2
+		Cryptlin.Kind.YOWIE:
+			return pet.energy > 25.0 and Den.wade(pet.position) <= 0.0
+		Cryptlin.Kind.KANGAROO:
+			return pet.energy > 25.0 and Den.wade(pet.position) <= 0.0
+		Cryptlin.Kind.KONGAMATO:
+			return pet.energy > 25.0 and Den.wade(pet.position) <= 0.0 and (Den.shore != Den.Shore.NONE or _skittle() != null)
+		Cryptlin.Kind.MERMAID:
+			return world.light_on
 	return false
 
 
@@ -230,6 +250,26 @@ func begin() -> void:
 			if victim != null:
 				# (well out, and a little to one side, to leave it room to come in)
 				pet.target = Den.in_room(Den.shore_by(victim.position + Den.place(-1.0 if victim.position.x > 0.0 else 1.0, 0.0), -0.9), 0.5)
+		Cryptlin.Kind.YOWIE:
+			mark = _to_hand()
+			bounces = 0
+		Cryptlin.Kind.KANGAROO:
+			for i in 8:
+				pet.target = Den.on_dry(Vector3(randf_range(-Den.half.x, Den.half.x), 0, randf_range(-Den.half.y, Den.half.y)), 0.5, 0.4)
+				if pet.target.distance_to(pet.position) > 1.4:
+					break
+			height = 0.0
+		Cryptlin.Kind.KONGAMATO:
+			_aim()
+		Cryptlin.Kind.MERMAID:
+			mark = _perch()
+			if mark != null:
+				pet.target = Vector3(mark.position.x, 0, mark.position.z)
+			elif Den.shore != Den.Shore.NONE:
+				pet.target = Den.in_room(Den.shore_by(pet.position, -0.1), 0.4)
+			else:
+				pet.target = pet.position
+			height = 0.0
 
 
 func tick(delta: float) -> void:
@@ -286,6 +326,14 @@ func tick(delta: float) -> void:
 			_flue(delta)
 		Cryptlin.Kind.WORM:
 			_spit(delta)
+		Cryptlin.Kind.YOWIE:
+			_lob(delta)
+		Cryptlin.Kind.KANGAROO:
+			_vanish(delta)
+		Cryptlin.Kind.KONGAMATO:
+			_swoop(delta)
+		Cryptlin.Kind.MERMAID:
+			_comb(delta)
 		_:
 			finish()
 
@@ -337,6 +385,18 @@ func over() -> void:
 		hid = false
 		pet.visible = true
 	_swallow()
+	if missile != null:
+		missile.queue_free()
+		missile = null
+	if pet.kind == Cryptlin.Kind.KANGAROO:
+		pet.visible = true
+	if pet.kind == Cryptlin.Kind.KONGAMATO and tipped != 0.0:
+		tipped = 0.0
+		if is_instance_valid(mark):
+			mark.rotation.x = 0.0
+			mark.rotation.z = 0.0
+	if pet.tresses != null:
+		pet.tresses.set_shader_parameter("glow", 0.0)
 	spell = ""
 	caster = null
 
@@ -1338,6 +1398,9 @@ func _pass(delta: float) -> void:
 
 # Whether the nightcrawler is on its way through this thing just now, and so is not kept off it
 func through(thing: Decor) -> bool:
+	# (nor is the mermaid kept off the rock it is getting up on to comb its hair)
+	if pet.kind == Cryptlin.Kind.MERMAID and pet.state == Cryptlin.State.TRICK and pet.step >= 1 and thing == mark:
+		return true
 	return pet.kind == Cryptlin.Kind.NIGHTCRAWLER and pet.state == Cryptlin.State.TRICK and pet.step >= 2 and thing == mark
 
 
@@ -1787,3 +1850,388 @@ func _puddles() -> int:
 		if m.kind == Mess.Kind.PUDDLE:
 			count += 1
 	return count
+# The yowie throws things. The toy, if it is lying still: it goes and gets it, lifts it over its
+# head in both hands and throws it the length of the room. With no toy to hand it scrabbles a
+# stone up off the floor and throws that, and the stone clatters down, bounces and is gone
+func _lob(delta: float) -> void:
+	var world := pet.world
+	if mark != null and pet.step < 3 and not _has(mark):
+		finish()
+		return
+	var ahead := Vector3(sin(pet.yaw), 0, cos(pet.yaw))
+	var hands := pet.global_position + Vector3(0, pet.top() + 0.14 * pet.grow, 0) - ahead * 0.06 * pet.grow
+	match pet.step:
+		0:
+			if mark != null:
+				# Over to the toy, and it has hold of it
+				pet.gaze = mark.global_position
+				if pet._steer(Vector3(mark.position.x, 0, mark.position.z), Cryptlin.WALK * 1.3, delta, 0.25 * pet.grow + 0.12):
+					(mark as Ball).held = true
+					(mark as Ball).vel = Vector3.ZERO
+					carrying = true
+					_next()
+				elif pet.state_time > 7.0:
+					finish()
+				return
+			# Or it feels about on the floor for a stone
+			pet._halt(delta)
+			pet.nod = 0.5
+			pet.arm_goal = Vector3(-0.9, 0.0, 0.1)
+			pet.arm_wave = 0.5
+			pet.gaze = pet.global_position + ahead * 0.4
+			if _beat(0.3, delta):
+				world.crumbs(pet.global_position + ahead * 0.3 * pet.grow + Vector3(0, 0.05, 0), Den.DUST)
+				world.sfx.play("sweep", 1.3, -14.0)
+			if pet.state_time > 0.9:
+				missile = Ps1.part(world, Ps1.ball(), Ps1.mat(Color(0.4, 0.38, 0.36), 0.0, 0.3), hands, Vector3(0.085, 0.065, 0.075) * pet.grow)
+				_next()
+		1:
+			# Up over its head with it, and it leans back
+			pet._halt(delta)
+			if pet.state_time < delta * 1.5:
+				# (the long way of the room, away from whichever end it is nearer)
+				pet.target = Den.on_dry(Vector3(Den.half.x * (-0.75 if pet.position.x > 0.0 else 0.75), 0, pet.position.z + randf_range(-0.5, 0.5)), 0.4, 0.3)
+				pet._cry("grumble", 0.8)
+			pet._face(pet.target, delta)
+			pet.gaze = pet.target + Vector3(0, 0.6, 0)
+			pet.arm_goal = Vector3(-3.3, 0.0, 0.25)
+			pet.nod = -0.25
+			pet.mouth_goal = 0.3
+			_carry(hands)
+			if pet.state_time > 1.0:
+				# And away it goes
+				var way := Vector3(pet.target.x - pet.position.x, 0, pet.target.z - pet.position.z)
+				var fling := way.normalized() * clampf(way.length() * 1.25, 2.4, 4.6) + Vector3.UP * 3.3
+				if mark != null:
+					var toy := mark as Ball
+					toy.held = false
+					toy.vel = fling * toy.heft
+					carrying = false
+					world._notice_ball()
+				else:
+					flung = fling
+				pet._cry("coo", 0.6)
+				pet.squash_v = 2.5
+				done = true
+				_next()
+		2:
+			# It watches it go, arms flung out after it
+			pet._halt(delta)
+			pet.arm_goal = Vector3(-1.5, 0.0, 0.5)
+			pet.mouth_goal = 0.9
+			pet.eye_goal = 1.2
+			if mark != null:
+				pet.gaze = mark.global_position if is_instance_valid(mark) else pet.target
+			elif missile != null:
+				pet.gaze = missile.global_position
+				flung.y -= 11.0 * delta
+				missile.position += flung * delta
+				missile.rotate_x(delta * 9.0)
+				if missile.position.y < 0.04 or absf(missile.position.x) > Den.half.x - 0.1 or absf(missile.position.z) > Den.half.y - 0.1:
+					var at := Den.in_room(missile.position, 0.1)
+					missile.position = Vector3(at.x, 0.04, at.z)
+					bounces += 1
+					if Den.wade(at) > 0.0:
+						world.splash(at)
+						bounces = 3
+					else:
+						world.crumbs(Vector3(at.x, 0.06, at.z), Den.DUST)
+						world.sfx.play("click", 0.55, -4.0)
+					flung = Vector3(flung.x * 0.45, absf(flung.y) * 0.4, flung.z * 0.45)
+					if bounces >= 3:
+						missile.queue_free()
+						missile = null
+			if pet.state_time > 1.5 and missile == null:
+				_next()
+		3:
+			# And is pleased with itself
+			pet._halt(delta)
+			pet.gaze = world.camera.global_position
+			pet.mouth_goal = 0.8
+			if pet.state_time < delta * 1.5:
+				pet.hop(1.9)
+				pet._cry("grumble", 1.2)
+			if pet.state_time > 0.8:
+				finish()
+
+
+# What the yowie has over its head is kept in its hands
+func _carry(hands: Vector3) -> void:
+	if mark != null:
+		mark.global_position = hands
+		(mark as Ball).vel = Vector3.ZERO
+	elif missile != null:
+		missile.global_position = hands
+
+
+# The toy, if it is lying still on dry floor for the yowie to pick up
+func _to_hand() -> Ball:
+	var toy := pet.world.ball
+	if toy != null and is_instance_valid(toy) and not toy.held and toy.speed() < 0.5 and Den.wade(toy.position) <= 0.0:
+		return toy
+	return null
+
+
+# The phantom kangaroo goes up in a hop and does not come down from it: at the top it is not
+# there, and a moment later it is in the air over another part of the floor, and comes down there
+func _vanish(delta: float) -> void:
+	var world := pet.world
+	var mist := Color(0.8, 0.88, 1.0)
+	match pet.step:
+		0:
+			# It gathers itself, facing the way it means to go
+			pet._halt(delta)
+			pet._face(pet.target, delta)
+			pet.gaze = pet.target + Vector3(0, 0.5, 0)
+			pet.sit_goal = 0.5
+			if pet.state_time > 0.6:
+				pet._cry("boing", 1.2, -4.0)
+				pet.squash_v = -2.0
+				_next()
+		1:
+			# Up, and a little way along
+			pet.sit_goal = 0.0
+			pet.gaze = pet.target + Vector3(0, 0.8, 0)
+			var rise := minf(pet.state_time / 0.42, 1.0)
+			height = 1.15 * pet.grow * sin(rise * PI * 0.5)
+			pet.velocity = (pet.target - pet.position).normalized() * 1.3
+			if rise >= 1.0:
+				# And at the top of it, gone
+				world.crumbs(pet.body_centre(), mist)
+				world.sfx.play("jingle", 0.45, -8.0)
+				pet.visible = false
+				pet.velocity = Vector3.ZERO
+				far = pet.position
+				_next()
+		2:
+			# Nowhere, for a moment
+			pet.velocity = Vector3.ZERO
+			if pet.state_time > 0.75:
+				pet.position.x = pet.target.x
+				pet.position.z = pet.target.z
+				pet.yaw = atan2(far.x - pet.target.x, far.z - pet.target.z) + randf_range(-0.6, 0.6)
+				pet.visible = true
+				world.crumbs(pet.global_position + Vector3(0, height + pet.centre_y * pet.grow, 0), mist)
+				world.sfx.play("jingle", 0.6, -10.0)
+				done = true
+				spun = 0.0
+				_next()
+		3:
+			# And down, where it had no business to be
+			pet.velocity = Vector3.ZERO
+			pet.eye_goal = 1.3
+			spun += delta * pet.gravity
+			height = maxf(height - spun * delta, 0.0)
+			if height <= 0.0:
+				pet.squash_v = 3.6
+				world.sfx.play("thud", 1.3, -8.0)
+				world.crumbs(pet.global_position + Vector3(0, 0.05, 0), Den.DUST)
+				_next()
+		4:
+			# It looks about it, to see where that is
+			pet._halt(delta)
+			pet.eye_goal = 1.25
+			var about := sin(pet.state_time * 5.0) * 1.2
+			pet.gaze = pet.global_position + Vector3(sin(pet.yaw + about), 0.25, cos(pet.yaw + about)) * 2.0
+			if pet.state_time > 1.1:
+				pet._cry("chirp", 0.9)
+				finish()
+				return
+	pet.lift = height
+
+
+# The kongamato flies up, comes down in a long dive and skims the pool with its beak trailing in
+# the water, and lands on the far side. With no pool it dives at some small thing in the room
+# instead and bowls it over on its way past; the thing rocks, and rights itself where it stood
+func _swoop(delta: float) -> void:
+	var world := pet.world
+	var thing := mark as Decor
+	if mark != null and (not is_instance_valid(thing) or thing.is_queued_for_deletion() or thing == world.held_thing):
+		mark = null
+		finish()
+		return
+	var high := 0.95
+	# (no lower than this over the water, or it would be taken for something wading in it)
+	var low := 0.3
+	match pet.step:
+		0:
+			# Up off the floor, looking at what it means to come down on
+			pet._halt(delta)
+			pet._face(far, delta)
+			pet.gaze = far + Vector3(0, 0.1, 0)
+			pet.flying = true
+			pet.lift = move_toward(pet.lift, high, delta * 1.5)
+			if pet.state_time < delta * 1.5:
+				pet._cry("squeak", 0.7)
+			if pet.lift >= high:
+				launch = pet.position
+				_next()
+		1:
+			# The dive: down the one side of a curve, low across the middle of it, and up the other
+			var path := launch.distance_to(far) + far.distance_to(pet.target)
+			var u := minf(pet.state_time * 2.3 / maxf(path, 0.5), 1.0)
+			# (a curve that goes through `far` at the middle of it)
+			var bend := far * 2.0 - (launch + pet.target) * 0.5
+			var at := launch.lerp(bend, u).lerp(bend.lerp(pet.target, u), u)
+			var on := launch.lerp(bend, u + 0.03).lerp(bend.lerp(pet.target, u + 0.03), u + 0.03)
+			pet.velocity = Vector3.ZERO
+			pet.position.x = at.x
+			pet.position.z = at.z
+			pet.yaw = lerp_angle(pet.yaw, atan2(on.x - at.x, on.z - at.z), 1.0 - exp(-delta * 10.0))
+			pet.lift = lerpf(high, low, sin(u * PI))
+			pet.rotation.x = 0.55 * cos(u * PI) * sin(u * PI) * 2.0
+			pet.flying = true
+			pet.mouth_goal = 0.8
+			pet.gaze = Vector3(on.x, 0.0, on.z)
+			if thing == null:
+				if u > 0.3 and u < 0.7 and Den.wade(at) > 0.0 and _beat(0.09, delta):
+					world.splash(at)
+					done = true
+			elif u >= 0.5 and tipped == 0.0:
+				tipped = 1.0
+				spun = 0.0
+				world.sfx.play("thud", 1.5, -6.0)
+				world.crumbs(thing.position + Vector3(0, 0.2, 0), Den.DUST)
+				done = true
+			if u >= 1.0:
+				_next()
+		2:
+			# Down onto dry floor, wings out
+			pet._halt(delta)
+			pet.flying = true
+			pet.rotation.x = 0.0
+			pet.lift = move_toward(pet.lift, 0.0, delta * 1.6)
+			if pet.lift <= 0.0:
+				pet.flying = false
+				pet.squash_v = 2.5
+				pet._cry("chirp", 0.8)
+				_next()
+		3:
+			# And it looks round at what it has done
+			pet._halt(delta)
+			pet.gaze = far + Vector3(0, 0.15, 0)
+			pet._face(far, delta)
+			if pet.state_time > (1.6 if thing != null else 1.0):
+				finish()
+				return
+	if tipped != 0.0 and thing != null:
+		# Over it goes, and rocks, each time less far, until it is standing as it was
+		spun += delta
+		var over := 1.25 * exp(-spun * 2.2) * cos(spun * 7.0) if spun > 0.12 else 1.25 * spun / 0.12
+		var way := (pet.target - launch).normalized().rotated(Vector3.UP, -thing.rotation.y)
+		thing.rotation.x = over * way.z
+		thing.rotation.z = -over * way.x
+
+
+# What the kongamato dives at, and where it comes down after: the middle of the pool if there is
+# one, or else some small thing standing in the room, and dry floor on the far side of either
+func _aim() -> void:
+	var world := pet.world
+	tipped = 0.0
+	if Den.shore != Den.Shore.NONE:
+		far = world.wading_spot(pet.position)
+		# (along the water, not straight in and out of it)
+		for i in 12:
+			pet.target = Den.on_dry(Vector3(randf_range(-Den.half.x, Den.half.x), 0, randf_range(-Den.half.y, Den.half.y)), 0.5, 0.4)
+			if pet.target.distance_to(pet.position) > 1.6:
+				break
+		return
+	mark = _skittle()
+	if mark != null:
+		far = Vector3(mark.position.x, 0, mark.position.z)
+		var on := far - Vector3(pet.position.x, 0, pet.position.z)
+		on = on.normalized() if on.length() > 0.05 else Vector3.BACK
+		pet.target = Den.on_dry(far + on * 1.2, 0.5, 0.4)
+
+
+# Some small thing standing on dry floor for the kongamato to bowl over
+func _skittle() -> Decor:
+	var world := pet.world
+	var fair: Array[Decor] = []
+	for d in world.decors:
+		if d.kind in [Decor.Kind.SKULL, Decor.Kind.CRYSTAL, Decor.Kind.PUMPKIN, Decor.Kind.FERN, Decor.Kind.DISH, Decor.Kind.POT] and d != world.held_thing and Den.wade(d.position) <= 0.0:
+			fair.append(d)
+	return fair.pick_random() if not fair.is_empty() else null
+
+
+# The mermaid combs its hair: up on the rock if there is one, or else at the edge of the pool,
+# or else where it is. It sits up with its head on one side and runs its fingers through it, the
+# lamp glints off it, and the others stop and look
+func _comb(delta: float) -> void:
+	var world := pet.world
+	var rock := mark as Decor
+	if not world.light_on or (mark != null and (not is_instance_valid(rock) or rock.is_queued_for_deletion() or rock == world.held_thing)):
+		finish()
+		return
+	match pet.step:
+		0:
+			pet.gaze = pet.target + Vector3(0, 0.3, 0)
+			var near := rock.radius + 0.28 * pet.grow if rock != null else 0.15
+			if pet._steer(pet.target, Cryptlin.WALK * 1.2, delta, near) or pet.state_time > 8.0:
+				if rock != null:
+					pet.hop(2.2)
+				_next()
+		1:
+			# Up onto the rock (or sat up where it is)
+			pet._halt(delta)
+			pet.sit_goal = 1.0
+			pet.gaze = world.camera.global_position
+			pet._face(pet.gaze, delta)
+			if rock != null:
+				var up := 1.0 - exp(-delta * 6.0)
+				pet.position.x = lerpf(pet.position.x, pet.target.x, up)
+				pet.position.z = lerpf(pet.position.z, pet.target.z, up)
+				height = lerpf(height, 0.4, up)
+			if pet.state_time > 0.8:
+				_next()
+		2:
+			# One hand up to its hair and down the length of it, over and over
+			pet._halt(delta)
+			pet.sit_goal = 1.0
+			pet.gaze = world.camera.global_position + Vector3(1.5, 0.5, 0)
+			pet._face(world.camera.global_position, delta)
+			pet.roll_goal = 0.32
+			pet.eye_goal = 0.55
+			pet.wag = 1.5
+			var stroke := fmod(pet.state_time, 0.9) / 0.9
+			pet.arm_goal = Vector3(lerpf(-2.9, -1.9, stroke), 0.0, 0.55)
+			pet.mouth_goal = 0.2 + 0.15 * sin(pet.state_time * 4.0)
+			var shine := maxf(sin(pet.state_time * 7.0), 0.0)
+			pet.tresses.set_shader_parameter("glow", 0.15 + 0.55 * shine * shine)
+			if _beat(0.45, delta):
+				var hair := pet.neck.global_position + Vector3(randf_range(-0.15, 0.15), randf_range(0.0, 0.3), randf_range(-0.1, 0.05)) * pet.grow
+				world.crumbs(hair, Color(1.0, 0.97, 0.8))
+				world.sfx.play("jingle", randf_range(1.5, 2.1), -16.0)
+			if pet.state_time > 1.2 and not done:
+				done = true
+				for other in world.pets():
+					if other != pet and other.state in Cryptlin.INTERRUPTIBLE:
+						other.glance_time = 2.5
+						other.glance_point = pet.global_position + Vector3(0, pet.top(), 0)
+			if pet.state_time > 4.6:
+				pet.tresses.set_shader_parameter("glow", 0.0)
+				if rock != null:
+					pet.target = pet._footing(pet.position + Vector3(sin(pet.yaw), 0, cos(pet.yaw)) * (rock.radius + 0.35 * pet.grow), 0.4)
+				_next()
+		3:
+			# And down again
+			pet._halt(delta)
+			if rock != null:
+				var down := 1.0 - exp(-delta * 5.0)
+				pet.position.x = lerpf(pet.position.x, pet.target.x, down)
+				pet.position.z = lerpf(pet.position.z, pet.target.z, down)
+				height = move_toward(height, 0.0, delta * 1.2)
+			if height <= 0.0 and pet.state_time > 0.4:
+				pet._cry("coo", 1.2)
+				finish()
+				return
+	pet.lift = height
+
+
+# The rock, for the mermaid to sit on while it combs its hair, if there is one on dry floor
+func _perch() -> Decor:
+	var world := pet.world
+	for d in world.decors:
+		if d.kind == Decor.Kind.ROCK and d != world.held_thing and Den.wade(d.position) <= 0.0:
+			return d
+	return null

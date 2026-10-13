@@ -20,6 +20,10 @@ const SHELLS: Array[Color] = [
 	Color(0.68, 0.14, 0.1), Color(0.55, 0.45, 0.32), Color(0.1, 0.14, 0.22), Color(0.62, 0.72, 0.82), Color(0.13, 0.11, 0.12),
 	Color(0.36, 0.27, 0.2), Color(0.88, 0.88, 0.84), Color(0.2, 0.2, 0.5), Color(0.4, 0.28, 0.18),
 	Color(0.1, 0.19, 0.16), Color(0.33, 0.16, 0.13), Color(0.62, 0.1, 0.08),
+	Color(0.74, 0.58, 0.36),
+	Color(0.4, 0.44, 0.5),
+	Color(0.4, 0.12, 0.1),
+	Color(0.8, 0.5, 0.52),
 ]
 const MARKS: Array[Color] = [
 	Color(0.2, 0.3, 0.15), Color(0.2, 0.16, 0.12), Color(0.5, 0.18, 0.1), Color(0.6, 0.58, 0.56), Color(0.45, 0.14, 0.1),
@@ -28,6 +32,10 @@ const MARKS: Array[Color] = [
 	Color(0.9, 0.87, 0.78), Color(0.9, 0.87, 0.8), Color(0.4, 1.0, 0.5), Color(0.95, 0.97, 1.0), Color(0.62, 0.1, 0.08),
 	Color(0.17, 0.12, 0.09), Color(0.3, 0.32, 0.38), Color(0.92, 0.72, 0.22), Color(0.16, 0.1, 0.07),
 	Color(0.8, 0.14, 0.1), Color(0.82, 0.76, 0.62), Color(0.3, 0.04, 0.05),
+	Color(0.56, 0.24, 0.1),
+	Color(0.14, 0.18, 0.28),
+	Color(0.1, 0.07, 0.08),
+	Color(0.94, 0.84, 0.8),
 ]
 const TITLES: Array[String] = [
 	"A mossy egg", "A streaky egg", "A speckled egg", "A silk-wound egg", "A thorn-patterned egg",
@@ -36,9 +44,13 @@ const TITLES: Array[String] = [
 	"A toadstool egg", "A dappled egg", "A starry egg", "A frosted egg", "An ember-veined egg",
 	"A tunnelled egg", "A long-shanked egg", "A gold-braided egg", "A bristly egg",
 	"A spade-marked egg", "A hoof-printed egg", "A banded egg",
+	"A shaggy egg",
+	"A moon-pale egg",
+	"A leathery egg",
+	"A scalloped egg",
 ]
 # How much of its own light each shell gives off, and how wide and how tall it is next to the usual
-const GLOWS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.35, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+const GLOWS: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.35, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.0, 0.0]
 const SHAPES: Array[Vector2] = [
 	Vector2(1.0, 1.0), Vector2(1.06, 1.04), Vector2(0.96, 0.98), Vector2(0.95, 1.06), Vector2(0.94, 1.04),
 	Vector2(1.06, 0.94), Vector2(1.0, 1.06), Vector2(1.08, 0.96), Vector2(0.92, 1.08),
@@ -46,6 +58,10 @@ const SHAPES: Array[Vector2] = [
 	Vector2(1.08, 0.92), Vector2(1.0, 0.94), Vector2(0.94, 1.08), Vector2(1.08, 1.06), Vector2(1.04, 1.0),
 	Vector2(1.08, 0.95), Vector2(0.9, 1.1), Vector2(0.98, 1.02), Vector2(1.1, 0.95),
 	Vector2(0.94, 1.1), Vector2(0.98, 1.04), Vector2(1.0, 1.1),
+	Vector2(1.1, 0.97),
+	Vector2(0.95, 1.08),
+	Vector2(0.94, 1.1),
+	Vector2(1.04, 0.96),
 ]
 
 var world: Den
@@ -281,6 +297,38 @@ func _paint(x: int, y: int) -> Color:
 			if y % 5 == 0:
 				return mark
 			return shell_colour.lightened(0.16) if y % 5 == 2 else shell_colour
+		Cryptlin.Kind.YOWIE:
+			# Sand, with rust-red hair hanging down it in three ragged rows
+			var hang := (y + 3) % 10
+			if hang < 3 + (x * 7 + (y / 10) * 5) % 5:
+				return mark if (x + y / 10) % 3 != 0 else mark.lightened(0.2)
+			return shell_colour.darkened(0.1) if chance == 0 else shell_colour
+		Cryptlin.Kind.KANGAROO:
+			# Ash, with the long prints of a pair of feet going round it in hops, and a gap where
+			# one hop in three ought to have come down
+			var along := x % 12
+			var hop := x / 12
+			if hop % 3 != 2 and y >= 17 and y <= 25 and along in [2, 3, 7, 8] and (y < 23 or along < 4):
+				return mark
+			if hop % 3 != 2 and y == 9 + absi(along - 5) and along % 3 != 0:
+				return mark.lightened(0.3)
+			return shell_colour.lightened(0.1) if chance < 2 else shell_colour
+		Cryptlin.Kind.KONGAMATO:
+			# Red leather, creased, with the long dark fingers of a wing spread down it from the top
+			var finger := (x + 64 - y / 3) % 16
+			if finger == 0 or (finger == 15 and y > 20):
+				return mark
+			if y == 26 - absi(finger - 8) / 2:
+				return mark
+			return shell_colour.darkened(0.3) if (x * 3 + y * 5) % 13 == 0 else shell_colour
+		Cryptlin.Kind.MERMAID:
+			# A scallop shell: pale ribs fanning down it from the top, growth rings across them, and
+			# a wavy edge near the bottom with mother-of-pearl under it
+			if y > 25 + int(sin(x * PI / 4.0) * 1.5):
+				return Color(0.7, 0.86, 0.88) if (x + y) % 3 == 0 else mark
+			if x % 8 == 0 or (x % 8 == 1 and y > 14):
+				return mark
+			return shell_colour.darkened(0.18) if y % 7 == 3 else shell_colour
 	return shell_colour
 
 

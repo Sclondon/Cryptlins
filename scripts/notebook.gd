@@ -102,6 +102,10 @@ const KIND_NOTES: Array[String] = [
 	"Tall, in a dark skirt like pleated tin that goes down to the floor, with a round red face set in a hood the shape of the ace of spades. It does not walk, it glides, and it hisses.",
 	"The head of a horse on a long neck, the wings of a bat, the legs of a goat and a fork to its tail. Quick and loud, and it flies when it cares to.",
 	"A fat red worm, all rings, with a round mouth full of teeth at one end and no eyes anywhere. It crawls, and it digs.",
+	"A short wide heap of red or sandy hair with its knuckles on the floor. A flat face, most of it mouth, bandy legs, and feet that turn out.",
+	"A thin kangaroo the colour of ash, with eyes that shine. It goes everywhere in hops, upright, with its fists up in front of it.",
+	"A small flying lizard in red or black: leather wings, a crest, a tail like an oar, and a long beak with teeth in it. Loud, and it sits up on top of things.",
+	"A small person down to the waist and a fish from there on: a great deal of hair, a shell or a starfish in it as often as not, and one long scaled tail where the legs should be. It has no legs at all, and hauls itself along on its arms.",
 ]
 # And on each nature (Cryptlin.NATURES): each of them has two
 const NATURE_NOTES: Array[String] = [
