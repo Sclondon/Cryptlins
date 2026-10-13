@@ -51,6 +51,9 @@ const LIST: Array[Dictionary] = [
 const FREE: Array[String] = ["notebook", "scanner", "bone", "ball", "rags", "dirt"]
 # Used up when used: each one fed, or each egg laid, is one fewer on the shelf
 const SPENT: Array[String] = ["food", "egg"]
+# The order things stand in along the row, by id or by group: the scanner first and the notebook
+# last, whatever order LIST is in (which saves and the shop go by, and is not to be renumbered)
+const ROW: Array[String] = ["scanner", "food", "toy", "egg", "decor", "nest", "ground", "notebook"]
 # Never bought or sold: on the shelf only while the keeper has one put away
 const KEPT: Array[String] = ["marker"]
 

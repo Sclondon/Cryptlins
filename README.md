@@ -49,8 +49,9 @@ bored, sleepy, grumpy, scared, sad, disgusted, poorly). What it shows you of its
 
 ## The room and the things in it
 
-Everything the keeper has floats in a row along the bottom of the screen, as the things themselves: the notebook
-and the scanner, food, toys, things for the room, nests and trays of ground. Slide the row sideways to see the rest.
+Everything the keeper has floats in a row along the bottom of the screen, as the things themselves: the scanner
+first, then food, toys, the egg, things for the room, nests and trays of ground, and the notebook last. Slide the row
+sideways to see the rest.
 Tap a thing to use it, or drag it up off the row and let go where you want it.
 
 | Thing | What it does |

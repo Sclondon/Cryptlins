@@ -1416,13 +1416,15 @@ func _sync() -> void:
 	var marks := {}
 	var counts := {}
 	var out := {}
-	for item in Items.LIST:
-		var id: String = item["id"]
-		if not owns(id):
-			continue
-		have.append(id)
-		if item["group"] in Items.SPENT and left_of(id) >= 0:
-			counts[id] = left_of(id)
+	# In the order of the row (see Items.ROW), whatever order the list of them is kept in
+	for place: String in Items.ROW:
+		for item in Items.LIST:
+			var id: String = item["id"]
+			if (id != place and item["group"] != place) or not owns(id):
+				continue
+			have.append(id)
+			if item["group"] in Items.SPENT and left_of(id) >= 0:
+				counts[id] = left_of(id)
 	if have.has("marker"):
 		counts["marker"] = markers_away.size()
 	# The marks are what is known of the one in question
@@ -2243,6 +2245,9 @@ func _press(e: InputEventScreenTouch) -> void:
 		grab = Grab.LAMP
 	elif ball != null and _ray_hits(e.position, ball.global_position, 0.5):
 		_hold_ball(e.position)
+	elif _snack_at(e.position) != null:
+		held_snack = _snack_at(e.position)
+		_hold_snack(e.position, true)
 	elif _resident_at(e.position) != null:
 		# One of them: it is the one in question from now on
 		chosen = _resident_at(e.position)
@@ -2251,9 +2256,6 @@ func _press(e: InputEventScreenTouch) -> void:
 		grab = Grab.EGG if held_egg != null else Grab.PET
 		carrying = false
 		_sync()
-	elif _snack_at(e.position) != null:
-		held_snack = _snack_at(e.position)
-		_hold_snack(e.position, true)
 	else:
 		held_thing = _thing_at(e.position)
 		if held_thing != null:
@@ -2302,7 +2304,10 @@ func _held_at(at: Vector2, height: float) -> Vector3:
 func _snack_at(at: Vector2) -> Snack:
 	for s in snacks:
 		if s.landed and _ray_hits(at, s.position + Vector3(0, 0.08, 0), 0.34):
-			return s
+			# (one of them standing behind it does not get in the way: the nearer is meant)
+			var behind := _resident_at(at)
+			if behind == null or camera.global_position.distance_to(s.position) < camera.global_position.distance_to(behind.body().position):
+				return s
 	return null
 
 
@@ -2420,9 +2425,10 @@ func _release() -> void:
 						_sync()
 					held_snack.queue_free()
 				else:
-					# Let go: it comes inside the walls and falls, and is anybody's
+					# Let go: it comes inside the walls (and far enough back not to lie under the row
+					# of things, where a finger could not get at it again) and falls, and is anybody's
 					var from := in_room(held_snack.position, 0.3)
-					held_snack.drop(Vector3(from.x, maxf(from.y, 0.0), from.z))
+					held_snack.drop(Vector3(from.x, maxf(from.y, 0.0), minf(from.z, half.y - 0.9)))
 					if snack_lying:
 						snacks.append(held_snack)
 					else:

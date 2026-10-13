@@ -225,7 +225,7 @@ func _run() -> void:
 	pet.position = Vector3(-1.6, 0, -1.2)
 	pet._enter(Cryptlin.State.IDLE, 30.0)
 	var from_row := _on_shelf(food)
-	var above := from_row - Vector2(0, 220)
+	var above := _screen(Vector3(0.5, 0.75, 1.0))
 	_touch(from_row, true)
 	await _frames(2)
 	for i in 10:
