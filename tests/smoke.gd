@@ -1650,25 +1650,42 @@ func _run() -> void:
 	await _frames(5)
 	check(main.residents.size() == 1 and main.who().egg != null and main.who().kind == kind and main.who().egg.warmth > 39.0, "an old save of an egg loads as that egg")
 
-	# Inside a site with a shop, eggs are stock; but nobody is left without one
+	# Inside a host page eggs are stock, and a room is never given one for nothing: it stands
+	# empty until the keeper lays one of their own, which the wheel holds out to them
 	main.dev_show(kind)
 	await _frames(10)
 	main.embedded = true
 	main.stock = {}
 	main._sync()
-	check(not main.shelf.ids.has("egg"), "with a shop, there are no eggs on the shelf until one is bought")
+	check(not main.shelf.ids.has("egg"), "inside a host page, there are no eggs on the wheel until one is given")
 	main.use("egg")
 	check(main.residents.size() == 1, "and none to lay")
 	main.ask_let_go(main.who())
 	main._answer(true)
-	check(await _until(func() -> bool: return main.who().egg != null, 1200) and main.residents.size() == 1, "but a room left empty is still sent an egg for nothing")
+	check(await _until(func() -> bool: return main.residents.is_empty(), 1200), "the last one let go leaves the room empty")
+	await _frames(120)
+	main.use("egg")
+	main.notebook.open()
+	main.notebook.close()
+	check(main.residents.is_empty() and main.who() == null and main.shelf.beckon == "", "and empty it stays, with no egg in stock")
 	main.stock = {"egg": 1}
 	main._sync()
-	check(main.shelf.ids.has("egg") and main.shelf.counts.get("egg") == 1, "an egg bought is on the shelf")
+	var middle := root.get_final_transform() * (main.shelf.global_position + Vector2(main.shelf.size.x * 0.5, 0))
+	check(main.shelf.ids.has("egg") and main.shelf.counts.get("egg") == 1 and main.shelf.beckon == "egg" and absf(_on_shelf("egg").x - middle.x) < 4.0, "an egg in stock is at the middle of the wheel, asking to be picked")
+	await _tap(_on_shelf("egg"))
+	check(main.residents.size() == 1 and main.who().egg != null and main.left_of("egg") == 0 and not main.shelf.ids.has("egg") and main.shelf.beckon == "", "a tap lays it, and the stock goes to none")
 	main.use("egg")
-	check(main.residents.size() == 2 and main.left_of("egg") == 0 and not main.shelf.ids.has("egg"), "and is used up when it is laid")
-	main.use("egg")
-	check(main.residents.size() == 2, "after which there are no more")
+	check(main.residents.size() == 1, "after which there are no more")
+	main.queue_free()
+	await _frames(3)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
+	main = load("res://main.tscn").instantiate()
+	main.save_path = save
+	main.ask_names = false
+	main.embedded = true
+	root.add_child(main)
+	await _frames(30)
+	check(main.residents.is_empty(), "a new game inside a host page starts with an empty room")
 	main.embedded = false
 	main._sync()
 

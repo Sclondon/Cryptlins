@@ -47,7 +47,8 @@ const LIST: Array[Dictionary] = [
 	{"id": "gravel", "group": "ground", "n": 6, "name": "Gravel"},
 ]
 # What every keeper has without buying it. The rest come from the shop when the game is played
-# inside a site that keeps one (see Den.stock); played by itself, everything is on the shelf.
+# inside a site that keeps one (see Den.stock), eggs among them: a room there is never given an
+# egg for nothing. Played by itself, everything is on the shelf.
 const FREE: Array[String] = ["notebook", "scanner", "bone", "ball", "rags", "dirt"]
 # Used up when used: each one fed, or each egg laid, is one fewer on the shelf
 const SPENT: Array[String] = ["food", "egg"]

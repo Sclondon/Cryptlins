@@ -39,6 +39,9 @@ var out := {}
 # Which spot is at the top of the wheel, and how fast that is changing
 var turn := 0.0
 var speed := 0.0
+# The thing that asks to be picked up just now ("" for none): it bobs higher than the rest,
+# turns right round, and glints
+var beckon := ""
 var held := false
 var t := 0.0
 
@@ -268,6 +271,9 @@ func _place() -> void:
 		var spin: Node3D = stand.get_child(0)
 		spin.position.y = -0.3 + sin(t * 1.3 + i * 2.3) * 0.03
 		spin.rotation.y = 0.35 + a * 0.9 + sin(t * 0.9 + i * 1.7) * 0.35
+		if ids[i] == beckon:
+			spin.position.y = -0.3 + absf(sin(t * 3.2)) * 0.12
+			spin.rotation.y = t * 2.4
 
 
 # What is drawn sharp over the picture: the marks, each going round with its thing, and a hint
@@ -284,6 +290,12 @@ func _paint() -> void:
 		if at.x < -reach or at.x > w + reach or at.y > h + reach:
 			continue
 		var id := ids[i]
+		if id == beckon:
+			# A four-pointed glint that comes and goes at its shoulder
+			var spark := at + Vector2(reach * 0.26, -reach * 0.3 - absf(sin(t * 3.2)) * reach * 0.12)
+			var big := reach * 0.16 * maxf(sin(t * 5.0), 0.0)
+			if big > 1.0:
+				overlay.draw_colored_polygon(PackedVector2Array([spark + Vector2(0, -big), spark + Vector2(big * 0.22, -big * 0.22), spark + Vector2(big, 0), spark + Vector2(big * 0.22, big * 0.22), spark + Vector2(0, big), spark + Vector2(-big * 0.22, big * 0.22), spark + Vector2(-big, 0), spark + Vector2(-big * 0.22, -big * 0.22)]), Icons.BONE)
 		if out.get(id, false):
 			overlay.draw_circle(at + Vector2(0, reach * 0.46), 4.0, Icons.AMBER)
 		if marks.has(id):

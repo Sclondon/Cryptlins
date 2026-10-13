@@ -259,6 +259,13 @@ func _run_wheel() -> void:
 	main.shelf.show_item("fish")
 	await _wait(0.5)
 	await _snap("w5_shop")
+	# An empty room there, with an egg in stock: the wheel holds the egg out
+	main.stock = {"egg": 1}
+	main.ask_let_go(main.who())
+	main._answer(true)
+	await _until(func() -> bool: return main.residents.is_empty(), 20.0)
+	await _wait(0.6)
+	await _snap("w6_gift")
 	quit()
 
 

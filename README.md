@@ -93,9 +93,13 @@ baby goes more often and wherever it happens to be. A grown one, content and lef
 over-fond of its nest the way a dog does of a cushion, and is mortified if it is caught at it. M mutes the sound.
 
 ## More than one
-
-The room holds up to four, eggs and cryptlins together. A new game starts with one egg; the **egg** on the wheel of
-things drops in another (played by itself there is no end of them; inside a page with a shop an egg is stock, used
+The room holds up to four, eggs and cryptlins together. Played by itself a new game starts with one egg, and the
+**egg** on the wheel of things drops in another: there is no end of them. Inside a host page (the site the game is
+played in) eggs are stock, each used up when it is laid, and the room is never given one for nothing: every account
+there is sent a parcel with one egg in it, and opening it puts that egg in the stock and brings the keeper down to
+the basement. A new or emptied room there stands empty, with the wheel turned to the egg and the egg bobbing,
+turning and glinting on it, until the keeper taps it or drags it up into the room. Each has its own name, needs,
+age, natures, tastes and idea of a good home, so one room cannot
 up when it is laid). Each has its own name, needs, age, natures, tastes and idea of a good home, so one room cannot
 please them all. Food dropped in is for whoever gets there first: a greedy or a bold one pushes in, a shy one hangs
 back, two at one bit of food share it bite by bite, and one that will not eat a thing leaves it for the others. More
@@ -118,8 +122,9 @@ with nobody hurt. Two that are fed, at home and on good terms all but never figh
 below a third of its health; and a grown one does not fight a baby: it cuffs it out of the way, unhurt.
 
 **Let go** (on a cryptlin's page of the notebook) asks first, then that one waves and walks off into the dark. No
-egg comes in its place, unless the room is left with nobody in it: an empty room is always sent an egg for nothing.
-
+**Let go** (on a cryptlin's page of the notebook) asks first, then that one waves and walks off into the dark. No
+egg comes in its place, unless the room is left with nobody in it: played by itself, an empty room is always sent an
+egg for nothing (inside a host page it waits for one of the keeper's own, as above).
 ## Health, and dying
 
 Each has a **health**, 0 to 100, kept with its needs. It wears away while its belly is empty (all of it in four
@@ -240,7 +245,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock and the empty room inside a host page
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots --pool [--portrait] [--kind=N]   # four in a room with the pool: each place it fits, each lamp, one let go over the middle of it, food and a toy afloat, a drink at the edge, and all asleep

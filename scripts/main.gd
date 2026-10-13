@@ -238,11 +238,7 @@ func _ready() -> void:
 			_spawn_pet(r, on_dry(Vector3(randf_range(-1.0, 1.0), 0, randf_range(-0.6, 0.8)), 0.3, 0.2))
 		else:
 			_lay_egg(r, false)
-	if residents.is_empty():
-		# A new game, or a room with nobody left in it: one egg for nothing
-		new_egg(first_kind)
-		_say("An egg!")
-	elif pets().is_empty():
+	if not residents.is_empty() and pets().is_empty():
 		_say("Still an egg")
 	# They have been living their lives while the game was shut (grown, asleep, hungry, glad to
 	# see you: they show all that themselves)
@@ -250,6 +246,14 @@ func _ready() -> void:
 		pass_time(away)
 		away = 0.0
 	_bridge()
+	# A new game, or a room with nobody left in it. Played by itself it is given one egg for
+	# nothing. Inside a host page eggs are the keeper's own, out of the stock the page sends: the
+	# room stands empty until one is laid from the wheel, which shows which thing that is (see
+	# _sync).
+	if residents.is_empty() and not embedded:
+		new_egg(first_kind)
+		_say("An egg!")
+	_sync()
 
 
 # Keeps a point on the floor inside the walls, `margin` clear of them
@@ -631,7 +635,8 @@ func died(pet: Cryptlin) -> void:
 	crumbs(marker.position + Vector3(0, 0.1, 0), DUST)
 	if pets().is_empty():
 		_clear_toys()
-	if residents.is_empty():
+	# (the last of them, in a room played by itself: an egg comes for nothing)
+	if residents.is_empty() and not embedded:
 		new_egg(-1, r.kind)
 	_sync()
 	save_game()
@@ -806,8 +811,9 @@ func _on_left(r: Resident) -> void:
 	residents.erase(r)
 	if pets().is_empty():
 		_clear_toys()
-	if residents.is_empty():
-		# Nobody is left: an egg comes for nothing, and never the same kind twice running
+	if residents.is_empty() and not embedded:
+		# Nobody is left: an egg comes for nothing, and never the same kind twice running (but
+		# not inside a host page, where eggs are the keeper's own: see _ready)
 		if not light_on:
 			set_lamp(Lamp.BRIGHT)
 		new_egg(-1, r.kind)
@@ -834,7 +840,7 @@ func dev_show(kind: int, as_egg := false, new_look := false) -> void:
 	stop_scan()
 	ask.visible = false
 	namer.visible = false
-	var r := who()
+	var r := _dev_one()
 	var at := EGG_SPOT
 	if r.body() != null:
 		at = Vector3(r.body().position.x, 0, r.body().position.z)
@@ -865,17 +871,22 @@ func dev_show(kind: int, as_egg := false, new_look := false) -> void:
 	save_game()
 
 
+# The one the panel works on: the one in question, or in an empty room an egg put there for it
+func _dev_one() -> Resident:
+	return who() if who() != null else new_egg()
+
+
 func _dev_step(by: int) -> void:
-	dev_show(who().kind + by)
+	dev_show(_dev_one().kind + by)
 
 
 func _dev_look() -> void:
-	dev_show(who().kind, who().egg != null, true)
+	dev_show(_dev_one().kind, who().egg != null, true)
 
 
 # With a cryptlin: its egg instead. With an egg: hatch it now.
 func _dev_egg() -> void:
-	if who().egg != null:
+	if _dev_one().egg != null:
 		who().egg.warmth = 100.0
 	else:
 		dev_show(who().kind, true)
@@ -883,7 +894,7 @@ func _dev_egg() -> void:
 
 # Baby to adult and back
 func _dev_age() -> void:
-	var pet := who().pet
+	var pet := _dev_one().pet
 	if pet != null:
 		pet.age = 0.0 if not pet.is_baby() else Cryptlin.GROW_AGE
 		_sync()
@@ -1702,6 +1713,12 @@ func _sync() -> void:
 	shelf.counts = counts
 	shelf.out = out
 	shelf.stock(have)
+	# An empty room inside a host page, and an egg to lay in it: the wheel turns to the egg, which
+	# asks to be picked up (see Shelf.beckon) until it has been
+	var waiting := embedded and residents.is_empty() and have.has("egg")
+	if waiting and shelf.beckon == "":
+		shelf.show_item("egg")
+	shelf.beckon = "egg" if waiting else ""
 	if who() != null:
 		dev_label.text = "%d/%d\n%s" % [who().kind + 1, Cryptlin.KINDS.size(), Cryptlin.KINDS[who().kind]["title"]]
 		dev_egg.text = "Hatch" if who().egg != null else "Egg"
