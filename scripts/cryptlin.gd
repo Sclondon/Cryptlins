@@ -3046,7 +3046,8 @@ func _interrupt() -> bool:
 	elif bowel >= 100.0 or bladder >= 100.0:
 		_enter(State.TOILET)
 	elif belly < 97.0 and world.snack_for(self) != null and not _hangs_back():
-		_enter(State.GO_FOOD)
+		# (one whose knack is a way of getting at its food may use that)
+		_enter(State.TRICK if knack.fetches() else State.GO_FOOD)
 	elif world.light_dragging and _sees(world.light_point):
 		_enter(State.CHASE_LIGHT)
 	elif world.ball != null and ball_cooldown <= 0.0 and (world.ball.held or world.ball.speed() > 1.5) and _sees(world.ball.position):
@@ -3877,7 +3878,7 @@ func _has_partner() -> bool:
 func _someone() -> Cryptlin:
 	var free: Array[Cryptlin] = []
 	for other in world.pets():
-		if other != self and other.state in INTERRUPTIBLE and (needs_water() or Den.wade(other.position) <= 0.0):
+		if other != self and other.state in INTERRUPTIBLE and not other.knack.dread() and (needs_water() or Den.wade(other.position) <= 0.0):
 			free.append(other)
 	return free.pick_random() if not free.is_empty() else null
 
@@ -4195,6 +4196,9 @@ func _keep_off_others(delta: float) -> void:
 		if state == State.SLEEP and other.state != State.SLEEP:
 			continue
 		var room := 0.3 * (grow + other.grow)
+		# (and a wide berth for one that is to be dreaded just now)
+		if other.knack.dread():
+			room += 0.6
 		if state == State.SLEEP:
 			room *= 0.45 if world.standing(self, other) >= 60.0 else 0.75
 		_keep_off(other.position, room, delta)

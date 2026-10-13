@@ -252,6 +252,9 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 	main.play_ball(Ball.Kind.BALL)
 	main.ball.position = Vector3(-1.6, 0.2, 1.3)
 	main.ball.vel = Vector3.ZERO
+	if pet.kind in [Cryptlin.Kind.FROGMAN, Cryptlin.Kind.BOLTER]:
+		# (something to eat, lying a little way off)
+		main.feed((pet.yuck_food + 1) % Snack.NAMES.size(), Vector3(0.9, 1.5, 1.5))
 	for p: Cryptlin in [pet, mate]:
 		p.set_needs({"belly": 90.0, "energy": 90.0, "fun": 50.0, "health": 100.0, "bowel": 0.0, "bladder": 0.0})
 		p.fight_cooldown = 9999.0
@@ -260,7 +263,13 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 		p._enter(Cryptlin.State.IDLE, 60.0)
 	pet.position = Vector3(-0.6, 0, 0.9)
 	mate.position = Vector3(0.6, 0, 0.9)
+	mate.belly = 100.0
+	pet.belly = 100.0
 	await _frames(30)
+	await _until(func() -> bool: return main.snacks.all(func(food: Snack) -> bool: return food.landed), 300)
+	# (hungry enough to want what is lying there, for the one that fetches it with its knack)
+	if pet.kind == Cryptlin.Kind.FROGMAN:
+		pet.belly = 60.0
 	pet.knack.again = 0.0
 	check(pet.knack.ready(), "with what it needs to hand, it is ready to do it")
 	var turns := 0

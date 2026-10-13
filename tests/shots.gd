@@ -528,6 +528,12 @@ func _run_knack() -> void:
 		p._enter(Cryptlin.State.IDLE, 60.0)
 	pet.position = Vector3(-0.6, 0, 0.8)
 	mate.position = Vector3(0.6, 0, 0.8)
+	if pet.kind in [Cryptlin.Kind.FROGMAN, Cryptlin.Kind.BOLTER]:
+		mate.belly = 100.0
+		pet.belly = 100.0
+		main.feed((pet.yuck_food + 1) % Snack.NAMES.size(), Vector3(1.1, 1.0, 1.6))
+		await _wait(1.2)
+		pet.belly = 60.0
 	await _wait(0.6)
 	pet.knack.again = 0.0
 	pet._enter(Cryptlin.State.TRICK)

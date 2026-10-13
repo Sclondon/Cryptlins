@@ -144,6 +144,11 @@ of the notebook ("Its knack", a "?" until then).
 | cockatrice | Fixes one of the others with its eye until its own eyes blaze, and that one stands stiff and grey as stone for a few seconds. |
 | mothman | Flies up and circles the bulb, throwing its shadow over the room. It does so three times as often when there is trouble coming (one of them poorly, two of them close to blows), and then its eyes glare. |
 | chupacabra | Creeps up on the toy, or a thing in the room, gets its teeth into it and sucks. The thing is left shrivelled for most of a minute. |
+| Loveland frogman | Does not always trouble to walk to its food: from a little way off its tongue goes out, and the food comes back on the end of it, to be eaten where it sits. |
+| Loch Ness monster | Wades out, sinks until its hump is all there is to see, goes across the pool as a hump with a ripple after it, and comes up in another part of it. It needs the pool. |
+| slide-rock bolter | Goes to one side of the room, opens its mouth as far as it will go, and comes down the length of the floor like a landslide. Any food lying in its way goes in. |
+| wendigo | Where it stands still, frost creeps out over the floor round it, and is gone again in half a minute (a pale `Track`). And while it is hungry (belly under 35) the others give it a wide berth and will not go up to it. |
+| kelpie | Wades in, turns and calls to one of those that do not live in water, which comes down the bank and in after it as if walking in its sleep, wakes up wet, and has to scramble out. It needs the pool and somebody to call. |
 
 ## Health, and dying
 
@@ -237,7 +242,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `shaders/water.gdshader`, the sheet a little below it: the two have to be changed together. A cryptlin that does
   not live in water is stopped at the edge in `Cryptlin._move()`, and gets itself out (`State.FLOUNDER`) if it is
   ever further in.
-  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
+  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint or a patch of frost (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/knack.gd`: the one thing each kind does that no other does (see Knacks above).
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
   `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes. The scanner itself is
