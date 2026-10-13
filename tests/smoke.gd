@@ -82,7 +82,10 @@ func _looks(pet: Cryptlin) -> void:
 		for old: Color in Cryptlin.FURS[k]:
 			near = near or (absf(fur.r - old.r) + absf(fur.g - old.g) + absf(fur.b - old.b) < 0.45)
 		kept = kept and near
-	check(heads.size() >= 5 and coats.size() >= 5 and not odd.is_empty(), "forty seeds give heads of %d sizes, %d sorts of coat and %d odd things" % [heads.size(), coats.size(), odd.size()])
+	# (a kind whose coat takes only some of the markings has those and plain)
+	var takes: Array = Cryptlin.SHAPES[k].get("marks", [])
+	var sorts := 5 if takes.is_empty() else mini(5, takes.size() + 1)
+	check(heads.size() >= 5 and coats.size() >= sorts and not odd.is_empty(), "forty seeds give heads of %d sizes, %d sorts of coat and %d odd things" % [heads.size(), coats.size(), odd.size()])
 	check(kept, "each in a colour its kind has always had, with only the odd things its kind can have")
 	check(Cryptlin.new_seed() > Cryptlin.OLD_SEEDS, "a new one has a seed from since there were more colours")
 	check(pet.eye_sizes.size() == pet.eyes.size() and pet.head_size > 0.8 and pet.head_size < 1.35, "its own is built to its proportions")
@@ -143,6 +146,8 @@ func _tracker(pet: Cryptlin) -> void:
 		if mi.material_override == pet.fur:
 			coated += 1
 	check(bare and coated >= 1, "the scanner takes its hair off and puts it back")
+	if pet.glances:
+		await _ape(pet)
 	var was := main.floor_style
 	var comfort := main.comfort_of(pet)
 	var lasts := [0.0, 0.0]
@@ -169,6 +174,67 @@ func _tracker(pet: Cryptlin) -> void:
 	await _frames(4)
 	main.leave_print("sasquatch", Vector3(0, 0, 0.5), 0.0, 1.0, 1.0)
 	check(main.tracks.size() == 1, "and they fade away")
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
+# The squatchling is an ape that goes upright: a head of its own on top of its shoulders with its
+# eyes in it, taller than it is wide, with arms that hang to its knees and bones the length of
+# them; plain or all but; hairier and bigger in the foot newly hatched; and as it walks off it
+# leans into its stride and now and then looks back over its shoulder without breaking it
+func _ape(pet: Cryptlin) -> void:
+	var was := pet.get_needs()
+	pet.set_needs({"age": Cryptlin.GROW_AGE})
+	pet.grow = pet.size_goal()
+	pet._enter(Cryptlin.State.IDLE, 5.0)
+	await _frames(30)
+	var headed := pet.neck.get_parent() == pet.torso and pet.neck.position.y > pet.arms[0].position.y and pet.top_y > pet.neck_y + 0.3
+	for eye in pet.eyes:
+		headed = headed and eye.get_parent() == pet.neck and eye.position.y > 0.0
+	check(headed and pet.eyes.size() == 2, "it has a head of its own on top of its shoulders, with its eyes in it")
+	var low := 9.0
+	var wide := 0.0
+	for mi: MeshInstance3D in pet.arms[1].find_children("*", "MeshInstance3D", true, false):
+		var at := pet.to_local(mi.global_position)
+		low = minf(low, at.y)
+		wide = maxf(wide, at.x)
+	check(pet.top_y + pet.stand > wide * 2.0 * 1.15 and low < pet.legs[0].position.y and low > 0.05, "it is taller than it is wide, and its arms hang to its knees")
+	pet.xray(true)
+	var boned := 0.0
+	for part in pet.insides:
+		if part is MeshInstance3D and pet.arms[1].is_ancestor_of(part):
+			boned += (part.mesh as CapsuleMesh).height
+	pet.xray(false)
+	check(boned > 0.4 and pet.inside_at("brain").y > pet.inside_at("lungs").y + 0.2 * pet.grow, "its insides are an upright ape's: long bones in its arms, and its brain well above its chest")
+	var plain := true
+	for s in 40:
+		for mark: int in [Cryptlin.looks(pet.kind, s + 1)["marks"][0], Cryptlin.looks(pet.kind, s + 1)["marks"][2]]:
+			plain = plain and not mark in [Cryptlin.Mark.SPOTS, Cryptlin.Mark.STRIPES, Cryptlin.Mark.FRECKLES, Cryptlin.Mark.PATCHES]
+	check(plain, "no spots or stripes on any of forty of them")
+	var foot := pet.feet[0].scale.x
+	var hair: float = pet.fur.get_shader_parameter("hair")
+	var edge: float = pet.fur.get_shader_parameter("edge")
+	pet.set_needs({"age": 0.0})
+	pet.grow = pet.size_goal()
+	await _frames(3)
+	check(pet.feet[0].scale.x > foot * 1.2 and float(pet.fur.get_shader_parameter("hair")) > hair * 1.5 and edge > 0.0, "a baby has bigger feet for its size and more hair, and the hair is cut only at its outline")
+	pet.set_needs({"age": Cryptlin.GROW_AGE})
+	pet.grow = pet.size_goal()
+	pet.position = Vector3(0.8, 0, 1.6)
+	pet.target = Vector3(-0.8, 0, -0.8)
+	pet.back_again = 99.0
+	pet._enter(Cryptlin.State.WANDER)
+	await _frames(50)
+	var lean := pet.torso.rotation.x
+	var ahead := absf(pet.head_yaw)
+	pet.glance_back(1.0)
+	await _frames(40)
+	var round := absf(pet.head_yaw) + absf(pet.torso.rotation.y)
+	var going := pet.state == Cryptlin.State.WANDER and pet.gait > 0.5
+	await _frames(90)
+	check(lean > 0.15 and ahead < 0.5 and round > 1.4 and going and absf(pet.torso.rotation.y) < 0.1, "it leans into its walk, looks back over its shoulder mid-stride (%.1f round), and faces front again" % round)
+	pet.back_again = 5.0
+	pet.set_needs(was)
+	pet.grow = pet.size_goal()
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 
 

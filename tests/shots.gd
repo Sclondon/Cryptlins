@@ -10,6 +10,7 @@ extends SceneTree
 ## them; fewer to a row with --per, for the wide ones; turned any way with --turn; with --with=K every
 ## other one is of kind K, to see two kinds side by side).
 ## With --wheel: the wheel of things at both of its stops and part of the way round.
+## With --walk [--baby]: the kind walking across the room, four moments of it, and going away up it, three (with the squatchling's look back over its shoulder).
 ## With --knack [--step=N] [--at=SECONDS] [--then=SECONDS]: the kind taking a turn at the one thing only it does, with another beside it: two moments of it side by side (so long after it gets to part N of it, and so long after that).
 ## With --pool (and no other of those): four in a room with the pool in it, in each place it fits and under each lamp.
 
@@ -37,6 +38,7 @@ var bare := false
 var per_row := 4
 var turned := 0.0
 var wheel := false
+var walk := false
 var pool := false
 var knack := false
 var tidy := false
@@ -98,6 +100,8 @@ func _initialize() -> void:
 			bare = true
 		if arg == "--dark":
 			dark = true
+		if arg == "--walk":
+			walk = true
 		if arg == "--wheel":
 			wheel = true
 		if arg == "--poses":
@@ -143,6 +147,8 @@ func _initialize() -> void:
 		_run_pool.call_deferred()
 	elif many:
 		_run_many.call_deferred()
+	elif walk:
+		_run_walk.call_deferred()
 	elif wheel:
 		_run_wheel.call_deferred()
 	elif scan_only:
@@ -756,6 +762,43 @@ func _tile(pet: Cryptlin) -> Image:
 	var piece := Image.create(size.x, size.y, false, Image.FORMAT_RGB8)
 	piece.blit_rect(shot, Rect2i(mid - size / 2, size).intersection(Rect2i(Vector2i.ZERO, shot.get_size())), Vector2i.ZERO)
 	return piece
+
+
+# The kind walking, under an even light: one picture of four moments of its stride as it goes
+# across the room, and another of it going away up the room, which for one that looks back over
+# its shoulder as it goes (the squatchling) is before the look and twice during it
+func _run_walk() -> void:
+	await _wait(0.6)
+	var pet := main.who().pet
+	pet.set_needs({"belly": 90.0, "fun": 90.0, "energy": 95.0, "love": 50.0, "age": 0.0 if baby else Cryptlin.GROW_AGE})
+	pet.grow = pet.size_goal()
+	var sun := DirectionalLight3D.new()
+	sun.light_energy = 0.45
+	main.add_child(sun)
+	sun.look_at_from_position(Vector3(0.5, 2.0, 4.0), Vector3(0, 0.4, 0))
+	var size := Vector2i(230, 250)
+	for away in 2:
+		pet.position = Vector3(0.9, 0, 2.3) if away == 1 else Vector3(-1.7, 0, 1.7)
+		pet.target = Vector3(-0.7, 0, -0.9) if away == 1 else Vector3(1.9, 0, 1.7)
+		pet.yaw = atan2(pet.target.x - pet.position.x, pet.target.z - pet.position.z)
+		pet.back_again = 99.0
+		pet._enter(Cryptlin.State.WANDER)
+		var waits: Array = [0.9, 0.5, 0.45] if away == 1 else [0.8, 0.32, 0.32, 0.32]
+		var sheet := Image.create(size.x * waits.size(), size.y, false, Image.FORMAT_RGB8)
+		for i in waits.size():
+			await _wait(waits[i])
+			pet.emote.visible = false
+			await RenderingServer.frame_post_draw
+			var shot := root.get_texture().get_image()
+			shot.convert(Image.FORMAT_RGB8)
+			var scale := Vector2(shot.get_size()) / main.get_viewport().get_visible_rect().size
+			var mid := Vector2i(main.screen_of(pet.global_position + Vector3(0, pet.tall() * 0.5, 0)) * scale)
+			if away == 1 and i == 0:
+				pet.glance_back(1.6)
+			sheet.blit_rect(shot, Rect2i(mid - size / 2, size), Vector2i(size.x * i, 0))
+		sheet.resize(sheet.get_width() * 3, sheet.get_height() * 3, Image.INTERPOLATE_NEAREST)
+		sheet.save_png("%s/k%d_%s%s.png" % [out, kind, "glance" if away == 1 else "walk", "_baby" if baby else ""])
+	quit()
 
 
 # Its knack: one of the kind with another beside it and what it needs to hand, taking its turn

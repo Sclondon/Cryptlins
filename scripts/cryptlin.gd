@@ -181,7 +181,7 @@ const INTERRUPTIBLE: Array[int] = [
 # Fur and eye colours to draw from, by kind
 const FURS: Array[Array] = [
 	[Color(0.36, 0.5, 0.3), Color(0.44, 0.36, 0.56), Color(0.26, 0.47, 0.48), Color(0.46, 0.46, 0.5), Color(0.58, 0.36, 0.26), Color(0.52, 0.52, 0.3)],
-	[Color(0.33, 0.27, 0.21), Color(0.26, 0.22, 0.18), Color(0.4, 0.34, 0.26), Color(0.29, 0.27, 0.25), Color(0.36, 0.26, 0.19)],
+	[Color(0.33, 0.27, 0.21), Color(0.2, 0.17, 0.16), Color(0.4, 0.34, 0.26), Color(0.29, 0.27, 0.25), Color(0.4, 0.25, 0.16)],
 	[Color(0.5, 0.46, 0.38), Color(0.42, 0.26, 0.16), Color(0.3, 0.3, 0.34), Color(0.46, 0.38, 0.2)],
 	[Color(0.24, 0.24, 0.29), Color(0.3, 0.26, 0.24), Color(0.34, 0.34, 0.37), Color(0.26, 0.21, 0.31)],
 	[Color(0.34, 0.4, 0.48), Color(0.44, 0.47, 0.5), Color(0.27, 0.32, 0.4), Color(0.44, 0.46, 0.38)],
@@ -266,7 +266,7 @@ const SHAPE := {
 # Where a kind's body will not take as much as that; "marks" is for a kind whose coat takes
 # only some of the markings
 const SHAPES: Array[Dictionary] = [
-	{}, {"head": [0.88, 1.2], "limb": [0.8, 1.2], "marks": [Mark.SPOTS, Mark.PATCHES, Mark.STRIPES, Mark.SOCKS, Mark.FRECKLES, Mark.POINTS]}, {}, {}, {"limb": [0.85, 1.25], "crest": [0.7, 1.5]}, {"limb": [0.85, 1.3]},
+	{}, {"head": [0.98, 1.24], "build": [0.9, 1.14], "limb": [0.86, 1.16], "crest": [0.6, 1.45], "eye": [0.8, 1.2], "marks": [Mark.BELLY, Mark.SOCKS, Mark.POINTS]}, {}, {}, {"limb": [0.85, 1.25], "crest": [0.7, 1.5]}, {"limb": [0.85, 1.3]},
 	{"limb": [0.9, 1.15], "crest": [0.66, 1.4]}, {"head": [0.88, 1.16], "limb": [0.8, 1.6]},
 	{"head": [0.85, 1.22], "limb": [0.84, 1.2]}, {"limb": [0.8, 1.22]}, {}, {"head": [0.85, 1.2]},
 	{"crest": [0.6, 1.4]}, {"head": [0.85, 1.25]}, {"crest": [0.75, 1.3]}, {}, {"head": [0.86, 1.2], "crest": [0.85, 1.25]},
@@ -366,6 +366,26 @@ var podge_sizes: Array[Vector3] = []
 var shoulders: Node3D
 var baby_sink := 0.0
 var reach := 1.0
+# An ape's way of going (the squatchling's): how far it leans into its walk, how far its arms
+# swing, and whether it looks back over its shoulder as it goes: how long the look has left,
+# which shoulder, how long before the next, and how far round it has turned to do it
+var stoop := 0.0
+var arm_swing := 0.7
+var glances := false
+var look_back := 0.0
+var back_side := 1.0
+var back_again := 2.0
+var twist := 0.0
+# Feet that are bigger on a baby, and by how much; and hair that is longer on one: each coat
+# with its length grown, how much longer it is newly hatched, and how young it was last combed
+var feet: Array[Node3D] = []
+var big_feet := 1.0
+var coats: Array[Array] = []
+var fluff := 0.0
+var combed := -1.0
+# The bones of its limbs, where they are not one short one in each: what each hangs from, how
+# long it is, where its middle is and how it is turned
+var long_bones: Array[Array] = []
 # What is its own about its shape (see looks()): the size of its head, of each eye, and of what
 # its kind wears on its head or back; how far longer legs raise its body, and whether it goes on
 # four of them; where a tuft would grow on its head; what is painted on its coat (the marking,
@@ -690,8 +710,9 @@ static func span(k: int, what: String, along: float) -> float:
 # from and a second marking over it. It goes round a body from the front (both edges) by way of
 # the back (the middle) and is the same on both sides, and from the top down; cones have only
 # its top half, so the top is also the tips of ears. Kept at 1/COAT_GAIN of its strength so that
-# a marking can be paler than the coat.
-static func coat(painted: Array, base: Color) -> ImageTexture:
+# a marking can be paler than the coat. At less than full `strength` the markings are only a
+# shade of the coat's own colour.
+static func coat(painted: Array, base: Color, strength := 1.0) -> ImageTexture:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(painted[1]) * 31 + 7
 	var layers: Array[Dictionary] = []
@@ -705,7 +726,7 @@ static func coat(painted: Array, base: Color) -> ImageTexture:
 			var c := base
 			for layer in layers:
 				if _marked(layer, x, y):
-					c = layer["ink"]
+					c = base.lerp(layer["ink"], strength)
 			var lit := c.srgb_to_linear()
 			var part := Color(lit.r / maxf(under.r, 0.004), lit.g / maxf(under.g, 0.004), lit.b / maxf(under.b, 0.004)) / COAT_GAIN
 			img.set_pixel(x, y, Color(minf(part.r, 1.0), minf(part.g, 1.0), minf(part.b, 1.0)))
@@ -854,6 +875,12 @@ func _build() -> void:
 		shape["head"] = clampf(float(me.looks["head"]), 0.0, 1.0)
 	for i in 3:
 		marks[i] = int(shape["marks"][i])
+	# (a coat that takes only some of the markings wears none in place of one handed down that
+	# it does not take)
+	var takes: Array = SHAPES[kind].get("marks", [])
+	for i: int in [0, 2]:
+		if not takes.is_empty() and not marks[i] in takes:
+			marks[i] = Mark.PLAIN
 	extras.assign(shape["extras"])
 	if odd_eyes and kind == Kind.GREMLIN and not "odd" in extras:
 		extras.append("odd")
@@ -974,66 +1001,110 @@ func _build_gremlin(chub: float, ear_len: float, horns: bool) -> void:
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.15, 0.07, 0.06))
 
 
-# A young sasquatch: no head and no arms yet, just a shaggy mound of hair with two tall eyes,
-# on feet it has not grown into
+# A young sasquatch, and an ape that goes upright: a head with a pointed crown sunk between big
+# sloping shoulders, a heavy brow over small deep-set eyes, a broad flat nose and a bare leathery
+# face; a barrel of a chest, taller than it is wide; long thick arms that hang to its knees, with
+# big bare hands; short bent legs, and feet it has not grown into, five fat toes on each. Its
+# hair is short and lies close, so that the shape of it shows, and is long and shaggy only at its
+# shoulders, forearms and shins. A baby is the same with more hair, a bigger head and bigger feet.
 func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
-	neck_y = 0.24
-	centre_y = 0.5
-	top_y = 0.95
+	neck_y = 0.84
+	head_y = 0.13
+	centre_y = 0.56
 	gravity = 15.0
-	brain_at = Vector3(0, 0.4, 0.04)
-	crown = Vector3(0, 0.52, 0)
-	fur = _shaggy(fur_colour * 0.76, 3, 0.15, {"hang": 0.9, "face": 0.2, "face_from": 0.42})
+	head_turn = 1.0
+	gut = 1.35
+	stoop = 0.22
+	arm_swing = 1.0
+	glances = true
+	big_feet = 1.3
+	fluff = 1.0
+	brain_at = Vector3(0, 0.2, -0.01)
+	var wide := lerpf(1.0, chub, 0.7)
+	var peak := 0.2 + 0.24 * crest
+	top_y = neck_y + peak
+	crown = Vector3(0, peak - 0.03, -0.02)
+	# What is its own besides: how long its hair is, how heavy its brow, and how dark its bare skin
+	var short := rng.randf_range(0.03, 0.055)
+	var brow := rng.randf_range(0.85, 1.25)
+	var tone := rng.randf()
+	var calm := {"hang": 0.8, "locks": 8.0, "rows": 2.0, "streak": 0.16, "root_shade": 0.12, "tip_bleach": 0.04, "edge": 0.55, "shade": 0.28}
+	# What is painted on it is faint: a paler chest, a greying crown, no more than that
+	if marks[0] != Mark.PLAIN or marks[2] != Mark.PLAIN:
+		fur.set_shader_parameter("tex", coat(marks, fur_colour, 0.38))
+	fur = _shaggy(fur_colour * 0.76, 2, short, calm)
+	var shag := _shaggy(fur_colour * 0.62, 2, short * 2.6, calm.merged({"hang": 1.1, "shade": 0.12}))
+	coats = [[fur, short], [shag, short * 2.6]]
+	var tuft := Ps1.mat(fur_colour * 0.5, 0.0, 0.35)
+	# Bare skin: darker than its coat, or on the darkest of them a grey that shows against it
+	var leather := (fur_colour * lerpf(0.34, 0.5, tone)).lerp(Color(0.2, 0.15, 0.14), 0.35)
+	if fur_colour.v < 0.27:
+		leather = Color(0.3, 0.26, 0.25) * lerpf(0.85, 1.15, tone)
+	var hide := Ps1.mat(leather, 0.0, 0.3)
+	var snout := Ps1.mat(leather * 1.4, 0.0, 0.3)
+	var sole := Ps1.mat(leather.lerp(Color(0.62, 0.5, 0.42), 0.55), 0.0, 0.3)
 	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(self, Vector3(0.18 * side, 0.24, 0.02))
-		_part(leg, _capsule(0.07, 0.24), dark, Vector3(0, -0.1, 0))
-		# Big flat feet, toes out, and five fat toes on each, the big one on the inside
-		var foot := _pivot(leg, Vector3(0, -0.185, 0))
-		foot.rotation.y = 1.0 * side
-		_part(foot, _sphere(), dark, Vector3(0, 0, 0.17), Vector3(0.19, 0.065, 0.3))
+		# A short thick leg, bent: the thigh goes forward to the knee and the shin back to the heel
+		var leg := _pivot(self, Vector3(0.17 * side, 0.3, 0))
+		_part(leg, _capsule(0.1, 0.27), fur, Vector3(0, -0.04, 0.03), Vector3.ONE, Vector3(-0.4, 0, 0))
+		_part(leg, _capsule(0.085, 0.24), shag, Vector3(0, -0.18, 0.04), Vector3.ONE, Vector3(0.4, 0, 0))
+		_spike(leg, tuft, Vector3(0.02 * side, -0.16, -0.05), Vector3(0.5 * side, -1.0, -0.7), 0.13, 0.05)
+		# Big flat feet, toes a little out, and five fat toes on each, the big one on the inside
+		var foot := _pivot(leg, Vector3(0, -0.25, 0))
+		foot.rotation.y = 0.3 * side
+		foot.scale = Vector3.ONE * 0.72
+		_part(foot, _sphere(), hide, Vector3(0, 0, 0.17), Vector3(0.19, 0.065, 0.3))
 		for toe in 5:
 			var across := (toe - 2.0) * 0.088 * side
 			var size := 0.085 - toe * 0.009
-			_part(foot, _sphere(), pale, Vector3(across, 0.01, 0.49 - toe * 0.03), Vector3(size * 0.8, size * 0.8, size * 1.3))
+			_part(foot, _sphere(), sole, Vector3(across, 0.01, 0.49 - toe * 0.03), Vector3(size * 0.8, size * 0.8, size * 1.3))
+		feet.append(foot)
 		legs.append(leg)
+		long_bones.append([leg, 0.2, Vector3(0, -0.04, 0.03), Vector3(-0.4, 0, 0)])
+		long_bones.append([leg, 0.17, Vector3(0, -0.18, 0.04), Vector3(0.4, 0, 0)])
 
+	# A barrel of a chest, widest at the shoulders, which slope up into where a neck would be
 	torso = _pivot(self, Vector3.ZERO)
+	var barrel: Array[Vector2] = [
+		Vector2(0.16, 0.19), Vector2(0.29, 0.25), Vector2(0.325, 0.4), Vector2(0.345, 0.56), Vector2(0.36, 0.7),
+		Vector2(0.32, 0.8), Vector2(0.22, 0.88), Vector2(0.1, 0.93), Vector2(0.0, 0.94),
+	]
+	_part(torso, _lathe(barrel, 12), fur, Vector3.ZERO, Vector3(wide, 1.0, 0.72 * wide))
 	tail = _pivot(torso, Vector3(0, 0.3, -0.2))
 	for side: float in [-1.0, 1.0]:
-		arms.append(_pivot(torso, Vector3(0.3 * side, 0.4, 0)))
+		# Long arms that hang nearly straight down from big shaggy shoulders, to its knees
+		var a := _pivot(torso, Vector3(0.39 * wide * side, 0.74, 0.02))
+		var drop := _pivot(a, Vector3.ZERO)
+		drop.rotation.z = -0.24 * side
+		_part(drop, _capsule(0.115, 0.25), shag, Vector3(-0.02 * side, -0.02, 0))
+		_part(drop, _capsule(0.078, 0.3), fur, Vector3(0, -0.17, 0))
+		_part(drop, _capsule(0.09, 0.3), shag, Vector3(0, -0.36, 0.02))
+		_part(drop, _sphere(), hide, Vector3(0, -0.535, 0.03), Vector3(0.095, 0.085, 0.1))
+		_part(drop, _sphere(), hide, Vector3(-0.06 * side, -0.5, 0.08), Vector3(0.04, 0.05, 0.04))
+		_spike(drop, tuft, Vector3(0.07 * side, -0.02, -0.02), Vector3(0.45 * side, -1.0, -0.3), 0.13, 0.055)
+		_spike(drop, tuft, Vector3(0.03 * side, -0.38, -0.06), Vector3(0.5 * side, -1.0, -0.8), 0.15, 0.05)
+		arms.append(a)
+		long_bones.append([drop, 0.26, Vector3(0, -0.15, 0), Vector3.ZERO])
+		long_bones.append([drop, 0.24, Vector3(0, -0.39, 0.02), Vector3.ZERO])
 
-	# The whole body turns to look, so it hangs from the neck
-	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
-	var body := _pivot(neck, Vector3.ZERO)
-	body.scale = Vector3(chub, 1.0, 0.8 * chub)
-	# One smooth mound, wider than it is tall, flaring out to the hem, under its hair
-	var shape: Array[Vector2] = [
-		Vector2(0.48, 0.0), Vector2(0.55, 0.04), Vector2(0.54, 0.11), Vector2(0.47, 0.19), Vector2(0.4, 0.28),
-		Vector2(0.35, 0.37), Vector2(0.28, 0.45), Vector2(0.17, 0.51), Vector2(0.0, 0.53),
+	# The head: no neck to speak of, and a crown that comes up to a point at the back
+	neck = _pivot(torso, Vector3(0, neck_y, 0.06))
+	var skull: Array[Vector2] = [
+		Vector2(0.1, -0.07), Vector2(0.17, -0.02), Vector2(0.2, 0.06), Vector2(0.205, 0.13), Vector2(0.19, 0.2),
+		Vector2(0.16, 0.2 + 0.08 * crest), Vector2(0.11, 0.2 + 0.15 * crest), Vector2(0.055, 0.2 + 0.21 * crest), Vector2(0.0, peak),
 	]
-	_part(body, _lathe(shape, 14), fur, Vector3.ZERO)
-	var shag := Ps1.mat(fur_colour * 0.76 * 0.62, 0.0, 0.35)
-	# The hem is ragged: pointed tufts of every length hang off it and splay, light and dark,
-	# and the odd one sticks straight out
-	for i in 17:
-		var around := TAU * (i + rng.randf_range(0.2, 0.8)) / 17.0
-		var out := Vector3(sin(around), 0, cos(around))
-		var long := rng.randf_range(0.13, 0.3)
-		var splay := rng.randf_range(0.25, 0.75) if i % 6 != 3 else 1.25
-		_spike(body, [pale, shag, fur][i % 3], out * 0.5 + Vector3(0, 0.1, 0), out * splay + Vector3.DOWN, long, 0.06)
-
-	# Two tall dark eyes, wide at the bottom and drawn up to a point, with a light in each
+	_part(neck, _lathe(skull, 10), fur, Vector3(0, 0, -0.01), Vector3(1.0, 1.0, 0.95), Vector3(-0.12, 0, 0))
 	for side: float in [-1.0, 1.0]:
-		var eye := _pivot(neck, Vector3(0.12 * chub * side, 0.2, 0.4 * chub))
-		eye.rotation.x = -0.62
-		_part(eye, _sphere(), black, Vector3.ZERO, Vector3(0.068, 0.078, 0.03))
-		_part(eye, _cone(), black, Vector3(0, 0.16, 0), Vector3(0.06, 0.28, 0.026))
-		var pupil := _part(eye, _sphere(), _eye_mat(), Vector3(0, 0, 0.03), Vector3(0.036, 0.046, 0.03))
-		eyes.append(eye)
-		pupils.append(pupil)
-	# Its mouth is somewhere under the hair, and only shows when it opens
-	mouth_node = _pivot(neck, Vector3(0, 0.07, 0.47 * chub))
-	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.11, 0.06, 0.04))
+		_spike(neck, tuft, Vector3(0.17 * side, 0.05, 0.02), Vector3(side, -0.9, 0.0), 0.11, 0.05)
+	# The face is bare: a dark patch of it, a muzzle, a broad flat nose, and a brow like a shelf
+	_part(neck, _sphere(), hide, Vector3(0, 0.085, 0.12), Vector3(0.14, 0.125, 0.1))
+	_part(neck, _sphere(), snout, Vector3(0, 0.03, 0.15), Vector3(0.105, 0.075, 0.085))
+	_part(neck, _sphere(), black, Vector3(0, 0.07, 0.226), Vector3(0.05, 0.028, 0.026))
+	_part(neck, _sphere(), dark, Vector3(0, 0.178, 0.17), Vector3(0.155 * brow, 0.045 * brow, 0.075))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.062 * side, 0.118, 0.2), 0.032)
+	mouth_node = _pivot(neck, Vector3(0, 0.005, 0.228))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.07, 0.035, 0.025))
 
 
 # Its coat as long hair of this colour that hangs off it in locks (see Ps1.fur), with whatever is
@@ -4483,7 +4554,18 @@ func _animate(delta: float) -> void:
 	squash = clampf(squash + squash_v * delta, -0.3, 0.4)
 	var breath := sin(anim_t * (1.3 if curl > 0.5 else 2.6)) * (0.03 if curl > 0.5 else 0.012)
 	torso.position.y = stand * (1.0 - sit * 0.3 - curl * 0.7) + absf(sin(phase)) * 0.05 * gait - sit * 0.1 - curl * 0.15 + hover * (1.0 - curl) * (1.0 + sin(anim_t * 2.2) * 0.22)
-	torso.rotation.x = gait * minf(speed, 3.5) * 0.07 + curl * 0.12
+	torso.rotation.x = gait * minf(speed, 3.5) * 0.07 + curl * 0.12 + stoop * gait
+	if glances:
+		# Now and then as it walks off it looks back over its shoulder, the one nearer whoever is
+		# watching, without breaking its stride
+		look_back -= delta
+		back_again -= delta
+		if look_back <= 0.0 and back_again <= 0.0 and gait > 0.7 and lift < 0.02 and state in [State.WANDER, State.LURK, State.GO_SLEEP, State.LEAVE] and randf() < delta * 0.5:
+			glance_back(randf_range(0.9, 1.4))
+		if look_back > 0.0:
+			gaze = world.camera.global_position
+		twist = lerpf(twist, back_side if look_back > 0.0 else 0.0, ease_slow)
+		torso.rotation.y = twist * 0.6
 	torso.rotation.z = wiggle + sin(anim_t * 42.0) * float(FEELINGS[feeling]["shake"])
 	torso.scale = Vector3(1.0 + squash * 0.6 + breath, 1.0 - squash + breath, 1.0 + squash * 0.6 + breath)
 	if heave > 0.0:
@@ -4509,14 +4591,20 @@ func _animate(delta: float) -> void:
 		shoulders.position.y = -baby_sink * young
 		for a in arms:
 			a.scale.y = reach * lerpf(1.0, 0.72, young)
+	for foot in feet:
+		foot.scale = Vector3.ONE * 0.72 * lerpf(1.0, big_feet, young)
+	if absf(young - combed) > 0.02:
+		combed = young
+		for coat in coats:
+			Ps1.comb(coat[0], {"hair": float(coat[1]) * (1.0 + fluff * young)})
 
 	arm = arm.lerp(arm_goal, ease_fast)
 	var wave := sin(anim_t * 9.0) * arm_wave
 	var tuck := curl * 0.8
 	# Wings beat while it is off the ground
 	var lift := (1.2 + sin(anim_t * 30.0) * 0.7) if wings and airborne else 0.0
-	arms[1].rotation = Vector3(arm.x - swing * 0.7 * (1.0 - curl) + wave - tuck, arm.y, arm.z + lift)
-	arms[0].rotation = Vector3(arm.x + swing * 0.7 * (1.0 - curl) - wave - tuck, -arm.y, -arm.z - lift)
+	arms[1].rotation = Vector3(arm.x - swing * arm_swing * (1.0 - curl) + wave - tuck, arm.y, arm.z + lift)
+	arms[0].rotation = Vector3(arm.x + swing * arm_swing * (1.0 - curl) - wave - tuck, -arm.y, -arm.z - lift)
 
 	# Head turns to whatever it is looking at; the pupils go the rest of the way
 	var seen := torso.global_transform.affine_inverse() * gaze - neck.position - Vector3(0, head_y, 0)
@@ -4525,6 +4613,9 @@ func _animate(delta: float) -> void:
 	if curl_goal > 0.5:
 		want_yaw = 0.35
 		want_pitch = 0.45
+	elif look_back > 0.0:
+		want_yaw = back_side * 1.45
+		want_pitch = 0.05
 	head_yaw = lerpf(head_yaw, want_yaw, ease_slow * 1.6)
 	head_pitch = lerpf(head_pitch, want_pitch, ease_slow * 1.6)
 	head_roll = lerpf(head_roll, roll_goal, ease_slow)
@@ -4591,6 +4682,16 @@ func _animate(delta: float) -> void:
 			var u := fmod(anim_t * 0.4 + i / 3.0, 1.0)
 			zzz[i].global_position = global_position + Vector3(0, (top_y + stand - 0.4) * grow + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
 			zzz[i].modulate.a = sin(u * PI) * 0.9
+
+
+# The look back over its shoulder, for so long: its head and shoulders come round towards
+# whoever is watching while its legs go on the way they were going. Only for one that does it.
+func glance_back(seconds: float) -> void:
+	if not glances:
+		return
+	look_back = seconds
+	back_again = seconds + randf_range(3.0, 7.0)
+	back_side = 1.0 if to_local(world.camera.global_position).x >= 0.0 else -1.0
 
 
 # ---------------------------------------------------------------- under the scanner
@@ -4668,8 +4769,12 @@ func _build_insides() -> void:
 	for i in 3:
 		_part(organs, hoop, white, Vector3(0, 0.14 - i * 0.07, 0), Vector3(0.14 - i * 0.012, 0.02, 0.11))
 	# (a dummy's legs have no bones in them)
-	for limb in (arms if decoy != null else legs + arms):
-		insides.append(_part(limb, _capsule(0.012, 0.16), white, Vector3(0, -0.09, 0)))
+	var bones := long_bones.duplicate()
+	if bones.is_empty():
+		for limb in (arms if decoy != null else legs + arms):
+			bones.append([limb, 0.16, Vector3(0, -0.09, 0), Vector3.ZERO])
+	for b in bones:
+		insides.append(_part(b[0], _capsule(0.012, b[1]), white, b[2], Vector3.ONE, b[3]))
 
 	stomach = _pivot(organs, Vector3(0, -0.11, 0.03))
 	_part(stomach, _sphere(), Ps1.organ(Color(0.32, 0.2, 0.1)), Vector3.ZERO, Vector3(0.125, 0.105, 0.1))

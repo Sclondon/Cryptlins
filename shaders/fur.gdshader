@@ -32,6 +32,12 @@ uniform vec3 shadow : source_color = vec3(1.0);
 uniform float face = 0.0;
 uniform float face_from = 0.4;
 uniform float face_hair = 0.2;
+// For a coat that is to read as one solid thing at this size: the locks are drawn only where the
+// body turns away from the eye by this much (the cosine of the angle; 0 for all over), so that
+// they are a ragged edge to it and nothing is cut out of the middle of it
+uniform float edge = 0.0;
+// How much darker the coat is at the bottom of what wears it than at the top
+uniform float shade = 0.0;
 
 // Where a corner of a shell goes: off the skin along its normal, and down
 vec3 shell_at(vec3 at, vec3 normal, vec2 uv, mat4 model) {
@@ -68,6 +74,9 @@ void fragment() {
 	// Strands: narrow round the body and long down it
 	float strand = noise(vec2(uv.x * locks * 3.0, uv.y * rows * 1.5));
 	if (shell > 0.0) {
+		if (edge > 0.0 && dot(normalize(NORMAL), normalize(VIEW)) > edge) {
+			discard;
+		}
 		// What is left of this layer: a lock wherever the hair is longer than this layer is
 		// high. Each row of locks starts somewhere else round the body, and each lock is
 		// widest at its top and drawn down to a point.
@@ -82,6 +91,7 @@ void fragment() {
 	}
 	vec3 c = tint * texture(tex, uv).rgb * gain;
 	float lit = (1.0 + (strand - 0.5) * streak) * mix(1.0 - root_shade, 1.0 + tip_bleach, shell);
+	lit *= 1.0 - shade * smoothstep(0.15, 1.0, uv.y);
 	c *= lit * mix(shadow, vec3(1.0), smoothstep(0.55, 1.0, lit));
 	ALBEDO = c;
 	EMISSION = c * glow;

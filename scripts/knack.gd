@@ -379,7 +379,8 @@ func _tinker(delta: float) -> void:
 
 
 # The squatchling, looked at too long, goes still and will not come into focus; then it is off
-# to somewhere it cannot be seen, and its footprints are what is left
+# to somewhere it cannot be seen, with a look back over its shoulder, and its footprints are
+# what is left
 func _blur(delta: float) -> void:
 	# (never quite where it was drawn the frame before)
 	pet.torso.position.x = (0.045 if Engine.get_process_frames() % 2 == 0 else -0.045) * (0.6 + 0.4 * sin(pet.anim_t * 31.0))
@@ -393,6 +394,9 @@ func _blur(delta: float) -> void:
 			_next()
 		return
 	pet.gaze = pet.target + Vector3(0, 0.3, 0)
+	# (with one look back over its shoulder as it goes)
+	if pet.state_time > 0.5 and pet.state_time - delta <= 0.5:
+		pet.glance_back(1.3)
 	if pet._steer(pet.target, Cryptlin.WALK * 1.3, delta, 0.3) or pet.state_time > 6.0:
 		finish()
 
