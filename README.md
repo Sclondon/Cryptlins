@@ -78,7 +78,7 @@ Tap a thing to use it, or drag it up off the wheel and let go where you want it.
 | **Broom** | A short broom and a tin dustpan, there always and nobody's to buy. Dragged up off the wheel and over a dropping, a puddle, a heap of earth or the bits of a broken toy, it sweeps it up: a few strokes, some dust, and it is gone. A tap on it sends it to sweep one thing up by itself. It is the only way to clear a mess: a tap on one does nothing to it. |
 | **Food**: bone (F), toadstool, candy corn, fish, beetle, berries | It runs over and eats what you drop, loves its favourite, and spits out the one it can't stand. |
 | **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Carry it down to the wheel to put it away. Play wears a toy out (see below). Pick the toy up with a finger and it jumps for it; let go to throw. |
-| **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the wheel to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
+| **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, water dish | They stay where they are put. Drag them about, or back down to the wheel to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
 | **Shelters**: cave, barrel, hollow stump, rag tent, crate, flowerpot | Things it can get inside: it hides in one to watch you, and would sooner have its nest there. |
 | **Pool** | About half the floor under water, from the walls to a stony, muddy edge that wanders across the room: the back of the room, or in a wide one either side. It goes over the part with least on it, and whatever stands there is moved out onto the dry. A finger on the water has hold of it: drag it to another side, or down to the wheel to put it away. The water kinds (frogman, Loch Ness monster, kelpie, merling, Cthulhu spawn, mermaid) are not at home without one: they are in and out of it as they like, wade about up to their middles for a good while at a time, and sleep at its edge; with none they beg for water (a drop in the thought bubble). The rest take it or leave it: they keep to the dry floor, come down to the edge for a drink, and if they are carried out over it and let go, or shoved in, scramble out by the shortest way, cross. Nothing else will stand in it; food thrown in floats and drifts in to the shallows where any of them can reach it, a toy floats back to the edge, and droppings are left on dry floor. |
 | **Nests**: rags, twigs, cushion, cardboard box | Its bed. Drag it where you like; it may well drag it somewhere else. |
@@ -214,10 +214,10 @@ days of that: `STARVE_HOURS`), a lost fight takes a little, and it comes back ov
 itself about with its head down, and the poorly face goes up over it. Nothing says so in words.
 
 At no health it dies. It lies down where it is and goes still; a moment later a pale ghost of it gets up, drifts up
-and out through the ceiling, and a small **grave marker** with a band of its own colour stands where it lay. The
-marker is a thing in the room like any other (drag it about, drag it down to the wheel to put it away, tap it there to
+and out through the ceiling, and a **gravestone** with a band of its own colour round it stands where it lay. That is the only way to come by one: it is not on the wheel for the asking, nor bought, and a page that says it has gravestones in stock is not heard (`Items.KEPT`). The
+stone is a thing in the room like any other (drag it about, drag it down to the wheel to put it away, tap it there to
 bring it back out; the others will go and sit by it) but it is never bought or sold: it is on the wheel only while one
-is put away. Its page stays in the notebook, after those of the living and marked as gone: what it was, how long it
+is put away. Its page stays in the notebook, after those of the living and marked as gone (and says so while its stone is kept): what it was, how long it
 lived, and what was ever found out about it. One that died while the game was shut is found lying there when it is
 
 ## Pairing off
@@ -287,7 +287,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `kind`, `seed`, `hatched`, `born`, `warmth`, `at`, `needs` (health among them), `known`, `regard` (what it thinks
   of each of the others, by their ids), `parents` and `parent_names`, `fur`, `nature` and `looks` (what it has from them),
   `paired` and `expecting` (when it last paired off, and the egg due as a result); `gone` holds the same for those
-  that have died, with `died` and `lived`, and `markers` the grave markers that are put away.
+  that have died, with `died` and `lived`, and `markers` the gravestones that are put away (the colour of each and whose it is). A gravestone bought before they came only by a death is kept, standing or put away, with no band and nobody's number; a save's grave markers (thing 15) are gravestones (thing 6); and two of a thing count once towards how at home a cryptlin is, so that a liking for a gravestone is not a reason to want two.
 - `scripts/shelf.gd`: the wheel of things along the bottom, its own little 3D picture with nothing behind it.
   `scripts/items.gd` lists what can be on it; inside a site that keeps a shop, only what comes free and what has been
   bought.

@@ -565,7 +565,7 @@ func _halfling(pet: Cryptlin) -> void:
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 
 
-# How many things there are to have on the wheel just now: all of them, but for the grave marker
+# How many things there are to have on the wheel just now: all of them, but for the gravestone
 # (which is only there when one is put away) and whatever is out in the room
 func _all_but_in_use() -> int:
 	return Items.LIST.filter(func(item: Dictionary) -> bool: return not item["id"] in Items.KEPT and not main.in_room_now(item["id"])).size()
@@ -2508,8 +2508,8 @@ func _run() -> void:
 	check(one.health > 90.0 and fourth.health > 90.0, "the others, fed, are none the worse")
 	var lay := third.position
 	check(await _until(func() -> bool: return main.departed.size() == 1, 400) and main.residents.size() == 2, "and then it is gone")
-	var marker := main.decor_of(Decor.Kind.MARKER)
-	check(marker != null and marker.position.distance_to(Vector3(lay.x, 0, lay.z)) < 0.3 and marker.whose == main.departed[0].id, "a marker of its own stands where it lay")
+	var marker := main.decor_of(Decor.Kind.GRAVESTONE)
+	check(marker != null and marker.position.distance_to(Vector3(lay.x, 0, lay.z)) < 0.3 and marker.whose == main.departed[0].id, "a gravestone of its own stands where it lay")
 	check(is_instance_valid(third) and not third.skin.is_empty() and await _until(func() -> bool: return third.lift > 1.0, 600), "a pale ghost of it drifts up")
 	var ghost := third.get_instance_id()
 	check(await _until(func() -> bool: return not is_instance_id_valid(ghost), 1200), "and out through the ceiling")
@@ -2532,26 +2532,68 @@ func _run() -> void:
 	ghost = fourth.get_instance_id()
 	await _until(func() -> bool: return not is_instance_id_valid(ghost), 1200)
 	# The marker is a thing like any other in the room, and never on sale
-	marker = main.decor_of(Decor.Kind.MARKER)
+	marker = main.decor_of(Decor.Kind.GRAVESTONE)
 	one.position = Vector3(1.6, 0, -1.4)
 	one._enter(Cryptlin.State.IDLE, 30.0)
 	marker.position = Vector3(-1.0, 0, 0.6)
 	await _frames(2)
 	await _slide(_screen(marker.position + Vector3(0, 0.15, 0)), _screen(Vector3(0.6, 0, 1.0)))
-	check(marker.position.x > 0.2, "its marker can be dragged about")
-	check(not main.shelf.ids.has("marker"), "there is none on the row of things while they all stand in the room")
+	check(marker.position.x > 0.2, "its gravestone can be dragged about")
+	check(not main.shelf.ids.has("gravestone"), "there is none on the row of things while they all stand in the room")
 	await _slide(_screen(marker.position + Vector3(0, 0.15, 0)), _on_shelf("bone"))
-	check(main.markers_away.size() == 1 and main.shelf.ids.has("marker") and main.shelf.counts.get("marker") == 1, "or put away, when it is on the row")
+	check(main.markers_away.size() == 1 and main.shelf.ids.has("gravestone") and main.shelf.counts.get("gravestone") == 1, "or put away, when it is on the row")
 	main.embedded = true
 	main._sync()
-	check(main.shelf.ids.has("marker") and main.left_of("marker") == 0, "inside a page with a shop too: it is kept, not bought")
+	check(main.shelf.ids.has("gravestone") and main.left_of("gravestone") == 0, "inside a page with a shop too: it is kept, not bought")
 	main.embedded = false
 	main._sync()
-	await _tap(_on_shelf("marker"))
-	check(main.markers_away.is_empty() and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.MARKER).size() == 2 and not main.shelf.ids.has("marker"), "and brought out again")
+	await _tap(_on_shelf("gravestone"))
+	check(main.markers_away.is_empty() and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.GRAVESTONE).size() == 2 and not main.shelf.ids.has("gravestone"), "and brought out again")
 	await _restart()
 	one = main.residents[0].pet
-	check(main.departed.size() == 2 and main.departed[1].name == late and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.MARKER and d.whose > 0).size() == 2, "the markers and the pages are kept")
+	check(main.departed.size() == 2 and main.departed[1].name == late and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.GRAVESTONE and d.whose > 0).size() == 2, "the gravestones and the pages are kept")
+	# There is no other way to come by a gravestone, and one from before that was so is kept
+	main.embedded = true
+	main.stock = {"gravestone": -1}
+	main._sync()
+	check(not main.shelf.ids.has("gravestone") and not main.owns("gravestone"), "what a page says it has of gravestones is not heard: there is none on the wheel that was not put away")
+	main.embedded = false
+	main.stock = {}
+	main._sync()
+	var probe := Decor.new(Decor.Kind.MARKER)
+	check(not main.shelf.ids.has("gravestone") and Items.find("marker").is_empty() and probe.kind == Decor.Kind.GRAVESTONE, "nor is there one to be had played by itself, and the marker of old is the gravestone")
+	probe.free()
+	main.notebook.open_at(main.residents.size())
+	check(main.notebook.said().contains("Its stone stands in the cellar."), "the page of one that died says its stone is there")
+	main.notebook.close()
+	main.save_game()
+	main.queue_free()
+	await _frames(3)
+	var graves: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(save))
+	for held: Dictionary in graves["decor"]:
+		if int(held["k"]) == Decor.Kind.GRAVESTONE:
+			held["k"] = Decor.Kind.MARKER
+	graves["decor"].append({"k": Decor.Kind.GRAVESTONE, "x": 1.6, "z": -1.6, "r": 0.0, "c": "808085", "w": 0})
+	var regraved := FileAccess.open(save, FileAccess.WRITE)
+	regraved.store_string(JSON.stringify(graves))
+	regraved.close()
+	main = _start()
+	await _frames(5)
+	one = main.residents[0].pet
+	var stones := main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.GRAVESTONE)
+	check(stones.size() == 3 and stones.filter(func(d: Decor) -> bool: return d.whose > 0).size() == 2 and not main.decors.any(func(d: Decor) -> bool: return d.kind == Decor.Kind.MARKER), "in a save from before, the markers of the dead are gravestones and a gravestone that was bought still stands")
+	var fond := one.like_decor.duplicate()
+	one.like_decor = [Decor.Kind.GRAVESTONE]
+	one.hate_decor = Decor.Kind.DISH
+	var with_three := main.comfort_of(one)
+	main.remove_decor(stones[2])
+	check(main.markers_away.size() == 1 and int(main.markers_away[0]["w"]) == 0 and main.shelf.counts.get("gravestone") == 1 and main.comfort_of(one) >= with_three - 4.5, "the bought one is put away like the rest, and one that likes a gravestone is as well off with two as with three")
+	main.use("gravestone")
+	check(main.markers_away.is_empty() and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.GRAVESTONE and d.whose == 0).size() == 1, "and brought back")
+	main.remove_decor(main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.GRAVESTONE and d.whose == 0)[0])
+	main.markers_away.clear()
+	one.like_decor = fond
+	main._sync()
 
 	# Pairing off: two grown ones that think well of each other and want for nothing
 	main.new_egg().egg.warmth = 100.0

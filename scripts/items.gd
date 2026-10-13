@@ -34,7 +34,6 @@ const LIST: Array[Dictionary] = [
 	{"id": "tent", "group": "decor", "n": 12, "name": "Rag tent"},
 	{"id": "crate", "group": "decor", "n": 13, "name": "Crate"},
 	{"id": "pot", "group": "decor", "n": 14, "name": "Flowerpot"},
-	{"id": "marker", "group": "decor", "n": 15, "name": "Grave marker"},
 	{"id": "rags", "group": "nest", "n": 0, "name": "Rag nest"},
 	{"id": "twigs", "group": "nest", "n": 1, "name": "Twig nest"},
 	{"id": "cushion", "group": "nest", "n": 2, "name": "Cushion"},
@@ -59,7 +58,7 @@ const SPENT: Array[String] = ["food", "egg"]
 # last, whatever order LIST is in (which saves and the shop go by, and is not to be renumbered)
 const ROW: Array[String] = ["scanner", "broom", "food", "toy", "egg", "decor", "nest", "ground", "notebook"]
 # Never bought or sold: on the shelf only while the keeper has one put away
-const KEPT: Array[String] = ["marker"]
+const KEPT: Array[String] = ["gravestone"]
 # On the scanner (see scanner()): how far up its barrel runs, the middle of the mouth of its cone
 # and how wide that is (as a radius), and the middle and size of the readout on its back
 const BORE := 0.56

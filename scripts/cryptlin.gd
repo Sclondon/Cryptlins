@@ -752,6 +752,11 @@ static func profile(k: int, s: int) -> Dictionary:
 	# drawn above changes: now and then, one of them to like as well
 	if rng.randf() < 0.45:
 		liked.append(rng.randi_range(Decor.Kind.POOL + 1, Decor.IDS.size() - 1))
+		# (the number the stones of the dead once had is the gravestone's now)
+		if liked.back() == Decor.Kind.MARKER:
+			liked.pop_back()
+			if not Decor.Kind.GRAVESTONE in liked and me["hates"] != Decor.Kind.GRAVESTONE:
+				liked.append(Decor.Kind.GRAVESTONE)
 	return me
 
 

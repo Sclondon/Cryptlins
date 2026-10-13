@@ -378,13 +378,25 @@ func _parents(r: Resident, line: String) -> String:
 func _remembrance(r: Resident) -> Array[String]:
 	var paras: Array[String] = [
 		"%s.%s" % [_a(Cryptlin.KINDS[r.kind]["title"]), _parents(r, " Its parents were %s and %s.")],
-		"It lived %s, and is gone." % _span(r.lived),
+		"It lived %s, and is gone.%s" % [_span(r.lived), _stone(r)],
 	]
 	var was := Cryptlin.profile(r.kind, r.look_seed)
 	paras.append_array(_found(r.known, false, was["food"], was["yuck"], was["toy"], was["ground"], was["lamp"], was["decor"], was["hates"], Cryptlin.KINDS[r.kind].get("water", false), r.kind, [
 		"Ate gladly", "Would not touch", "Best toy", "Floor it liked", "Lamp it liked", "Liked about the place", "Could not abide", "Wanted water", "Its knack",
 	]))
 	return paras
+
+
+# A few words on the gravestone of one that died, if the keeper still has it: standing in the
+# room, or put away
+func _stone(r: Resident) -> String:
+	for d in world.decors:
+		if d.kind == Decor.Kind.GRAVESTONE and d.whose == r.id:
+			return " Its stone stands in the cellar."
+	for kept: Variant in world.markers_away:
+		if kept is Dictionary and int(kept.get("w", 0)) == r.id:
+			return " Its stone is put by."
+	return ""
 
 
 # What is known of this cryptlin, in paragraphs: what it is, how old and how it seems, and then

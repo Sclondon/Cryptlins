@@ -118,7 +118,8 @@ var next_id := 1
 var chosen: Resident
 # Those that have died, the longest gone first: each keeps a page in the notebook
 var departed: Array[Resident] = []
-# Grave markers the keeper has put away: the colour of each and whose it is
+# Gravestones the keeper has put away: the colour of each and whose it is (0 for one that is
+# nobody's, from when they could be bought)
 var markers_away: Array = []
 # A fight, while one is going on: the ball of dust, the two in it, how long it has left to
 # run, and how long till the next squeak out of it
@@ -676,7 +677,7 @@ func dying(pet: Cryptlin) -> void:
 	_sync()
 
 
-# It is gone. A marker of its own stands where it lay, and its page stays in the notebook.
+# It is gone. A gravestone of its own stands where it lay, and its page stays in the notebook.
 func died(pet: Cryptlin) -> void:
 	var r := pet.me
 	r.needs = pet.get_needs()
@@ -690,7 +691,7 @@ func died(pet: Cryptlin) -> void:
 		departed.pop_front()
 	for other in residents:
 		other.regard.erase(str(r.id))
-	var marker := _stand(Decor.Kind.MARKER, pet.position, randf_range(-0.3, 0.3), pet.fur.get_shader_parameter("tint"), r.id)
+	var marker := _stand(Decor.Kind.GRAVESTONE, pet.position, randf_range(-0.3, 0.3), pet.fur.get_shader_parameter("tint"), r.id)
 	crumbs(marker.position + Vector3(0, 0.1, 0), DUST)
 	if pets().is_empty():
 		_clear_toys()
@@ -1011,7 +1012,12 @@ func comfort_of(who: Cryptlin) -> float:
 	if who.likes.get("dim", false):
 		c += 12.0 if lamp_mode == Lamp.OFF else (-14.0 if lamp_mode == Lamp.BRIGHT else 0.0)
 	var others := 0
+	# (two of a thing are no better and no worse than one: there may be several gravestones)
+	var seen := {}
 	for d in decors:
+		if seen.has(d.kind):
+			continue
+		seen[d.kind] = true
 		if d.kind in who.like_decor:
 			c += 14.0
 		elif d.kind == who.hate_decor:
@@ -1040,7 +1046,8 @@ func owns(id: String) -> bool:
 	# (what is being put away has a place on it, whatever else)
 	if id == stowing and id != "":
 		return true
-	# (a grave marker is never bought: it is on the shelf while one has been put away)
+	# (a gravestone is never bought, whatever the page says: it is on the shelf while one has been
+	# put away)
 	if id in Items.KEPT:
 		return not markers_away.is_empty()
 	# (nor is a toy that has been out in the room and was put away again: it is the room's)
@@ -1209,7 +1216,7 @@ func use(id: String) -> void:
 			play_ball(n)
 		"egg":
 			lay_egg()
-		"decor" when id == "marker":
+		"decor" when id in Items.KEPT:
 			_bring_marker(_free_spot(Decor.RADII[n]))
 			sfx.play("thud", 1.1, -6.0)
 			_sync()
@@ -1389,10 +1396,10 @@ func decor_of(kind: int) -> Decor:
 	return null
 
 
-# Stands one of the grave markers that were put away back in the room
+# Stands one of the gravestones that were put away back in the room
 func _bring_marker(at: Vector3) -> Decor:
 	var kept: Dictionary = markers_away.pop_back()
-	return _stand(Decor.Kind.MARKER, at, randf_range(-0.3, 0.3), Color.html(str(kept.get("c", "808085"))), int(kept.get("w", 0)))
+	return _stand(Decor.Kind.GRAVESTONE, at, randf_range(-0.3, 0.3), Color.html(str(kept.get("c", "808085"))), int(kept.get("w", 0)))
 
 
 func _stand(kind: int, at: Vector3, turn := 0.0, tint := Color(0.5, 0.5, 0.52), whose := 0) -> Decor:
@@ -1485,7 +1492,7 @@ func remove_decor(d: Decor) -> void:
 	if d.kind == Decor.Kind.POOL:
 		shore = Shore.NONE
 		floor_mat.set_shader_parameter("shore", shore)
-	if d.kind == Decor.Kind.MARKER:
+	if d.kind == Decor.Kind.GRAVESTONE:
 		markers_away.append({"c": d.tint.to_html(false), "w": d.whose})
 	decors.erase(d)
 	d.queue_free()
@@ -2008,8 +2015,8 @@ func _sync() -> void:
 			elif item["group"] == "toy" and left_of(id) >= 0:
 				# (those bought and not yet out, and those that have been out and were put away)
 				counts[id] = left_of(id) + toybox.get(id, []).size()
-	if have.has("marker"):
-		counts["marker"] = markers_away.size() + (1 if stowing == "marker" else 0)
+	if have.has("gravestone"):
+		counts["gravestone"] = markers_away.size() + (1 if stowing == "gravestone" else 0)
 	# The marks are what is known of the one in question
 	var pet := who().pet if who() != null else null
 	if pet != null:
@@ -3053,7 +3060,7 @@ func _pull(id: String, at: Vector2) -> void:
 				ball.position = _floor_at(at, 0.75, 0.3)
 			_hold_ball(at)
 			_sync()
-		"decor" when id == "marker":
+		"decor" when id in Items.KEPT:
 			# One of those put away comes back out
 			held_thing = _bring_marker(_floor_at(at, 0.0, 0.3))
 			thing_new = false

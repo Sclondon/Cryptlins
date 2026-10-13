@@ -2,7 +2,7 @@ class_name Decor
 extends Node3D
 ## Something stood in the tank to make it a home: a rock, a hollow log, a fern and so on. Each
 ## cryptlin likes having some of them about and cannot stand one. Some are shelters it can get
-## inside, one is the marker left where a cryptlin died, and one is the pool, which is no small
+## inside, one is the gravestone left where a cryptlin died, and one is the pool, which is no small
 ## thing: half the floor under water (see fill). Also builds the nests.
 
 enum Kind { ROCK, LOG, FERN, SKULL, CRYSTAL, PUMPKIN, GRAVESTONE, DISH, CAVE, POOL, BARREL, STUMP, TENT, CRATE, POT, MARKER }
@@ -13,12 +13,12 @@ const IDS: Array[String] = [
 ]
 const NAMES: Array[String] = [
 	"Rock", "Hollow log", "Fern", "Skull", "Crystal", "Pumpkin", "Gravestone", "Water dish", "Cave", "Pool",
-	"Barrel", "Hollow stump", "Rag tent", "Crate", "Flowerpot", "Grave marker",
+	"Barrel", "Hollow stump", "Rag tent", "Crate", "Flowerpot", "Gravestone",
 ]
 # As in "it likes having the ... about"
 const PLAIN: Array[String] = [
 	"rock", "hollow log", "fern", "skull", "crystal", "pumpkin", "gravestone", "water dish", "cave", "pool",
-	"barrel", "hollow stump", "rag tent", "crate", "flowerpot", "grave marker",
+	"barrel", "hollow stump", "rag tent", "crate", "flowerpot", "gravestone",
 ]
 # How much floor each takes up: the cryptlin walks round it
 const RADII: Array[float] = [0.36, 0.34, 0.22, 0.24, 0.22, 0.28, 0.24, 0.32, 0.85, 0.72, 0.7, 0.74, 0.82, 0.78, 0.76, 0.2]
@@ -38,7 +38,7 @@ var water: ShaderMaterial
 # A shelter (the cave, a barrel, a tent and so on) can be gone into: the cryptlin hides in it,
 # looking out of the front, which faces +Z
 var hollow := false
-# A grave marker is one cryptlin's own: the colour it was, and its number
+# A gravestone is one cryptlin's own: the colour it was, and its number
 var tint := Color(0.5, 0.5, 0.52)
 var whose := 0
 
@@ -113,7 +113,13 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 			for side: float in [-1.0, 1.0]:
 				Ps1.part(self, Ps1.drum(3, 0.0), fire, Vector3(0.09 * side, 0.26, 0.24), Vector3(0.04, 0.07, 0.01))
 			Ps1.part(self, Ps1.ball(), fire, Vector3(0, 0.14, 0.26), Vector3(0.12, 0.035, 0.01))
-		Kind.GRAVESTONE:
+		Kind.GRAVESTONE, Kind.MARKER:
+			# Where one of them died (there is no other way to come by one): a leaning slab with an
+			# arched top and a cross cut in it, a band of the colour the cryptlin was painted round
+			# it, moss at its foot and the earth heaped in front. One from when they could be bought
+			# is nobody's, and has no band. (MARKER is the number the stones of the dead once had.)
+			kind = Kind.GRAVESTONE
+			radius = RADII[kind]
 			var stone := Ps1.mat(Color(0.4, 0.41, 0.43))
 			var slab := Ps1.part(self, Ps1.box(), stone, Vector3(0, 0.22, 0), Vector3(0.36, 0.44, 0.1))
 			slab.rotation.z = 0.06
@@ -123,6 +129,10 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 			Ps1.part(self, Ps1.box(), cut, Vector3(-0.02, 0.38, 0.052), Vector3(0.03, 0.18, 0.004))
 			Ps1.part(self, Ps1.box(), cut, Vector3(-0.02, 0.41, 0.052), Vector3(0.12, 0.03, 0.004))
 			Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.2, 0.34, 0.14)), Vector3(0.1, 0.04, 0.05), Vector3(0.14, 0.06, 0.1))
+			if tint.to_html(false) != "808085":
+				var band := Ps1.part(self, Ps1.box(), Ps1.mat(tint), Vector3(-0.008, 0.16, 0), Vector3(0.375, 0.07, 0.115))
+				band.rotation.z = 0.06
+				Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.2, 0.15, 0.1)), Vector3(-0.04, 0.02, 0.13), Vector3(0.26, 0.05, 0.16))
 		Kind.DISH:
 			Ps1.part(self, Ps1.drum(10, 0.82), Ps1.mat(Color(0.42, 0.24, 0.16)), Vector3(0, 0.05, 0), Vector3(0.3, 0.1, 0.3))
 			Ps1.part(self, Ps1.drum(10), Ps1.mat(Color(0.16, 0.38, 0.5), 0.15), Vector3(0, 0.1, 0), Vector3(0.21, 0.012, 0.21))
@@ -261,17 +271,6 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 			# The shard that came out of it, and what was growing in it
 			Ps1.part(self, Ps1.box(), clay, Vector3(0.74, 0.04, 0.5), Vector3(0.3, 0.05, 0.24), Vector3(0.1, 0.5, 0.15))
 			Ps1.part(self, Ps1.drum(4), Ps1.mat(Color(0.3, 0.26, 0.14)), Vector3(-0.2, 0.36, -0.72), Vector3(0.015, 0.5, 0.015), Vector3(-0.7, 0, 0.3))
-		Kind.MARKER:
-			# Where one of them died: a small rounded stone leaning a little, a band of its own
-			# colour painted round it, and the earth heaped at its foot
-			var stone := Ps1.mat(Color(0.78, 0.77, 0.72))
-			var slab := Node3D.new()
-			slab.rotation = Vector3(-0.08, 0, 0.07)
-			add_child(slab)
-			Ps1.part(slab, Ps1.box(), stone, Vector3(0, 0.16, 0), Vector3(0.24, 0.32, 0.08))
-			Ps1.part(slab, Ps1.drum(8), stone, Vector3(0, 0.32, 0), Vector3(0.12, 0.08, 0.12), Vector3(PI * 0.5, 0, 0))
-			Ps1.part(slab, Ps1.box(), Ps1.mat(tint), Vector3(0, 0.22, 0), Vector3(0.25, 0.08, 0.09))
-			Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.2, 0.15, 0.1)), Vector3(0, 0.02, 0.1), Vector3(0.24, 0.05, 0.16))
 
 
 # The pool as it lies in the room: water over one part of the floor, from the walls to a

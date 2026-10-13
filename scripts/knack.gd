@@ -659,14 +659,14 @@ func _latch(delta: float) -> void:
 
 
 # Something for the chupacabra to get its teeth into: the toy, if it is lying still, or else a
-# thing in the room that has its full shape (never the pool, nor anybody's marker)
+# thing in the room that has its full shape (never the pool, nor a gravestone)
 func _prey() -> Node3D:
 	var world := pet.world
 	if world.ball != null and not world.ball.held and world.ball.speed() < 0.5 and not world.shrivelled.has(world.ball) and Den.wade(world.ball.position) <= 0.0:
 		return world.ball
 	var fair: Array[Node3D] = []
 	for d in world.decors:
-		if not d.kind in [Decor.Kind.POOL, Decor.Kind.MARKER] and d != world.held_thing and not world.shrivelled.has(d):
+		if not d.kind in [Decor.Kind.POOL, Decor.Kind.GRAVESTONE] and d != world.held_thing and not world.shrivelled.has(d):
 			fair.append(d)
 	return fair.pick_random() if not fair.is_empty() else null
 
