@@ -336,6 +336,10 @@ var back_y := 0.0
 # Where its insides are, if not on its middle line, and how they are drawn out along it
 var gut_at := Vector3.ZERO
 var gut_stretch := Vector3.ONE
+# How far its head turns on its neck to look at something (and tips, in proportion), and how much
+# one that drags itself along on its belly bunches up and stretches out as it goes
+var head_turn := 1.25
+var heave := 0.0
 # What is its own about its shape (see looks()): the size of its head, of each eye, and of what
 # its kind wears on its head or back; how far longer legs raise its body, and whether it goes on
 # four of them; where a tuft would grow on its head; what is painted on its coat (the marking,
@@ -1331,43 +1335,80 @@ func _build_nessie(chub: float) -> void:
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.08, 0.035, 0.05))
 
 
-# A whale of the high slopes: mostly mouth, grey as scree, with a hooked tail for hanging on to ridges
+# A whale of the high slopes, and a whale to look at: a long body tapering back along the ground
+# from a broad blunt head, a great wide mouth with the underjaw jutting and pegs for teeth, small
+# eyes far back, a pale grooved throat, flat flippers it rows itself along on, a low ridge on its
+# back, and flukes that curl over into hooks for hanging on to ridges. Grey as scree, blotched
+# with lichen, with stones lying along its back. It is no water kind: it lives on the slopes.
 func _build_bolter(chub: float, rng: RandomNumberGenerator) -> void:
-	neck_y = 0.2
-	centre_y = 0.42
-	top_y = 0.92
+	neck_y = 0.25
+	head_y = 0.04
+	centre_y = 0.25
+	top_y = 0.6
 	gravity = 15.0
-	brain_at = Vector3(0, 0.36, 0.22)
+	brain_at = Vector3(0, 0.08, 0.12)
+	# It has no neck to speak of, and turns the whole of itself to look at anything off to one side
+	head_turn = 0.4
+	heave = 0.07
+	# Its insides are drawn out along it, and its backbone lies flat
+	back_y = 0.34
+	gut_at = Vector3(0, 0, -0.2)
+	gut_stretch = Vector3(1.0, 0.85, 2.3)
+	# (it has no legs: what the rig has for them is the pair of small bones a whale keeps)
 	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(self, Vector3(0.17 * side, 0.15, 0.05))
-		_part(leg, _sphere(), dark, Vector3(0, -0.1, 0.04), Vector3(0.1, 0.05, 0.14))
-		legs.append(leg)
+		legs.append(_pivot(self, Vector3(0.07 * side, 0.12, -0.32)))
 
 	torso = _pivot(self, Vector3.ZERO)
-	# All of it turns to look, tail and flippers too
-	neck = _pivot(torso, Vector3(0, neck_y, 0))
-	_part(neck, _sphere(), fur, Vector3(0, 0.22, -0.02), Vector3(0.36 * chub, 0.31, 0.47 * chub))
-	_part(neck, _sphere(), pale, Vector3(0, 0.13, 0.05), Vector3(0.33 * chub, 0.24, 0.43 * chub))
+	# The body, turned on a lathe from the tail forward and laid along the ground
+	var hull: Array[Vector2] = [
+		Vector2(0.045, 0.0), Vector2(0.075, 0.14), Vector2(0.14, 0.32), Vector2(0.22, 0.52), Vector2(0.28, 0.72),
+		Vector2(0.3, 0.9), Vector2(0.27, 1.02),
+	]
+	_part(torso, _lathe(hull, 10), fur, Vector3(0, 0.25, -0.82), Vector3(chub, 1.0, 0.8), Vector3(PI * 0.5, 0, 0))
+	_part(torso, _sphere(), pale, Vector3(0, 0.15, -0.12), Vector3(0.24 * chub, 0.14, 0.42))
+	# Lichen on it in blotches, and a low ridge of a fin
+	var lichens: Array[Material] = [Ps1.mat(Color(0.27, 0.31, 0.17), 0.0, 0.2), Ps1.mat(Color(0.34, 0.27, 0.13), 0.0, 0.2)]
+	for i in 7:
+		var along := rng.randf_range(-0.5, 0.1)
+		var round := rng.randf_range(-1.2, 1.2)
+		var wide := lerpf(0.13, 0.29, clampf((along + 0.8) / 0.9, 0.0, 1.0))
+		_part(torso, _sphere(), lichens[i % 2], Vector3(sin(round) * wide * chub, 0.25 + cos(round) * wide * 0.8, along), Vector3(0.085, 0.03, 0.1) * rng.randf_range(0.6, 1.1), Vector3(0, 0, -round))
+	_part(torso, _cone(), dark, Vector3(0, 0.5, -0.3), Vector3(0.025, 0.11, 0.13), Vector3(-0.5, 0, 0))
 	var rock := BoxMesh.new()
-	var scree := neck.get_child_count()
+	var scree := torso.get_child_count()
 	for i in 4:
-		var at := Vector3(rng.randf_range(-0.16, 0.16), 0.5 - i * 0.02, 0.05 - i * 0.12)
-		_part(neck, rock, dark, at, Vector3(0.11, 0.07, 0.1) * rng.randf_range(0.7, 1.2), Vector3(rng.randf(), rng.randf(), rng.randf()))
-	_swell(neck, scree, Vector3(0, 0.44, -0.1), Vector3.ONE * crest)
-	tail = _pivot(neck, Vector3(0, 0.24, -0.42 * chub))
-	_part(tail, _capsule(0.07, 0.4), fur, Vector3(0, 0.1, -0.13), Vector3.ONE, Vector3(-0.9, 0, 0))
+		var at := Vector3(rng.randf_range(-0.1, 0.1), 0.49 - i * 0.012, 0.02 - i * 0.14)
+		_part(torso, rock, dark, at, Vector3(0.11, 0.07, 0.1) * rng.randf_range(0.7, 1.2), Vector3(rng.randf(), rng.randf(), rng.randf()))
+	_swell(torso, scree, Vector3(0, 0.44, -0.2), Vector3.ONE * crest)
+	tail = _pivot(torso, Vector3(0, 0.25, -0.82))
+	_part(tail, _capsule(0.045, 0.2), fur, Vector3(0, 0.01, -0.05), Vector3.ONE, Vector3(PI * 0.5, 0, 0))
 	for side: float in [-1.0, 1.0]:
-		# The flukes curl over into hooks
-		_part(tail, _cone(), dark, Vector3(0.09 * side, 0.3, -0.27), Vector3(0.06, 0.22, 0.03), Vector3(0.5, 0, -1.9 * side))
-		var a := _pivot(neck, Vector3(0.35 * chub * side, 0.2, 0.08))
-		_part(a, _sphere(), dark, Vector3(0, -0.1, 0), Vector3(0.04, 0.13, 0.09))
+		# The flukes: flat, spread, and curled over at the tips into hooks
+		_part(tail, _sphere(), fur, Vector3(0.1 * side, 0.02, -0.15), Vector3(0.12, 0.022, 0.07), Vector3(0, 0.5 * side, 0))
+		_part(tail, _cone(), dark, Vector3(0.2 * side, 0.07, -0.19), Vector3(0.04, 0.14, 0.03), Vector3(0.4, 0, 0.9 * side))
+		# The flippers reach out and down to the floor, and row
+		var a := _pivot(torso, Vector3(0.24 * chub * side, 0.2, 0.06))
+		_spike(a, dark, Vector3.ZERO, Vector3(0.8 * side, -0.55, -0.15), 0.3, 0.03, _drum(1.0, 1.0, 1.0))
+		_part(a, _sphere(), dark, Vector3(0.2 * side, -0.15, -0.06), Vector3(0.15, 0.03, 0.1), Vector3(0, -0.3 * side, -0.6 * side))
 		arms.append(a)
-		_eye(Vector3(0.25 * chub * side, 0.37, 0.24 * chub), 0.05)
-	mouth_node = _pivot(neck, Vector3(0, 0.15, 0.4 * chub))
-	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.3 * chub, 0.11, 0.09))
+
+	# The head: a blunt brow over a mouth as wide as the whole of it, and the underjaw out in front
+	neck = _pivot(torso, Vector3(0, neck_y, 0.14))
+	_part(neck, _sphere(), fur, Vector3(0, 0.04, 0.14), Vector3(0.32 * chub, 0.23, 0.3))
+	_part(neck, _sphere(), pale, Vector3(0, -0.12, 0.2), Vector3(0.33 * chub, 0.12, 0.34))
+	_part(neck, _sphere(), dark, Vector3(0, 0.19, 0.3), Vector3(0.03, 0.012, 0.03))
+	for i in 5:
+		# Grooves down its throat
+		var x := (i - 2.0) * 0.1 * chub
+		_part(neck, Ps1.box(), dark, Vector3(x, -0.17 + absf(x) * 0.12, 0.36 - x * x * 1.3), Vector3(0.014, 0.012, 0.3), Vector3(0.32, x * 1.6, 0))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.275 * chub * side, 0.1, 0.07), 0.042)
+	mouth_node = _pivot(neck, Vector3(0, -0.03, 0.4))
+	_part(mouth_node, _sphere(), maw, Vector3(0, 0, -0.06), Vector3(0.29 * chub, 0.12, 0.1))
 	for i in 6:
-		var x := (i - 2.5) * 0.085 * chub
-		_part(neck, _cone(), bone, Vector3(x, 0.21, 0.455 * chub - x * x * 1.6), Vector3(0.028, 0.07, 0.022), Vector3(PI, 0, 0))
+		# Pegs standing up out of the underjaw
+		var x := (i - 2.5) * 0.09 * chub
+		_part(neck, _cone(), bone, Vector3(x, -0.03, 0.515 - x * x * 1.7), Vector3(0.026, 0.075, 0.024))
 
 
 # Thin as hunger: a deer's skull on a dark, long-armed body, and a light in the sockets
@@ -4187,6 +4228,10 @@ func _animate(delta: float) -> void:
 	torso.rotation.x = gait * minf(speed, 3.5) * 0.07 + curl * 0.12
 	torso.rotation.z = wiggle + sin(anim_t * 42.0) * float(FEELINGS[feeling]["shake"])
 	torso.scale = Vector3(1.0 + squash * 0.6 + breath, 1.0 - squash + breath, 1.0 + squash * 0.6 + breath)
+	if heave > 0.0:
+		# It hauls its front up and forward on its flippers, and the rest of it slides up behind
+		torso.scale.z *= 1.0 + sin(phase * 2.0) * heave * gait
+		torso.rotation.x -= maxf(sin(phase * 2.0), 0.0) * heave * 1.6 * gait
 
 	var fold := sit * 1.3 + curl * 1.35
 	legs[0].rotation.x = swing * 0.9 - fold
@@ -4211,8 +4256,8 @@ func _animate(delta: float) -> void:
 
 	# Head turns to whatever it is looking at; the pupils go the rest of the way
 	var seen := torso.global_transform.affine_inverse() * gaze - neck.position - Vector3(0, head_y, 0)
-	var want_yaw := clampf(atan2(seen.x, seen.z), -1.25, 1.25)
-	var want_pitch := clampf(-atan2(seen.y, Vector2(seen.x, seen.z).length()), -0.7, 0.5)
+	var want_yaw := clampf(atan2(seen.x, seen.z), -head_turn, head_turn)
+	var want_pitch := clampf(-atan2(seen.y, Vector2(seen.x, seen.z).length()), -0.56 * head_turn, 0.4 * head_turn)
 	if curl_goal > 0.5:
 		want_yaw = 0.35
 		want_pitch = 0.45
@@ -4332,7 +4377,12 @@ func _build_insides() -> void:
 	var chest := _pivot(torso, Vector3.ZERO)
 	insides.append(chest)
 	var top: float = back_y if back_y > 0.0 else neck_y + brain_at.y * 0.5
-	_part(chest, _capsule(0.014, maxf(top - centre_y + 0.22, 0.1)), white, Vector3(0, (top + centre_y - 0.22) * 0.5, -0.06) + gut_at)
+	var spine := _part(chest, _capsule(0.014, maxf(top - centre_y + 0.22, 0.1)), white, Vector3(0, (top + centre_y - 0.22) * 0.5, -0.06) + gut_at)
+	if gut_stretch.z > 1.0:
+		# One whose insides are drawn out along it has its backbone lying along its back
+		spine.position = Vector3(0, top, 0) + gut_at
+		spine.rotation.x = PI * 0.5
+		spine.scale.y = gut_stretch.z * 1.4
 	# The rest sits about the middle of its body, smaller in a slight one
 	var organs := _pivot(chest, Vector3(0, centre_y, 0) + gut_at)
 	organs.scale = gut_stretch * gut

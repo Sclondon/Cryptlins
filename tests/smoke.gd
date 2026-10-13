@@ -194,6 +194,27 @@ func _serpent(pet: Cryptlin) -> void:
 	pet.wiggle = 0.0
 
 
+# The slide-rock bolter is a whale to look at, long along the ground from its mouth to its
+# flukes, with its insides drawn out along it; it is no water kind, and it heaves itself along
+func _whale(pet: Cryptlin) -> void:
+	check(not pet.needs_water() and pet.tail.position.z < -0.7 and pet.mouth_node.position.z > 0.3 and pet.head_turn < 0.6, "it lies long along the ground, mouth to flukes, and wants no water")
+	pet.xray(true)
+	var organs: Node3D = pet.stomach.get_parent()
+	check(organs.scale.z > organs.scale.y * 2.0 and pet.inside_at("brain").y > pet.inside_at("stomach").y, "its insides are drawn out along it")
+	pet.xray(false)
+	pet.position = Vector3(-1.2, 0, 0.6)
+	pet.target = Vector3(1.3, 0, 0.9)
+	pet._enter(Cryptlin.State.WANDER)
+	var most := 0.0
+	var least := 9.0
+	for i in 90:
+		await _frames(1)
+		most = maxf(most, pet.torso.scale.z)
+		least = minf(least, pet.torso.scale.z)
+	check(most - least > 0.04, "it bunches up and stretches out as it hauls itself along")
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -595,6 +616,8 @@ func _run() -> void:
 		await _tracker(pet)
 	if pet.decoy != null:
 		await _serpent(pet)
+	if pet.heave > 0.0:
+		await _whale(pet)
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name
