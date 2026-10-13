@@ -35,7 +35,9 @@ An egg is one more for the room, which holds four.
 
 Food gets eaten. Toys get thrown: pick one up and throw it again.
 
-Rocks, logs and the like stay put. Drag them about, or back down to the wheel to put them away. They will sit on them, drink from them, wade in them and hide in them.
+Rocks, logs and the like stay put. Drag them about, or back down to the wheel to put them away. They will sit on them, drink from them and hide in them.
+
+The pool is half the floor under water. A finger on the water has hold of it: drag it to another side of the room, or down to the wheel. Those that live in water wade about in it and sleep at its edge. The rest keep to the dry floor, come down for a drink, and are cross if they are put in. Nothing else will stand in it. Food and toys float.
 
 A tray of ground changes the floor. A nest changes their bed.
 

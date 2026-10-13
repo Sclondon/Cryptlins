@@ -88,18 +88,24 @@ func speed() -> float:
 func _process(delta: float) -> void:
 	if held:
 		return
+	# On the floor it rests on the floor; out in the pool it floats
+	var out := Den.wade(position)
+	var rest := lerpf(R, Decor.WATER + R * 0.4, smoothstep(0.0, 0.2, out))
 	vel.y -= fall * delta
 	position += vel * delta
-	if position.y < R:
-		position.y = R
+	if position.y < rest:
+		position.y = rest
 		if vel.y < -0.9:
 			bounced.emit(-vel.y)
-			vel.y = -vel.y * bounce
+			vel.y = -vel.y * bounce * (0.25 if out > 0.0 else 1.0)
 		else:
 			vel.y = 0.0
 	var flat := Vector3(vel.x, 0, vel.z)
-	if position.y <= R + 0.001:
+	if position.y <= rest + 0.001:
 		flat = flat.move_toward(Vector3.ZERO, delta * drag)
+		if out > 0.0:
+			# The water takes the way off it, and it drifts back to the edge and out onto the floor
+			flat = flat.move_toward((Den.shore_by(position, R + 0.1) - position).normalized() * 0.55, delta * 3.0)
 		vel.x = flat.x
 		vel.z = flat.z
 	# The walls of the room, and the unseen one across the front

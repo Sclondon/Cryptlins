@@ -109,7 +109,7 @@ func _digger(pet: Cryptlin) -> void:
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 	pet.beg_cooldown = 0.0
 	main.set_ground(was)
-	check(digs[0] > 40 and digs[1] > 15, "it digs a great deal on dirt and has a go at flagstones too (%d and %d times in 200)" % digs)
+	check(digs[0] > 25 and digs[1] > 8 and digs[0] > digs[1], "it digs a great deal on dirt and has a go at flagstones too (%d and %d times in 200)" % digs)
 	var comfort := {}
 	for mode: int in [Den.Lamp.BRIGHT, Den.Lamp.LOW, Den.Lamp.OFF]:
 		main.lamp_mode = mode
@@ -353,6 +353,166 @@ func _content(one: Cryptlin, mate: Cryptlin) -> void:
 	mate.position = Vector3(0.7, 0, 0.6)
 	main.warm(one, mate, 90.0 - main.regard(one, mate))
 	main.warm(mate, one, 90.0 - main.regard(mate, one))
+
+
+# How much of the floor is under water, 0 to 1
+func _wet_share() -> float:
+	var wet := 0
+	for i in 40:
+		for j in 40:
+			if Den.wade(Vector3(lerpf(-Den.half.x, Den.half.x, (i + 0.5) / 40.0), 0, lerpf(-Den.half.y, Den.half.y, (j + 0.5) / 40.0))) > 0.0:
+				wet += 1
+	return wet / 1600.0
+
+
+# The pool: its shape, each place it fits, what is kept out of it and what is moved out when it
+# arrives, the room changing shape round it, what floats in it, and what a cryptlin makes of it
+# by whether it lives in water
+func _pool(pet: Cryptlin) -> void:
+	var pool := main.decor_of(Decor.Kind.POOL)
+	await _until(func() -> bool: return _settled(pet), 900)
+	pet.set_needs({"belly": 100.0, "energy": 95.0, "fun": 80.0, "bowel": 0.0, "bladder": 0.0})
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	# The shape of it
+	check(is_equal_approx(Den.wade(Den.at_shore(0.7, 0.5)), 0.5) and is_equal_approx(Den.wade(Den.at_shore(-1.1, -0.4)), -0.4), "how far out into it a place is can be told, either side of the edge")
+	check(absf(Den.wade(Den.place(-1.5, 0.0)) - Den.wade(Den.place(1.2, 0.0))) > 0.1, "an edge that wanders")
+	check(Den.deep(Den.at_shore(0.0, -0.5)) == 0.0 and is_equal_approx(Den.deep(Den.at_shore(0.0, 0.3)), 0.3 * Decor.SHELVE) and Den.deep(Den.middle(Den.shore)) == Decor.DEEP, "the ground shelves down into it")
+	var out := Den.on_dry(Den.middle(Den.shore), 0.3, 0.25)
+	check(is_equal_approx(Den.wade(out), -0.25) and Den.on_dry(out, 0.3, 0.25).is_equal_approx(out), "and the nearest dry floor to a place in it can be found")
+	for where in Den.shores():
+		main.place_decor(Decor.Kind.POOL, Den.middle(where))
+		check(Den.shore == where and pool.position == Den.middle(where) and _wet_share() > 0.4 and _wet_share() < 0.6, "it lies over the %s of the room, half the floor (%.2f)" % [["", "back", "left", "right"][where], _wet_share()])
+	# Nothing else goes in it
+	var skull := main.place_decor(Decor.Kind.SKULL, Den.middle(Den.shore))
+	check(Den.wade(skull.position) <= -skull.radius + 0.001, "a thing put down in the pool stands on the dry floor beside it")
+	pet.position = Vector3(-2.0, 0, 1.6)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	await _frames(2)
+	await _slide(_screen(skull.position + Vector3(0, 0.2, 0)), _screen(Den.middle(Den.shore)))
+	check(Den.wade(skull.position) <= -skull.radius + 0.001 and Den.wade(skull.position) > -skull.radius - 0.2 and Den.shore == Den.Shore.RIGHT, "and dragged at the water it stops at the edge")
+	await _slide(_screen(main.nest_pos + Vector3(0, 0.1, 0)), _screen(Den.middle(Den.shore)))
+	check(Den.wade(main.nest_pos) <= -0.699 and Den.wade(main.nest_pos) > -0.9, "so does the nest")
+	var spots: Array[Vector3] = [main._clear_spot(Den.middle(Den.shore), 1.1)]
+	for i in 20:
+		spots.append_array([main._free_spot(0.3), main.hiding_place(pet), main.nest_spot(pet), main.toilet_spot(pet)])
+	check(spots.all(func(p: Vector3) -> bool: return Den.wade(p) < 0.0), "an egg, a thing, a nest, a hiding place and a dropping are all found dry floor")
+	var left := main.leave_mess(Mess.Kind.DROPPING, Den.middle(Den.shore), pet)
+	check(Den.wade(left.position) < 0.0, "and nothing is left lying in the water")
+	main.clear_mess(left)
+	# A drag moves it, and puts it away
+	await _slide(_screen(Den.middle(Den.Shore.RIGHT)), _screen(Vector3(-2.0, 0, 0.5)))
+	check(Den.shore == Den.Shore.LEFT and pool.position == Den.middle(Den.Shore.LEFT), "a finger on the water drags the pool over to another part of the floor")
+	check(Den.wade(skull.position) < 0.0 and Den.wade(main.nest_pos) < 0.0, "and what was standing there is moved out of it")
+	pet.position = Vector3(2.0, 0, 1.6)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	await _frames(2)
+	await _slide(_screen(Den.middle(Den.Shore.LEFT)), _on_shelf("notebook"))
+	check(main.decor_of(Decor.Kind.POOL) == null and Den.shore == Den.Shore.NONE and _wet_share() == 0.0, "dragged down to the row it is put away, and the floor is whole again")
+	main.move_nest(Vector3(0, 0, -1.5))
+	main.place_decor(Decor.Kind.SKULL, Vector3(1.2, 0, -1.6))
+	left = main.leave_mess(Mess.Kind.DROPPING, Vector3(-1.2, 0, -1.5), pet)
+	pool = main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
+	check(Den.shore == Den.Shore.BACK and Den.wade(main.nest_pos) <= -0.699 and Den.wade(skull.position) < 0.0 and Den.wade(left.position) < 0.0, "laid where things stand, it moves them out onto the dry")
+	main.clear_mess(left)
+	await _tap(_on_shelf("pool"))
+	check(main.decor_of(Decor.Kind.POOL) == null and Den.shore == Den.Shore.NONE, "a tap on its item puts it away too")
+	# The room changing shape round it
+	pool = main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.LEFT))
+	var wide := Den.half
+	var lamp := Den.lamp_at
+	main._reshape(Vector2(1.85, 3.1), Vector3(0, 6.3, 0.1))
+	check(Den.shores() == [Den.Shore.BACK] and Den.shore == Den.Shore.BACK and pool.position == Den.middle(Den.Shore.BACK) and _wet_share() > 0.4 and _wet_share() < 0.6, "on an upright phone it fits over the back of the room, and is built again there (%.2f)" % _wet_share())
+	check(Den.wade(main.nest_pos) < 0.0 and Den.wade(skull.position) < 0.0 and absf(skull.position.x) < Den.half.x, "with the things in the room brought out of it")
+	var room := (1.0 - _wet_share()) * 4.0 * Den.half.x * Den.half.y
+	check(room > 8.0, "which leaves four of them room on the dry half (%.1f square)" % room)
+	main._reshape(wide, lamp)
+	check(Den.shore == Den.Shore.BACK and pool.position == Den.middle(Den.Shore.BACK) and _wet_share() > 0.4 and _wet_share() < 0.6, "and turned back, it is built again to the wide room")
+	main.remove_decor(skull)
+	# Food thrown in floats, and can be got at; a toy floats back
+	pet.position = Vector3(0, 0, 1.6)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	main.feed((pet.yuck_food + 1) % Snack.NAMES.size(), Den.at_shore(0.3, 1.2) + Vector3(0, 2.0, 0))
+	var bit: Snack = main.snacks[0]
+	check(await _until(func() -> bool: return bit.landed, 300) and Den.wade(bit.position) > 0.5 and bit.position.y < 0.0, "food thrown into the pool floats")
+	check(await _until(func() -> bool: return Den.wade(bit.position) < 0.2, 900) and Den.wade(bit.position) > 0.0, "and drifts in to the shallows")
+	pet.belly = 30.0
+	pet._enter(Cryptlin.State.IDLE, 0.2)
+	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500) and pet.belly > 50.0 and (pet.needs_water() or Den.wade(pet.position) <= 0.15), "where it is reached, and eaten")
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	main.play_ball(Ball.Kind.BALL)
+	main.ball.position = Den.at_shore(-0.4, 1.3) + Vector3(0, 1.0, 0)
+	main.ball.vel = Vector3.ZERO
+	pet.ball_cooldown = 60.0
+	check(await _until(func() -> bool: return main.ball.position.y < Ball.R * 0.9, 200) and Den.wade(main.ball.position) > 0.5, "a toy thrown into it floats")
+	check(await _until(func() -> bool: return Den.wade(main.ball.position) < 0.0 and main.ball.position.y >= Ball.R - 0.001, 1500), "and comes back to the edge and out onto the floor")
+	main._clear_toys()
+	pet.set_needs({"belly": 100.0, "energy": 95.0, "fun": 80.0, "bowel": 0.0, "bladder": 0.0})
+	if pet.needs_water():
+		# One that lives in water is in and out of it as it likes
+		pet._enter(Cryptlin.State.VISIT)
+		check(pet.visiting == pool, "one that lives in water goes to the pool of its own accord")
+		check(await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.step >= 1 and Den.wade(pet.position) > 0.3 and pet.position.y < -0.1, 900), "and wades in up to its middle")
+		var waded := 0
+		while pet.state == Cryptlin.State.VISIT and waded < 4000:
+			await _frames(10)
+			waded += 10
+		check(waded > 900 and pet.kicks == 2 and pet.state != Cryptlin.State.VISIT, "paddling about in one part of it and then another for a good while (%d s)" % (waded / 60))
+		pet.target = Vector3(0.5, 0, 1.6)
+		pet._enter(Cryptlin.State.WANDER)
+		check(await _until(func() -> bool: return Den.wade(pet.position) < -0.3, 600) and is_equal_approx(pet.position.y, pet.jump_y), "it walks out of it")
+		pet.target = Den.at_shore(-0.5, 1.2)
+		pet._enter(Cryptlin.State.WANDER)
+		check(await _until(func() -> bool: return Den.wade(pet.position) > 0.6, 600) and pet.state != Cryptlin.State.FLOUNDER, "and back in, as it likes")
+		check(not pet._footing(Den.middle(Den.shore), 0.4).is_equal_approx(Den.on_dry(Den.middle(Den.shore), 0.4)), "anywhere in the room is somewhere for it to go")
+		pet.fight_cooldown = 0.0
+		pet._enter(Cryptlin.State.DIG)
+		check(pet.state != Cryptlin.State.DIG and not pet._can_fight(), "out in the water it does not dig, and is not to be fought with")
+		pet.fight_cooldown = 20.0
+		pet.bowel = 100.0
+		pet._enter(Cryptlin.State.IDLE, 0.1)
+		check(await _until(func() -> bool: return main.droppings() == 1, 1500) and Den.wade(main.messes.back().position) < 0.0, "it gets out of the water to leave a dropping")
+		main.clear_mess(main.messes.back())
+		await _until(func() -> bool: return _settled(pet), 600)
+		pet.energy = 40.0
+		main.set_lamp(Den.Lamp.OFF)
+		check(await _until(func() -> bool: return pet.state == Cryptlin.State.SLEEP, 1800) and absf(Den.wade(pet.position)) < 0.3, "and it sleeps at the edge of it (%.2f)" % Den.wade(pet.position))
+		pet.energy = 70.0
+		main.set_lamp(Den.Lamp.BRIGHT)
+		await _until(func() -> bool: return pet.state != Cryptlin.State.SLEEP, 300)
+	else:
+		# One that does not keeps to the dry half
+		var goes: Array[Vector3] = []
+		for i in 30:
+			goes.append(pet._footing(Vector3(randf_range(-9.0, 9.0), 0, randf_range(-9.0, 9.0)), 0.4))
+		check(goes.all(func(p: Vector3) -> bool: return Den.wade(p) < 0.0), "one that does not live in water has nowhere to go but the dry floor")
+		pet.position = Vector3(0.4, 0, 1.4)
+		pet.target = Den.middle(Den.shore)
+		pet._enter(Cryptlin.State.WANDER)
+		await _frames(300)
+		check(Den.wade(pet.position) <= 0.0 and Den.wade(pet.position) > -0.5 and pet.state != Cryptlin.State.FLOUNDER and pet.position.y >= 0.0, "walked at the water, it stops at the edge (%.2f)" % Den.wade(pet.position))
+		await _until(func() -> bool: return _settled(pet), 600)
+		pet._enter(Cryptlin.State.VISIT)
+		pet.visiting = pool
+		check(await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.step >= 1, 900) and Den.wade(pet.position) <= 0.0 and Den.wade(pet.position) > -0.4, "it comes down to the edge for a drink")
+		await _until(func() -> bool: return pet.state != Cryptlin.State.VISIT, 900)
+		await _until(func() -> bool: return _settled(pet), 600)
+		pet._enter(Cryptlin.State.IDLE, 60.0)
+		pet.pick_up()
+		pet.carry(Den.at_shore(0.0, 1.2) + Vector3(0, 0.8, 0))
+		await _frames(40)
+		check(pet.position.y > 0.6, "carried out over the pool, it hangs over it")
+		pet.put_down()
+		check(await _until(func() -> bool: return pet.state == Cryptlin.State.FLOUNDER, 200) and pet.position.y < -0.1, "let go there, it is in the water up to its middle")
+		check(await _until(func() -> bool: return Den.wade(pet.position) <= 0.0 and pet.state != Cryptlin.State.FLOUNDER, 600) and pet.feeling == Cryptlin.Feeling.GRUMPY, "and scrambles out by the shortest way, cross")
+		await _until(func() -> bool: return _settled(pet), 600)
+		pet.position = Den.at_shore(0.0, -0.4)
+		pet._enter(Cryptlin.State.IDLE, 60.0)
+		await _frames(2)
+		pet.push(Den.at_shore(0.0, 1.0) - pet.position)
+		check(await _until(func() -> bool: return pet.state == Cryptlin.State.FLOUNDER, 300), "shoved in, the same")
+		check(await _until(func() -> bool: return Den.wade(pet.position) <= 0.0 and pet.state != Cryptlin.State.FLOUNDER, 600), "and out it comes again")
+	await _until(func() -> bool: return _settled(pet), 900)
 
 
 func _run() -> void:
@@ -682,35 +842,59 @@ func _run() -> void:
 	pet._enter(Cryptlin.State.VISIT)
 	check(await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.lift > 0.3, 900), "and climbs up to sit on the rock")
 	main.remove_decor(rock)
-	# A pool: a water kind is not at home without one and wades into it; the rest take it or leave it
+	# A pool: half the floor under water. A water kind is not at home without one; the rest take it or leave it
 	await _until(func() -> bool: return _settled(pet), 900)
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	pet.position = Vector3(0, 0, 0.9)
+	main.move_nest(Vector3(-1.6, 0, -1.2))
 	main.who().known.erase("water")
 	var dry := main.comfort_of(pet)
 	check(pet.dry() == pet.needs_water() and not main.notebook._notes(pet).contains("pool"), "nothing says yet whether it needs water")
+	check(Den.shore == Den.Shore.NONE and Den.wade(Vector3(0, 0, -2.0)) < 0.0 and Den.deep(Vector3(0, 0, -2.0)) == 0.0 and Den.on_dry(Vector3(1, 0, -2), 0.3, 0.3) == Vector3(1, 0, -2), "with no pool the whole floor is dry")
+	check(Den.shores() == [Den.Shore.BACK, Den.Shore.LEFT, Den.Shore.RIGHT], "in a wide room a pool fits over the back or either side")
 	await _tap(_on_shelf("pool"))
 	var pool := main.decor_of(Decor.Kind.POOL)
-	check(pool != null and pool.radius > Decor.RADII[Decor.Kind.DISH] * 2.0, "a tap on the pool stands it in the room, a good deal bigger than the dish")
+	check(pool != null and Den.shore == Den.Shore.RIGHT and pool.position == Den.middle(Den.Shore.RIGHT), "a tap on the pool lays it over the part of the floor with least on it")
+	check(_wet_share() > 0.4 and _wet_share() < 0.6, "and about half the floor is under water (%.2f)" % _wet_share())
 	check(not Decor.Kind.POOL in pet.like_decor and pet.hate_decor != Decor.Kind.POOL, "the pool is no part of its likes and dislikes")
 	check(await _until(func() -> bool: return main.who().known.get("water", false), 900), "the cryptlin goes to look, and whether it needs water is found out")
 	check(main.toast.text.findn("water") < 0 and main.toast.text.findn("pool") < 0, "nothing is written on the screen about it")
 	if pet.needs_water():
 		check(main.comfort_of(pet) > dry + 30.0, "a water kind is far more at home with a pool (%.0f, from %.0f)" % [main.comfort_of(pet), dry])
 		check(main.shelf.marks.get("pool") == "heart" and main.notebook._notes(pet).contains("a pool to wade in"), "the shelf marks it and the notebook says so")
-		await _until(func() -> bool: return _settled(pet), 900)
-		pet._enter(Cryptlin.State.VISIT)
-		check(pet.visiting == pool, "it goes to the pool of its own accord")
-		check(await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.lift < 0.0 and pet.position.distance_to(Vector3(pool.position.x, pet.position.y, pool.position.z)) < 0.2, 900), "and wades in up to its middle")
-		check(await _until(func() -> bool: return pet.state != Cryptlin.State.VISIT, 900) and pet.lift == 0.0, "and climbs out again")
-		main.remove_decor(pool)
-		check(pet.dry() and main.comfort_of(pet) < dry + 1.0, "without one it is back to making do")
-		pet._enter(Cryptlin.State.BEG)
-		check(pet.beg_for == Cryptlin.Want.WATER, "and asks for water")
 	else:
 		check(absf(main.comfort_of(pet) - dry) < 5.0 and not main.shelf.marks.has("pool"), "its kind takes a pool as it would anything else")
 		check(main.notebook._notes(pet).contains("no more than a drink"), "and the notebook says so")
-		main.remove_decor(pool)
+	await _pool(pet)
+	# A save from when the pool was a small round thing: it loads as the pool there is now, over
+	# the part of the floor the old one stood in
+	main.place_decor(Decor.Kind.SKULL, Vector3(-1.9, 0, 1.0))
+	main.save_game()
+	main.queue_free()
+	await _frames(3)
+	var kept: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(save))
+	for held: Dictionary in kept["decor"]:
+		if int(held["k"]) == Decor.Kind.POOL:
+			held["x"] = -1.8
+			held["z"] = 0.4
+	var rewritten := FileAccess.open(save, FileAccess.WRITE)
+	rewritten.store_string(JSON.stringify(kept))
+	rewritten.close()
+	main = _start()
+	await _frames(5)
+	pet = main.who().pet
+	pool = main.decor_of(Decor.Kind.POOL)
+	check(pool != null and Den.shore == Den.Shore.LEFT and pool.position == Den.middle(Den.Shore.LEFT) and _wet_share() > 0.4, "a save with the old small pool in it loads with the pool over that side of the floor")
+	check(Den.wade(main.decor_of(Decor.Kind.SKULL).position) < 0.0 and Den.wade(main.nest_pos) < 0.0, "and what stood there out on the dry")
+	main.remove_decor(main.decor_of(Decor.Kind.SKULL))
+	main.remove_decor(pool)
+	check(Den.shore == Den.Shore.NONE and _wet_share() == 0.0, "put away, the floor is whole again")
+	if pet.needs_water():
+		check(pet.dry() and main.comfort_of(pet) < dry + 1.0, "without one a water kind is back to making do")
+		await _until(func() -> bool: return _settled(pet), 900)
+		pet.set_needs({"belly": 90.0, "energy": 95.0, "fun": 80.0})
+		pet._enter(Cryptlin.State.BEG)
+		check(pet.beg_for == Cryptlin.Want.WATER, "and asks for water")
 	await _until(func() -> bool: return _settled(pet), 900)
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	await _tap(_on_shelf(Items.id_of("ground", pet.fav_ground)))
@@ -1100,6 +1284,16 @@ func _run() -> void:
 		one.squabble(two, 1.0)
 		await _until(func() -> bool: return main.scuffle == null, 400)
 	check(is_equal_approx(minf(one.health, two.health), Cryptlin.FIGHT_FLOOR), "fight after fight never takes one below the floor (%.0f, %.0f)" % [one.health, two.health])
+	# A fight is had out on dry floor, pool or no pool
+	await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+	main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
+	one.position = Den.at_shore(0.0, 0.9)
+	two.position = Den.at_shore(0.4, 0.7)
+	main.start_fight(one, two)
+	check(main.scuffle != null and Den.wade(main.scuffle.position) <= -0.299, "two that come to blows with water under them have it out on the dry floor")
+	main.end_fight(true)
+	check(Den.wade(one.position) < 0.0 and Den.wade(two.position) < 0.0, "and are both left there")
+	main.remove_decor(main.decor_of(Decor.Kind.POOL))
 	# The keeper can break it up: a tap, food dropped on it, the lamp swung over it
 	for way in 3:
 		await _until(func() -> bool: return _settled(one) and _settled(two), 900)
@@ -1280,7 +1474,7 @@ func _run() -> void:
 	var mate: Cryptlin = main.residents[1].pet
 	# (a room that suits them both: whatever each has is what it likes, and water for a water kind)
 	if (one.needs_water() or mate.needs_water()) and main.decor_of(Decor.Kind.POOL) == null:
-		main.place_decor(Decor.Kind.POOL, Vector3(1.6, 0, -1.4))
+		main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
 	for m in main.messes.duplicate():
 		main.clear_mess(m)
 	_content(one, mate)

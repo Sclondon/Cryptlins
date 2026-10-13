@@ -9,7 +9,7 @@ enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
 	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED, INSPECT, SCANNED, VISIT, MOVE_NEST,
 	TOILET, FOND, SCRATCH, STRETCH, DIG, SPIN, GAZE,
-	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED, DYING, PAIR,
+	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED, DYING, PAIR, FLOUNDER,
 }
 # The cryptids they are the young of
 enum Kind {
@@ -2303,6 +2303,35 @@ func dry() -> bool:
 	return needs_water() and world.decor_of(Decor.Kind.POOL) == null
 
 
+# A place it can go to, as near a given one as may be: anywhere inside the walls for one that
+# lives in water, and for the rest only the dry floor
+func _footing(point: Vector3, margin: float) -> Vector3:
+	return Den.in_room(point, margin) if needs_water() else Den.on_dry(point, margin, 0.3 * grow)
+
+
+# Somewhere to wander off to: anywhere on the floor that it can go (one that does not live in
+# water looks again sooner than end up at the edge of the pool every other time)
+func _roam() -> Vector3:
+	var spot := Vector3.ZERO
+	for i in 6:
+		spot = Vector3(randf_range(-9.0, 9.0), 0, randf_range(-9.0, 9.0)).limit_length(Den.half.length())
+		if needs_water() or Den.wade(Den.in_room(spot, 0.4)) < -0.3 * grow:
+			break
+	return _footing(spot, 0.4)
+
+
+# How far below the floor it stands where it is: down the shelving bed of the pool until the
+# water is up to its middle, and afloat from there on out (and not at all while it is held up)
+func _sunk() -> float:
+	return minf(maxf(-Den.deep(position), Decor.WATER - centre_y * 0.75 * grow), 0.0) * clampf(1.0 - lift / 0.3, 0.0, 1.0)
+
+
+# Whether it is in the pool with no business there: carried over it and let go, shoved in, or
+# the water come to where it was standing
+func _swamped() -> bool:
+	return not needs_water() and lift <= 0.05 and Den.wade(position) > 0.15 and not state in [State.FLOUNDER, State.HELD, State.SHOVED, State.LEAVE, State.SCUFFLE]
+
+
 func is_baby() -> bool:
 	return age < GROW_AGE
 
@@ -2483,7 +2512,7 @@ func call_to(point: Vector3) -> void:
 		return
 	if state in [State.SLEEP, State.GO_SLEEP, State.EAT, State.PETTED, State.STARTLED, State.LEAVE, State.HELD, State.SHOVED, State.SCANNED]:
 		return
-	target = Den.in_room(point, 0.35)
+	target = _footing(point, 0.35)
 	_enter(State.COME)
 
 
@@ -2496,7 +2525,7 @@ func look_over(point: Vector3, liking: int, key: String) -> void:
 		return
 	inspect_liking = liking
 	inspect_key = key
-	target = Den.in_room(point, 0.35)
+	target = _footing(point, 0.35)
 	_enter(State.INSPECT)
 
 
@@ -2664,6 +2693,9 @@ func _enter(s: int, length := 0.0) -> void:
 	# and no kin (see Den.would_pair): there is no other way into it than this
 	if s == State.PAIR and (not _has_partner() or not world.would_pair(self, partner)):
 		s = State.IDLE
+	# And there is no digging where it stands in water
+	if s == State.DIG and Den.wade(position) > 0.0:
+		s = State.IDLE
 	waiting = false
 	if state == State.PETTED and s != State.PETTED:
 		world.sfx.purr(false)
@@ -2720,7 +2752,7 @@ func _enter(s: int, length := 0.0) -> void:
 			elif dry() and (fun >= 22.0 or world.ball != null):
 				beg_for = Want.WATER
 			beg_cooldown = 90.0 if beg_for == Want.WATER else 30.0
-			target = Den.in_room(world.light_point + Vector3(randf_range(-0.6, 0.6), 0, 1.5), 0.4)
+			target = _footing(world.light_point + Vector3(randf_range(-0.6, 0.6), 0, 1.5), 0.4)
 		State.ZOOMIES:
 			state_len = randf_range(0.0, TAU)
 			_cry("chirp", 1.2)
@@ -2755,7 +2787,17 @@ func _enter(s: int, length := 0.0) -> void:
 			wag = 6.0
 		State.VISIT:
 			visiting = world.somewhere_to_go(self)
+			kicks = 0
 			wag = 5.0
+		State.FLOUNDER:
+			# Out by the shortest way, and making the most of it
+			target = Den.on_dry(position, 0.3, 0.45)
+			eye_goal = 1.25
+			arm_goal = UP_ARM
+			arm_wave = 0.4
+			world.splash(position)
+			_cry("squeak", 1.1)
+			feel(Feeling.GRUMPY, 9.0)
 		State.MOVE_NEST:
 			nest_cooldown = randf_range(400.0, 900.0)
 			wag = 6.0
@@ -2900,8 +2942,7 @@ func _decide() -> void:
 		roll -= float(options[s])
 		if roll <= 0.0:
 			if s == State.WANDER:
-				var a := randf() * TAU
-				target = Den.in_room(Vector3(randf_range(-9.0, 9.0), 0, randf_range(-9.0, 9.0)).limit_length(Den.half.length()), 0.4)
+				target = _roam()
 			if s in [State.SNIFF, State.FOLLOW, State.TAG, State.PAIR]:
 				meet(s, other)
 			else:
@@ -2911,6 +2952,8 @@ func _decide() -> void:
 
 
 func _think(delta: float) -> void:
+	if _swamped():
+		_enter(State.FLOUNDER)
 	if state in INTERRUPTIBLE and _interrupt():
 		return
 	match state:
@@ -2953,7 +2996,7 @@ func _think(delta: float) -> void:
 				_halt(delta)
 				_face(gaze, delta)
 				if state_time > state_len:
-					target = Den.in_room(Vector3(randf_range(-1.2, 1.2), 0, randf_range(-0.8, 1.2)), 0.4)
+					target = _footing(Vector3(randf_range(-1.2, 1.2), 0, randf_range(-0.8, 1.2)), 0.4)
 					_enter(State.WANDER)
 		State.COME:
 			if _steer(target, RUN, delta, 0.25) or state_time > 6.0:
@@ -3000,7 +3043,7 @@ func _think(delta: float) -> void:
 					_enter(State.IDLE)
 		State.ZOOMIES:
 			var a := state_len + step * 1.9
-			var point := Den.in_room(Vector3(cos(a) * Den.half.x, 0, sin(a) * Den.half.y) * 0.75, 0.4)
+			var point := _footing(Vector3(cos(a) * Den.half.x, 0, sin(a) * Den.half.y) * 0.75, 0.4)
 			gaze = point + Vector3(0, 0.3, 0)
 			mouth_goal = 0.7
 			if _steer(point, RUN * 1.45, delta, 0.55):
@@ -3090,26 +3133,19 @@ func _think(delta: float) -> void:
 			if not is_instance_valid(visiting) or visiting.is_queued_for_deletion():
 				_enter(State.IDLE, 0.6)
 				return
+			if visiting.kind == Decor.Kind.POOL:
+				_visit_pool(delta)
+				return
 			var at := visiting.position
 			gaze = at + Vector3(0, 0.3, 0)
-			# A water kind does not stop at the edge of the pool
-			var wading := visiting.kind == Decor.Kind.POOL and needs_water()
 			if step == 0:
 				var near := 0.2 if visiting.hollow else visiting.radius + 0.28 * grow
-				if wading:
-					near = visiting.radius * 0.45
 				if _steer(at, WALK * 1.2, delta, near) or state_time > 7.0:
 					step = 1
 					state_time = 0.0
-					state_len = randf_range(4.0, 7.5) + (4.0 if wading else 0.0)
+					state_len = randf_range(4.0, 7.5)
 					if visiting.kind == Decor.Kind.ROCK:
 						hop(2.6)
-					if wading:
-						hop(2.2)
-						world.splash(at)
-						hearts.emitting = true
-						feel(Feeling.LOVING, 4.0)
-						world.learned(self, "water")
 			else:
 				_halt(delta)
 				match visiting.kind:
@@ -3136,21 +3172,6 @@ func _think(delta: float) -> void:
 						eye_goal = 1.2
 						gaze = world.camera.global_position
 						_face(gaze, delta)
-					Decor.Kind.POOL when wading:
-						# Wades in up to its middle and paddles about
-						var down := 1.0 - exp(-delta * 5.0)
-						position.x = lerpf(position.x, at.x, down)
-						position.z = lerpf(position.z, at.z, down)
-						if not airborne:
-							lift = lerpf(lift, minf(Decor.WATER - centre_y * 0.75 * grow, 0.0), down)
-						arm_wave = 0.2
-						wag = 8.0
-						wiggle = sin(anim_t * 3.0) * 0.06
-						gaze = world.camera.global_position
-						_face(gaze, delta)
-						if int(state_time / 1.4) + 1 > step:
-							step = int(state_time / 1.4) + 1
-							world.splash(position)
 					_:
 						# Has a sniff at it, then settles down beside it
 						_face(at, delta)
@@ -3161,13 +3182,22 @@ func _think(delta: float) -> void:
 							sit_goal = 1.0
 							gaze = world.camera.global_position
 				if state_time > state_len:
-					fun = minf(fun + (5.0 if wading else 1.5), 100.0)
+					fun = minf(fun + 1.5, 100.0)
 					if visiting.kind in like_decor:
 						love = minf(love + 0.3, 100.0)
 					_enter(State.IDLE, 1.0)
-					if wading:
-						# Out over the stones
-						hop(2.2)
+		State.FLOUNDER:
+			# Thrashing for the bank, and none too pleased once it is on it
+			gaze = target + Vector3(0, 0.2, 0)
+			wiggle = sin(anim_t * 16.0) * 0.12
+			if int(state_time / 0.4) + 1 > step and Den.wade(position) > 0.0:
+				step = int(state_time / 0.4) + 1
+				world.splash(position)
+			if _steer(target, RUN * 0.7, delta, 0.15) or state_time > 8.0:
+				love = maxf(love - 1.0, 0.0)
+				_cry("grumble", 1.2)
+				_enter(State.STARTLED, 1.4)
+				roll_goal = 0.3
 		State.MOVE_NEST:
 			if step == 0:
 				gaze = world.nest_pos + Vector3(0, 0.1, 0)
@@ -3389,6 +3419,55 @@ func _think(delta: float) -> void:
 				state_len = -1.0
 
 
+# At the pool. One that lives in water wades out and paddles about, in one place and then
+# another, for a good long while; the rest come down to the edge of it for a drink.
+func _visit_pool(delta: float) -> void:
+	var wading := needs_water()
+	if step == 0:
+		if wading and Den.wade(target) < 0.4:
+			target = world.wading_spot(position)
+		var at := target if wading else Den.on_dry(Den.shore_by(position, 0.1 * grow + 0.04), 0.3)
+		gaze = at + Vector3(0, 0.2, 0)
+		if _steer(at, WALK * 1.2, delta, 0.25 if wading else 0.1) or state_time > 7.0:
+			step = 1
+			state_time = 0.0
+			state_len = randf_range(4.0, 7.5) + (4.0 if wading else 0.0)
+			if wading:
+				world.splash(position)
+				hearts.emitting = true
+				feel(Feeling.LOVING, 4.0)
+				world.learned(self, "water")
+		return
+	_halt(delta)
+	if wading:
+		arm_wave = 0.2
+		wag = 8.0
+		wiggle = sin(anim_t * 3.0) * 0.06
+		gaze = world.camera.global_position
+		_face(gaze, delta)
+		if int(state_time / 1.4) + 1 > step:
+			step = int(state_time / 1.4) + 1
+			world.splash(position)
+	else:
+		# Drinks, facing out over the water
+		_face(Den.shore_by(position, -1.0), delta)
+		nod = 0.5 + sin(state_time * 7.0) * 0.12
+		mouth_goal = 0.5
+		if int(state_time / 0.8) + 1 > step:
+			step = int(state_time / 0.8) + 1
+			_cry("chomp", 1.7, -14.0)
+	if state_time > state_len:
+		if wading and kicks < 2:
+			# (and off to another part of it)
+			kicks += 1
+			step = 0
+			state_time = 0.0
+			target = world.wading_spot(position)
+			return
+		fun = minf(fun + (5.0 if wading else 1.5), 100.0)
+		_enter(State.IDLE, 1.0)
+
+
 # Those asleep in the nest already
 func _bedfellows() -> Array[Cryptlin]:
 	var there: Array[Cryptlin] = []
@@ -3399,12 +3478,14 @@ func _bedfellows() -> Array[Cryptlin]:
 
 
 # Where it goes to sleep: the nest, or the floor a little way off if one it does not get on
-# with is in it already
+# with is in it already. One that lives in water sleeps at the edge of the pool, half in it.
 func _bed() -> Vector3:
+	if needs_water() and Den.shore != Den.Shore.NONE:
+		return Den.in_room(Den.shore_by(position, -0.1), 0.4)
 	for other in _bedfellows():
 		if world.standing(self, other) < 35.0:
 			var off := world.nest_pos.x * -1.0 if absf(world.nest_pos.x) > 0.1 else 1.0
-			return Den.in_room(world.nest_pos + Vector3(signf(off) * 1.0, 0, 0.3), 0.4)
+			return Den.on_dry(world.nest_pos + Vector3(signf(off) * 1.0, 0, 0.3), 0.4, 0.2)
 	return world.nest_pos
 
 
@@ -3609,11 +3690,12 @@ func _has_partner() -> bool:
 	return is_instance_valid(partner) and partner in world.pets()
 
 
-# Another cryptlin that is up and free to be bothered, or null
+# Another cryptlin that is up and free to be bothered (and not out in the pool, where one that
+# does not live in water could not get at it), or null
 func _someone() -> Cryptlin:
 	var free: Array[Cryptlin] = []
 	for other in world.pets():
-		if other != self and other.state in INTERRUPTIBLE:
+		if other != self and other.state in INTERRUPTIBLE and (needs_water() or Den.wade(other.position) <= 0.0):
 			free.append(other)
 	return free.pick_random() if not free.is_empty() else null
 
@@ -3653,9 +3735,9 @@ func temper(other: Cryptlin) -> float:
 	return clampf(t, 0.0, 1.0)
 
 
-# Whether it is in a state to be fought with: up, on the floor and not in anybody's hands
+# Whether it is in a state to be fought with: up, on dry floor and not in anybody's hands
 func _can_fight() -> bool:
-	return fight_cooldown <= 0.0 and lift <= 0.05 and not state in [State.SLEEP, State.HELD, State.LEAVE, State.SCANNED, State.SCUFFLE, State.COWED, State.SHOVED, State.PETTED]
+	return fight_cooldown <= 0.0 and lift <= 0.05 and Den.wade(position) <= 0.0 and not state in [State.SLEEP, State.HELD, State.LEAVE, State.SCANNED, State.SCUFFLE, State.COWED, State.SHOVED, State.PETTED, State.FLOUNDER]
 
 
 # Something to fall out over (food, the toy, being crowded): at these odds, and by how ready
@@ -3782,10 +3864,10 @@ func _flee(delta: float) -> void:
 	from.y = 0.0
 	if from.length() < 1.6 or position.distance_to(target) < 0.5:
 		var side := from.normalized().rotated(Vector3.UP, 1.1 if me.id % 2 == 0 else -1.1)
-		target = Den.in_room(position + (from.normalized() + side) * 1.4, 0.5)
+		target = _footing(position + (from.normalized() + side) * 1.4, 0.5)
 		if target.distance_to(position) < 0.8:
 			# Cornered: break back past it
-			target = Den.in_room(-position * 0.8, 0.5)
+			target = _footing(-position * 0.8, 0.5)
 	_steer(target, RUN * 1.05, delta, 0.3)
 
 
@@ -3795,7 +3877,7 @@ func _cowed(delta: float) -> void:
 		if _has_partner():
 			var from := position - partner.position
 			from.y = 0.0
-			target = Den.in_room(position + from.normalized() * 2.2, 0.45)
+			target = _footing(position + from.normalized() * 2.2, 0.45)
 		gaze = target + Vector3(0, 0.2, 0)
 		if _steer(target, RUN, delta, 0.3) or state_time > 2.5:
 			step = 1
@@ -3944,8 +4026,9 @@ func _move(delta: float) -> void:
 		if lift <= 0.05:
 			for thing in world.decors:
 				var room := thing.radius + 0.2 * grow
-				# Not the shelter it is tucked into, nor the rock it is sat on
-				if (thing.hollow and state in [State.SLEEP, State.GO_SLEEP, State.MOVE_NEST]) or (thing == visiting and state in [State.LURK, State.VISIT]):
+				# Not the shelter it is tucked into, nor the rock it is sat on (and the pool is not
+				# a thing to walk round: see below)
+				if (thing.hollow and state in [State.SLEEP, State.GO_SLEEP, State.MOVE_NEST]) or (thing == visiting and state in [State.LURK, State.VISIT]) or thing.kind == Decor.Kind.POOL:
 					continue
 				_keep_off(thing.position, room, delta)
 			# And round what has been left on the floor, unless it is busy adding to it
@@ -3954,6 +4037,12 @@ func _move(delta: float) -> void:
 					if m.kind != Mess.Kind.HEAP:
 						_keep_off(m.position, 0.08 + 0.18 * grow, delta)
 			_keep_off_others(delta)
+			# One that does not live in water goes no further than the edge of the pool, unless
+			# it is sent in (when it has to get itself out again: see _swamped)
+			if not needs_water() and Den.wade(position) <= 0.15 and not state in [State.SHOVED, State.FLOUNDER, State.HELD]:
+				var ashore := Den.on_dry(position, 0.0, 0.1 * grow)
+				position.x = ashore.x
+				position.z = ashore.z
 		var kept := Den.in_room(position, 0.3)
 		position.x = kept.x
 		position.z = kept.z
@@ -3964,7 +4053,7 @@ func _move(delta: float) -> void:
 			jump_y = 0.0
 			airborne = false
 			squash_v = 3.2
-	position.y = jump_y + lift
+	position.y = jump_y + lift + _sunk()
 	rotation.y = yaw
 
 

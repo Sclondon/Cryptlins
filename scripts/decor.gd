@@ -2,7 +2,8 @@ class_name Decor
 extends Node3D
 ## Something stood in the tank to make it a home: a rock, a hollow log, a fern and so on. Each
 ## cryptlin likes having some of them about and cannot stand one. Some are shelters it can get
-## inside, one is a pool, and one is the marker left where a cryptlin died. Also builds the nests.
+## inside, one is the marker left where a cryptlin died, and one is the pool, which is no small
+## thing: half the floor under water (see fill). Also builds the nests.
 
 enum Kind { ROCK, LOG, FERN, SKULL, CRYSTAL, PUMPKIN, GRAVESTONE, DISH, CAVE, POOL, BARREL, STUMP, TENT, CRATE, POT, MARKER }
 
@@ -23,11 +24,17 @@ const PLAIN: Array[String] = [
 const RADII: Array[float] = [0.36, 0.34, 0.22, 0.24, 0.22, 0.28, 0.24, 0.32, 0.85, 0.72, 0.7, 0.74, 0.82, 0.78, 0.76, 0.2]
 const NESTS: Array[String] = ["Rags", "Twigs", "Cushion", "Box"]
 const NEST_IDS: Array[String] = ["rags", "twigs", "cushion", "box"]
-# How high the water in the pool stands
-const WATER := 0.2
+# Where the water in the pool stands (a little below the floor), how deep it gets, and how
+# steeply the ground shelves down into it from the edge
+const WATER := -0.06
+const DEEP := 0.6
+const SHELVE := 0.9
 
 var kind: int = Kind.ROCK
+# (the pool in the room has none: it is not walked round but kept out of, by Den.wade)
 var radius := 0.3
+# The pool's water, once it lies in the room
+var water: ShaderMaterial
 # A shelter (the cave, a barrel, a tent and so on) can be gone into: the cryptlin hides in it,
 # looking out of the front, which faces +Z
 var hollow := false
@@ -135,7 +142,9 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 			Ps1.part(self, lump, grey, Vector3(0.03, 1.2, -0.08), Vector3(0.86, 0.24, 0.58), Vector3(0.05, 0.2, 0.04))
 			Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.2, 0.34, 0.14)), Vector3(-0.25, 1.4, 0.05), Vector3(0.34, 0.06, 0.26))
 		Kind.POOL:
-			# A pond in a ring of stones with rushes at the back, deep enough to wade into
+			# As it rides the wheel of things: a pond in a ring of stones with rushes at the back.
+			# In the room it is a good deal more than that (see fill).
+			var brim := 0.2
 			var grey := Ps1.mat(Color(0.36, 0.35, 0.37))
 			var dim := Ps1.mat(Color(0.27, 0.27, 0.3))
 			var lump := Ps1.ball()
@@ -146,11 +155,11 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 				var out := Vector3(sin(around), 0, cos(around))
 				var tall := rng.randf_range(0.13, 0.19)
 				Ps1.part(self, lump, grey if i % 2 == 0 else dim, out * 0.6 + Vector3(0, tall * 0.6, 0), Vector3(0.19, tall, 0.12), Vector3(rng.randf_range(-0.2, 0.2), around, 0))
-			Ps1.part(self, Ps1.drum(12), Ps1.mat(Color(0.08, 0.26, 0.4), 0.2), Vector3(0, WATER * 0.5, 0), Vector3(0.6, WATER, 0.6))
+			Ps1.part(self, Ps1.drum(12), Ps1.mat(Color(0.08, 0.26, 0.4), 0.2), Vector3(0, brim * 0.5, 0), Vector3(0.6, brim, 0.6))
 			var shine := Ps1.mat(Color(0.5, 0.75, 0.85), 0.3)
-			Ps1.part(self, Ps1.ball(), shine, Vector3(0.18, WATER, 0.2), Vector3(0.12, 0.004, 0.035), Vector3(0, 0.4, 0))
-			Ps1.part(self, Ps1.ball(), shine, Vector3(-0.22, WATER, -0.05), Vector3(0.08, 0.004, 0.03), Vector3(0, -0.3, 0))
-			Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.16, 0.4, 0.16)), Vector3(-0.3, WATER + 0.004, 0.3), Vector3(0.12, 0.006, 0.1))
+			Ps1.part(self, Ps1.ball(), shine, Vector3(0.18, brim, 0.2), Vector3(0.12, 0.004, 0.035), Vector3(0, 0.4, 0))
+			Ps1.part(self, Ps1.ball(), shine, Vector3(-0.22, brim, -0.05), Vector3(0.08, 0.004, 0.03), Vector3(0, -0.3, 0))
+			Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.16, 0.4, 0.16)), Vector3(-0.3, brim + 0.004, 0.3), Vector3(0.12, 0.006, 0.1))
 			var rush := Ps1.mat(Color(0.2, 0.38, 0.14))
 			for i in 3:
 				var at := Vector3(-0.3 + i * 0.26, 0, -0.56 + absf(i - 1.0) * 0.1)
@@ -263,6 +272,85 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 			Ps1.part(slab, Ps1.drum(8), stone, Vector3(0, 0.32, 0), Vector3(0.12, 0.08, 0.12), Vector3(PI * 0.5, 0, 0))
 			Ps1.part(slab, Ps1.box(), Ps1.mat(tint), Vector3(0, 0.22, 0), Vector3(0.25, 0.08, 0.09))
 			Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.2, 0.15, 0.1)), Vector3(0, 0.02, 0.1), Vector3(0.24, 0.05, 0.16))
+
+
+# The pool as it lies in the room: water over one part of the floor, from the walls to a
+# wandering edge across the middle (Den.shore says which part, and Den.wade where the edge runs).
+# The floor is cut away over it and the water is a sheet a little below; along the edge there
+# are stones with gaps of bare mud between them, rushes in the shallows, and a few lily pads and
+# rocks further out. Built to the room's size, and built again when that or its place changes.
+func fill() -> void:
+	for part in get_children():
+		part.free()
+	radius = 0.0
+	rotation = Vector3.ZERO
+	position = Den.middle(Den.shore)
+	var back := Den.shore == Den.Shore.BACK
+	var wide := Den.half.x if back else Den.half.y
+	var mid := Den.SHORE_MIDS[Den.shore]
+	var far := (Den.half.y if back else Den.half.x) + mid
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 23 + Den.shore
+	water = ShaderMaterial.new()
+	water.shader = load("res://shaders/water.gdshader")
+	water.set_shader_parameter("shore", Den.shore)
+	# (the sheet runs on a little way under the floor and the walls, so that nothing shows past
+	# its edge, and at the side of the room on out to the front with the floor)
+	var from := Den.place(-wide - 0.5, mid - far - 0.5)
+	var to := Den.place(wide + (0.5 if back else 6.0), mid + 0.5)
+	var sheet := PlaneMesh.new()
+	sheet.size = Vector2(absf(to.x - from.x), absf(to.z - from.z))
+	var surface := Ps1.part(self, sheet, water, (from + to) * 0.5 - position + Vector3(0, WATER, 0))
+	surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Lit as the floor is, by the lamp and not by what it throws back
+	surface.layers = 2
+	var grey := Ps1.mat(Color(0.36, 0.35, 0.37))
+	var dim := Ps1.mat(Color(0.27, 0.27, 0.3))
+	var moss := Ps1.mat(Color(0.2, 0.34, 0.14))
+	var lump := Ps1.ball()
+	lump.radial_segments = 7
+	lump.rings = 3
+	# Stones along the edge, half in and half out
+	var along := -wide + 0.12
+	while along < wide - 0.1:
+		var big := rng.randf_range(0.07, 0.17)
+		if rng.randf() < 0.7:
+			var at := Den.at_shore(along, rng.randf_range(-0.12, 0.05)) - position
+			Ps1.part(self, lump, grey if rng.randf() < 0.5 else dim, at + Vector3(0, big * 0.2, 0), Vector3(big * rng.randf_range(1.0, 1.5), big * 0.7, big), Vector3(rng.randf_range(-0.2, 0.2), rng.randf() * TAU, 0))
+			if rng.randf() < 0.2:
+				Ps1.part(self, Ps1.ball(), moss, at + Vector3(0, big * 0.85, 0), Vector3(big * 0.7, 0.02, big * 0.6))
+		along += big * 2.0 + rng.randf_range(0.04, 0.4)
+	# Rushes in the shallows: a stand at each end of the edge and one somewhere between
+	var rush := Ps1.mat(Color(0.2, 0.38, 0.14))
+	var head := Ps1.mat(Color(0.3, 0.18, 0.1))
+	for stand: float in [-wide + 0.45, rng.randf_range(-0.4, 0.4) * wide, wide - 0.45]:
+		for i in 6:
+			var at := Den.at_shore(stand + rng.randf_range(-0.3, 0.3), rng.randf_range(0.06, 0.32)) - position
+			var tall := rng.randf_range(0.45, 0.85)
+			var lean := Vector3(rng.randf_range(-0.14, 0.14), 0, rng.randf_range(-0.14, 0.14))
+			Ps1.part(self, Ps1.drum(4), rush, at + Vector3(0, WATER + tall * 0.5, 0), Vector3(0.016, tall, 0.016), lean)
+			if i % 2 == 0:
+				Ps1.part(self, Ps1.drum(5), head, at + Vector3(-lean.z * tall, WATER + tall, lean.x * tall), Vector3(0.034, 0.16, 0.034), lean)
+	# Lily pads (one of them in flower) and a rock or two, out where it is deep
+	var pad := Ps1.mat(Color(0.16, 0.4, 0.16))
+	for i in 5:
+		var at := Den.at_shore(rng.randf_range(-0.85, 0.85) * wide, rng.randf_range(0.5, 0.9) * (far - 0.5)) - position + Vector3(0, WATER, 0)
+		if i < 2:
+			var big := rng.randf_range(0.16, 0.26)
+			Ps1.part(self, lump, dim if i == 0 else grey, at, Vector3(big * 1.3, big * 0.55, big), Vector3(0, rng.randf() * TAU, 0.1))
+		else:
+			Ps1.part(self, Ps1.ball(), pad, at + Vector3(0, 0.004, 0), Vector3(0.13, 0.005, 0.11), Vector3(0, rng.randf() * TAU, 0))
+			Ps1.part(self, Ps1.ball(), pad, at + Vector3(0.17, 0.004, 0.08), Vector3(0.08, 0.005, 0.07))
+			if i == 2:
+				Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.9, 0.82, 0.86), 0.2), at + Vector3(0.02, 0.03, 0.01), Vector3(0.04, 0.03, 0.04))
+
+
+# Where the lamp is pointing, its colour and how hard it burns, for the glint it makes on the pool
+func glint(at: Vector3, colour: Color, burning: float) -> void:
+	if water != null:
+		water.set_shader_parameter("lamp", at)
+		water.set_shader_parameter("lamp_tint", colour)
+		water.set_shader_parameter("lamp_glow", burning)
 
 
 # A ring of boards about a line running front to back, `height` off the floor: a barrel, or a

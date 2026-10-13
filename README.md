@@ -67,14 +67,14 @@ Tap a thing to use it, or drag it up off the wheel and let go where you want it.
 | **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Pick the toy up with a finger and it jumps for it; let go to throw. |
 | **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the wheel to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
 | **Shelters**: cave, barrel, hollow stump, rag tent, crate, flowerpot | Things it can get inside: it hides in one to watch you, and would sooner have its nest there. |
-| **Pool** | A pond in a ring of stones. The water kinds (frogman, Loch Ness monster, kelpie, merling, Cthulhu spawn) are not at home without one: they wade in up to the middle of their own accord, and beg for water (a drop in the thought bubble) when there is none. The rest take it or leave it. |
+| **Pool** | About half the floor under water, from the walls to a stony, muddy edge that wanders across the room: the back of the room, or in a wide one either side. It goes over the part with least on it, and whatever stands there is moved out onto the dry. A finger on the water has hold of it: drag it to another side, or down to the wheel to put it away. The water kinds (frogman, Loch Ness monster, kelpie, merling, Cthulhu spawn) are not at home without one: they are in and out of it as they like, wade about up to their middles for a good while at a time, and sleep at its edge; with none they beg for water (a drop in the thought bubble). The rest take it or leave it: they keep to the dry floor, come down to the edge for a drink, and if they are carried out over it and let go, or shoved in, scramble out by the shortest way, cross. Nothing else will stand in it; food thrown in floats and drifts in to the shallows where any of them can reach it, a toy floats back to the edge, and droppings are left on dry floor. |
 | **Nests**: rags, twigs, cushion, cardboard box | Its bed. Drag it where you like; it may well drag it somewhere else. |
 | **Ground**: flagstones, floorboards, moss, checkered tiles, dirt, sand, gravel | A tray of it changes the floor. |
 
 | You | It |
 | --- | --- |
 | Tap the floor | Calls them over. |
-| Hold or drag on the floor | Swings the lamp. It chases the pool of light and pounces on it. |
+| Hold or drag on the floor | Swings the lamp. It chases the pool of light and pounces on it. (On the water of the pool, a drag moves the pool.) |
 | Tap the lamp (L puts it out) | Bright, low, heat, off. In the dark all you can see are its eyes, and before long it goes to its nest and sleeps. |
 | Rub it | It purrs. Builds the bond. |
 | Tap it | A poke: it jumps (and wakes, grumbling, if it was asleep). Poke it four times running and it has had enough. |
@@ -202,6 +202,16 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `scripts/items.gd` lists what can be on it; inside a site that keeps a shop, only what comes free and what has been
   bought.
 - `scripts/decor.gd`: the things that stand in the room (shelters and the pool among them) and the nests.
+  The pool is a thing like the rest (item `pool`, and in the save by where the middle of its water is) but lies
+  over a part of the floor, `Den.shore`: the back, the left or the right (`Den.shores()` is those that fit the room
+  as it is). `Den.wade(p)` is the shape test, how far out into the water a place is from its edge (below zero on
+  dry floor) and `Den.deep(p)` how deep it is there; `Den.on_dry(p, margin, clear)` is the nearest dry floor, and
+  `Den.shore_by(p, back)` the edge straight across from a place. `Decor.fill()` builds it to the room, and
+  `Den._flood()` lays it and moves everything else out. The same wandering line is drawn by
+  `shaders/shore.gdshaderinc`, which cuts the floor away over the water (`shaders/floor.gdshader`) and shades
+  `shaders/water.gdshader`, the sheet a little below it: the two have to be changed together. A cryptlin that does
+  not live in water is stopped at the edge in `Cryptlin._move()`, and gets itself out (`State.FLOUNDER`) if it is
+  ever further in.
   `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
   `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes. The scanner itself is
@@ -233,4 +243,5 @@ them out.
 godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots --pool [--portrait] [--kind=N]   # four in a room with the pool: each place it fits, each lamp, one let go over the middle of it, food and a toy afloat, a drink at the edge, and all asleep
 ```

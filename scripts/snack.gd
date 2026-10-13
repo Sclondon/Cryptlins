@@ -3,6 +3,8 @@ extends Node3D
 ## Something dropped into the light for the cryptlin to eat. What it makes of each is up to it.
 
 signal thud(strength: float)
+# It has landed in the pool
+signal splashed
 
 enum Kind { BONE, TOADSTOOL, CANDY, FISH, BEETLE, BERRIES }
 
@@ -21,6 +23,8 @@ var bites_left := BITES
 var colour := Color.WHITE
 var spin := Vector3.ZERO
 var visual: Node3D
+# How long it has been floating in the pool
+var afloat := 0.0
 
 
 func _init(which: int = Kind.BONE) -> void:
@@ -139,12 +143,30 @@ func drop(from: Vector3) -> void:
 
 
 func _process(delta: float) -> void:
-	if landed or held:
+	if held:
+		return
+	var wet := Den.wade(position) > 0.0
+	if landed:
+		# In the pool it floats, low in the water, and drifts in to the shallows, where any of
+		# them can get at it from the edge
+		if wet:
+			afloat += delta
+			position = position.move_toward(Den.shore_by(position, -0.12), delta * 0.3)
+			position.y = Decor.WATER + sin(afloat * 2.6) * 0.012
+		else:
+			position.y = 0.0
 		return
 	vel.y -= 14.0 * delta
 	position += vel * delta
 	visual.rotation += spin * delta
-	if position.y <= 0.0:
+	if wet:
+		if position.y <= Decor.WATER:
+			position.y = Decor.WATER
+			landed = true
+			vel = Vector3.ZERO
+			visual.rotation = Vector3(0, visual.rotation.y, 0)
+			splashed.emit()
+	elif position.y <= 0.0:
 		position.y = 0.0
 		thud.emit(-vel.y)
 		if vel.y > -2.2:

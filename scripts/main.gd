@@ -8,6 +8,8 @@ extends Node
 
 enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER }
 enum Lamp { BRIGHT, LOW, HEAT, OFF }
+# The part of the floor the pool lies over
+enum Shore { NONE, BACK, LEFT, RIGHT }
 
 # How far below where its cord is fixed the lamp's bulb hangs
 const LAMP_DROP := 0.6
@@ -63,6 +65,12 @@ const GROUND_TINTS: Array[Color] = [
 static var half := Vector2(2.9, 2.5)
 # Where the lamp's cord is fixed
 static var lamp_at := Vector3(0, 3.4, 0.1)
+# Where the pool is, if there is one: it covers about half the floor, from the walls on its
+# side to an edge that wanders across the room (see wade). SHORE_MIDS is how far across the
+# room from the middle of it that edge runs, for each place the pool can be: a little short of
+# the middle on either side, and a little past it at the back, which is a long way off.
+static var shore: int = Shore.NONE
+const SHORE_MIDS: Array[float] = [0.0, 0.2, -0.3, -0.3]
 
 var save_path := "user://cryptlin.json"
 # Set before it is added to the tree to choose what a new game's egg holds (tests); -1 for any
@@ -206,6 +214,7 @@ var dev_tap_time := -10.0
 
 func _ready() -> void:
 	randomize()
+	shore = Shore.NONE
 	_load_game()
 	_build_room()
 	_build_lamp()
@@ -226,7 +235,7 @@ func _ready() -> void:
 		dev_toggle()
 	for r in residents:
 		if r.hatched:
-			_spawn_pet(r, Vector3(randf_range(-1.0, 1.0), 0, randf_range(-0.6, 0.8)))
+			_spawn_pet(r, on_dry(Vector3(randf_range(-1.0, 1.0), 0, randf_range(-0.6, 0.8)), 0.3, 0.2))
 		else:
 			_lay_egg(r, false)
 	if residents.is_empty():
@@ -246,6 +255,103 @@ func _ready() -> void:
 # Keeps a point on the floor inside the walls, `margin` clear of them
 static func in_room(p: Vector3, margin := 0.0) -> Vector3:
 	return Vector3(clampf(p.x, -half.x + margin, half.x - margin), p.y, clampf(p.z, -half.y + margin, half.y - margin))
+
+
+# ---------------------------------------------------------------- the pool
+
+# The parts of the floor the pool fits over in a room this shape: the back of any room, and
+# either side of one wide enough to leave four of them room on the other
+static func shores() -> Array[int]:
+	var fit: Array[int] = [Shore.BACK]
+	if half.x >= 2.4:
+		fit.append_array([Shore.LEFT, Shore.RIGHT])
+	return fit
+
+
+# How far into one of those parts a place on the floor is, as a share of the way from the
+# middle of the room to the wall
+static func into(where: int, p: Vector3) -> float:
+	match where:
+		Shore.LEFT:
+			return -p.x / half.x
+		Shore.RIGHT:
+			return p.x / half.x
+	return -p.z / half.y
+
+
+# The one of those parts that a place on the floor is furthest into
+static func shore_near(p: Vector3) -> int:
+	var best: int = Shore.BACK
+	for where in shores():
+		if into(where, p) > into(best, p):
+			best = where
+	return best
+
+
+# The middle of the water, for a pool over that part of the floor
+static func middle(where: int) -> Vector3:
+	match where:
+		Shore.LEFT:
+			return Vector3((SHORE_MIDS[where] - half.x) * 0.5, 0, 0)
+		Shore.RIGHT:
+			return Vector3((half.x - SHORE_MIDS[where]) * 0.5, 0, 0)
+	return Vector3(0, 0, (SHORE_MIDS[where] - half.y) * 0.5)
+
+
+# A place on the floor from how far `along` the water's edge it is and how far `across` the room
+# from the middle of it, away from the pool's side
+static func place(along: float, across: float) -> Vector3:
+	match shore:
+		Shore.LEFT:
+			return Vector3(across, 0, along)
+		Shore.RIGHT:
+			return Vector3(-across, 0, along)
+	return Vector3(along, 0, across)
+
+
+# How far across the room the water's edge is at a point along it: a line that wanders (the
+# same line shore.gdshaderinc draws, which has to be changed with it)
+static func _edge(along: float) -> float:
+	return SHORE_MIDS[shore] + sin(along * 1.3 + 0.7 + shore * 1.9) * 0.2 + sin(along * 3.1 + 2.1) * 0.1 + sin(along * 6.7 + 4.0) * 0.04
+
+
+# The place this far `out` into the water from its edge (or back from it, below zero)
+static func at_shore(along: float, out: float) -> Vector3:
+	return place(along, _edge(along) - out)
+
+
+# The shape test. How far out into the pool a place on the floor is, from the water's edge:
+# above zero in the water, below it on dry floor (and with no pool, as far below as can be)
+static func wade(p: Vector3) -> float:
+	match shore:
+		Shore.BACK:
+			return _edge(p.x) - p.z
+		Shore.LEFT:
+			return _edge(p.z) - p.x
+		Shore.RIGHT:
+			return _edge(p.z) + p.x
+	return -INF
+
+
+# How deep the water is at a place: nothing on dry floor, shelving down from the edge
+static func deep(p: Vector3) -> float:
+	return clampf(wade(p) * Decor.SHELVE, 0.0, Decor.DEEP)
+
+
+# Straight across from a place to the water's edge: `back` from it on the dry side (or, below
+# zero, that far into the shallows)
+static func shore_by(p: Vector3, back := 0.0) -> Vector3:
+	if shore == Shore.NONE:
+		return p
+	var over := wade(p) + back
+	return p + (Vector3(0, 0, over) if shore == Shore.BACK else Vector3(over if shore == Shore.LEFT else -over, 0, 0))
+
+
+# Keeps a point on dry floor: inside the walls, `margin` clear of them, and out of the pool,
+# `clear` back from the water's edge
+static func on_dry(p: Vector3, margin := 0.0, clear := 0.0) -> Vector3:
+	var kept := in_room(p, margin)
+	return shore_by(kept, clear) if wade(kept) > -clear else kept
 
 
 # ---------------------------------------------------------------- who lives here
@@ -281,7 +387,7 @@ func room_for_more() -> bool:
 
 
 # Time that went by with nobody looking (the game shut, or covered by the page it is played
-# in): each of them lives through it, and is found asleep in the nest if that is how it ended
+# in): each of them lives through it, and is found asleep in its bed if that is how it ended
 func pass_time(seconds: float) -> void:
 	end_fight(true)
 	# A pair that would pair off may well have done, with nobody there to see
@@ -292,7 +398,8 @@ func pass_time(seconds: float) -> void:
 				paired(all[i], all[j], seconds * randf_range(0.2, 0.8))
 	for pet in pets():
 		if pet.pass_time(seconds, not light_on):
-			pet.position = nest_pos + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.2))
+			# (in the nest, or for one that lives in water at the edge of the pool)
+			pet.position = pet._bed() + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.2))
 			pet._enter(Cryptlin.State.SLEEP)
 		elif pet.state == Cryptlin.State.SLEEP:
 			pet._enter(Cryptlin.State.IDLE)
@@ -344,7 +451,8 @@ func start_fight(a: Cryptlin, b: Cryptlin) -> void:
 	var tints: Array[Color] = [a.fur.get_shader_parameter("tint"), b.fur.get_shader_parameter("tint")]
 	scuffle = Scuffle.new(tints, (a.grow + b.grow) * 0.5)
 	add_child(scuffle)
-	scuffle.position = Vector3((a.position.x + b.position.x) * 0.5, 0, (a.position.z + b.position.z) * 0.5)
+	# (on dry floor, wherever the two of them were standing)
+	scuffle.position = on_dry(Vector3((a.position.x + b.position.x) * 0.5, 0, (a.position.z + b.position.z) * 0.5), 0.3, 0.3)
 	scuffle_left = randf_range(2.6, 3.8)
 	fighters = [a, b]
 	a.partner = b
@@ -388,8 +496,8 @@ func end_fight(broken: bool) -> void:
 	var b := fighters[1]
 	fighters.clear()
 	var apart := Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU) * 0.5
-	a.position = in_room(at + apart, 0.3)
-	b.position = in_room(at - apart, 0.3)
+	a.position = on_dry(at + apart, 0.3, 0.1)
+	b.position = on_dry(at - apart, 0.3, 0.1)
 	for f: Cryptlin in [a, b]:
 		f.visible = true
 		f.fight_cooldown = randf_range(90.0, 150.0)
@@ -573,7 +681,7 @@ func _lay_egg(r: Resident, from_above: bool) -> void:
 	add_child(egg)
 	r.egg = egg
 	r.hatched = false
-	egg.position = in_room(r.at if r.at != Vector3.INF else EGG_SPOT, 0.4)
+	egg.position = on_dry(r.at if r.at != Vector3.INF else EGG_SPOT, 0.4, 0.4)
 	if from_above:
 		egg.drop(egg.position + Vector3(0, 5.5, 0))
 	egg.cracked.connect(_on_cracked.bind(r))
@@ -916,7 +1024,8 @@ func use(id: String) -> void:
 			if there != null:
 				remove_decor(there)
 			else:
-				place_decor(n, _free_spot(Decor.RADII[n]))
+				# (the pool over whichever part of the floor has least on it)
+				place_decor(n, middle(_emptiest_shore()) if n == Decor.Kind.POOL else _free_spot(Decor.RADII[n]))
 		"nest":
 			set_nest(n)
 		"ground":
@@ -946,6 +1055,7 @@ func feed(which := -1, at := Vector3.INF) -> void:
 # A bit of food let go of in the room: it is for whichever of them gets there first
 func _serve(snack: Snack) -> void:
 	snack.thud.connect(func(strength: float) -> void: sfx.play("thud", 1.3, clampf(strength * 2.0 - 16.0, -24.0, -4.0)))
+	snack.splashed.connect(func() -> void: splash(snack.position))
 	snacks.append(snack)
 	_spend(Items.id_of("food", snack.kind))
 
@@ -979,7 +1089,10 @@ func _new_ball(which: int) -> void:
 	var toy := Ball.new(which)
 	ball = toy
 	add_child(ball)
-	ball.bounced.connect(func(strength: float) -> void: sfx.play(toy.sound, toy.pitch, clampf(strength * 3.0 - 16.0, -24.0, -3.0)))
+	ball.bounced.connect(func(strength: float) -> void:
+		sfx.play(toy.sound, toy.pitch, clampf(strength * 3.0 - 16.0, -24.0, -3.0))
+		if wade(toy.position) > 0.0:
+			splash(toy.position))
 
 
 func _clear_ball() -> void:
@@ -1008,10 +1121,58 @@ func _stand(kind: int, at: Vector3, turn := 0.0, tint := Color(0.5, 0.5, 0.52), 
 	var d := Decor.new(kind, tint)
 	d.whose = whose
 	add_child(d)
-	d.position = in_room(at, d.radius * 0.6)
-	d.rotation.y = turn
 	decors.append(d)
+	if kind == Decor.Kind.POOL:
+		_flood(d, shore_near(at))
+	else:
+		d.position = on_dry(at, d.radius * 0.6, d.radius)
+		d.rotation.y = turn
 	return d
+
+
+# The pool comes to lie over one part of the floor (or is built again there, the room having
+# changed shape), and whatever was standing where it now is gets moved out onto the dry: the
+# nest, the eggs, the things and the messes. Food and toys float, and the cryptlins see to
+# themselves.
+func _flood(d: Decor, where: int) -> void:
+	shore = where
+	d.fill()
+	d.water.set_shader_parameter("bed", GROUND_TINTS[floor_style])
+	floor_mat.set_shader_parameter("shore", shore)
+	move_nest(nest_pos)
+	for other in decors:
+		if other != d:
+			other.position = on_dry(other.position, other.radius * 0.6, other.radius)
+	for m in messes:
+		m.position = on_dry(m.position, 0.15, 0.15)
+	for r in residents:
+		if r.egg != null:
+			r.egg.position = on_dry(r.egg.position, 0.4, 0.4)
+
+
+# The part of the floor a pool would be least in the way over: the one with the fewest things,
+# eggs, cryptlins that do not live in water, and nests on it
+func _emptiest_shore() -> int:
+	var here: Array[Vector3] = [nest_pos]
+	for d in decors:
+		here.append(d.position)
+	for r in residents:
+		if r.body() != null and (r.pet == null or not r.pet.needs_water()):
+			here.append(r.body().position)
+	var was := shore
+	var best: int = Shore.BACK
+	var fewest := here.size() + 1
+	# (either side sooner than the back, where there is the choice: the pool shows best there)
+	var order := shores()
+	order.reverse()
+	for where in order:
+		shore = where
+		var count := here.filter(func(p: Vector3) -> bool: return wade(p) > 0.0).size()
+		if count < fewest:
+			fewest = count
+			best = where
+	shore = was
+	return best
 
 
 # Stands a thing in the room (or moves the one of its kind already there), and lets the
@@ -1020,10 +1181,16 @@ func place_decor(kind: int, at: Vector3) -> Decor:
 	var d := decor_of(kind)
 	if d == null:
 		d = _stand(kind, at, randf_range(-0.4, 0.4))
-		crumbs(d.position + Vector3(0, 0.1, 0), Color(0.3, 0.25, 0.2))
-		sfx.play("thud", 1.1, -6.0)
+		if kind == Decor.Kind.POOL:
+			splash(d.position)
+		else:
+			crumbs(d.position + Vector3(0, 0.1, 0), Color(0.3, 0.25, 0.2))
+			sfx.play("thud", 1.1, -6.0)
+	elif kind == Decor.Kind.POOL:
+		if shore_near(at) != shore:
+			_flood(d, shore_near(at))
 	else:
-		d.position = in_room(at, d.radius * 0.6)
+		d.position = on_dry(at, d.radius * 0.6, d.radius)
 	_judge(d)
 	_sync()
 	save_game()
@@ -1031,6 +1198,9 @@ func place_decor(kind: int, at: Vector3) -> Decor:
 
 
 func remove_decor(d: Decor) -> void:
+	if d.kind == Decor.Kind.POOL:
+		shore = Shore.NONE
+		floor_mat.set_shader_parameter("shore", shore)
 	if d.kind == Decor.Kind.MARKER:
 		markers_away.append({"c": d.tint.to_html(false), "w": d.whose})
 	decors.erase(d)
@@ -1046,7 +1216,11 @@ func _judge(d: Decor) -> void:
 	var all := pets()
 	for i in all.size():
 		var pet := all[i]
-		var near := d.position + Vector3((i - (all.size() - 1) * 0.5) * 0.55, 0, d.radius + 0.35)
+		var beside := (i - (all.size() - 1) * 0.5) * 0.55
+		var near := d.position + Vector3(beside, 0, d.radius + 0.35)
+		if d.kind == Decor.Kind.POOL:
+			# (to the water's edge, the nearest of it to where each is standing)
+			near = on_dry(shore_by(pet.position, 0.35) + place(beside, 0.0), 0.35, 0.35)
 		if d.kind == Decor.Kind.POOL:
 			# Whether it needs water shows the first time it sees some
 			pet.look_over(near, 1 if pet.needs_water() else 0, "water")
@@ -1058,9 +1232,10 @@ func _judge(d: Decor) -> void:
 			pet.look_over(near, 0, "")
 
 
-# How much bare floor there is round a place: how far to the nearest thing, nest, egg or cryptlin
+# How much bare floor there is round a place: how far to the water or the nearest thing, nest,
+# egg or cryptlin
 func _clearance(p: Vector3) -> float:
-	var room := p.distance_to(nest_pos) - 0.6
+	var room := minf(p.distance_to(nest_pos) - 0.6, -wade(p))
 	for d in decors:
 		room = minf(room, p.distance_to(d.position) - d.radius)
 	for r in residents:
@@ -1069,12 +1244,12 @@ func _clearance(p: Vector3) -> float:
 	return room
 
 
-# Somewhere on the floor with nothing standing on it
+# Somewhere on dry floor with nothing standing on it
 func _free_spot(radius: float) -> Vector3:
 	var best := Vector3.ZERO
 	var best_room := -INF
 	for i in 24:
-		var p := Vector3(randf_range(-half.x + radius + 0.2, half.x - radius - 0.2), 0, randf_range(-half.y + radius + 0.1, half.y - radius - 0.7))
+		var p := on_dry(Vector3(randf_range(-half.x + radius + 0.2, half.x - radius - 0.2), 0, randf_range(-half.y + radius + 0.1, half.y - radius - 0.7)), 0.0, radius + 0.1)
 		if _clearance(p) > best_room:
 			best_room = _clearance(p)
 			best = p
@@ -1084,13 +1259,13 @@ func _free_spot(radius: float) -> Vector3:
 # A place for an egg: the given one if it is clear, or else the clearest to be found within
 # `reach` of it (near enough the middle for the lamp to warm it)
 func _clear_spot(centre: Vector3, reach: float) -> Vector3:
-	var best := in_room(centre, 0.4)
+	var best := on_dry(centre, 0.4, 0.4)
 	var best_room := _clearance(best)
 	for i in 24:
 		if best_room > 0.25:
 			break
 		var a := randf() * TAU
-		var p := in_room(centre + Vector3(cos(a), 0, sin(a)) * randf_range(0.5, reach), 0.4)
+		var p := on_dry(centre + Vector3(cos(a), 0, sin(a)) * randf_range(0.5, reach), 0.4, 0.4)
 		if _clearance(p) > best_room:
 			best_room = _clearance(p)
 			best = p
@@ -1104,6 +1279,8 @@ func set_ground(style: int) -> void:
 	for old in tracks:
 		old.queue_free()
 	tracks.clear()
+	if decor_of(Decor.Kind.POOL) != null:
+		decor_of(Decor.Kind.POOL).water.set_shader_parameter("bed", GROUND_TINTS[floor_style])
 	sfx.play("thud", 0.7, -8.0)
 	for pet in pets():
 		var right := floor_style == pet.fav_ground
@@ -1130,7 +1307,7 @@ func _build_nest() -> void:
 
 # The nest pushed or dragged to a new place (by a finger, or by the cryptlin itself)
 func move_nest(to: Vector3) -> void:
-	nest_pos = in_room(Vector3(to.x, 0, to.z), 0.6)
+	nest_pos = on_dry(Vector3(to.x, 0, to.z), 0.6, 0.7)
 	nest.position = nest_pos
 
 
@@ -1150,9 +1327,9 @@ func nest_spot(who: Cryptlin) -> Vector3:
 			spots.append(d.position + Vector3(d.radius + 0.6, 0, 0.1))
 	var far: Array[Vector3] = []
 	for s in spots:
-		if in_room(s, 0.6).distance_to(nest_pos) > 0.8:
-			far.append(in_room(s, 0.6))
-	return far.pick_random() if not far.is_empty() else in_room(Vector3(randf_range(-1.5, 1.5), 0, -1.2), 0.6)
+		if on_dry(s, 0.6, 0.7).distance_to(nest_pos) > 0.8:
+			far.append(on_dry(s, 0.6, 0.7))
+	return far.pick_random() if not far.is_empty() else on_dry(Vector3(randf_range(-1.5, 1.5), 0, -1.2), 0.6, 0.7)
 
 
 # A shelter in the room for a cryptlin to get inside (never one it cannot stand): one it likes
@@ -1177,8 +1354,17 @@ func hiding_place(who: Cryptlin) -> Vector3:
 		return hole.position + Vector3(0, 0, 0.05)
 	for d in decors:
 		if d.kind in who.like_decor:
-			return in_room(d.position + Vector3(0, 0, -d.radius - 0.4), 0.35)
-	return in_room(Vector3(9.0 if randf() < 0.5 else -9.0, 0, -9.0), 0.5)
+			return on_dry(d.position + Vector3(0, 0, -d.radius - 0.4), 0.35, 0.3)
+	return on_dry(Vector3(9.0 if randf() < 0.5 else -9.0, 0, -9.0), 0.5, 0.3)
+
+
+# Somewhere out in the pool for one that lives in water to wade to: well in from its edge
+func wading_spot(from: Vector3) -> Vector3:
+	for i in 12:
+		var p := Vector3(randf_range(-half.x + 0.5, half.x - 0.5), 0, randf_range(-half.y + 0.5, half.y - 0.5))
+		if wade(p) > 0.5:
+			return p
+	return in_room(shore_by(from, -0.8), 0.5)
 
 
 # A thing in the room for a cryptlin to go and make use of (never the one it hates), or null
@@ -1210,7 +1396,7 @@ func leave_mess(kind: int, at: Vector3, who: Cryptlin, ago := 0.0) -> Mess:
 func _lay_mess(kind: int, at: Vector3, when: float, tint: Color, big: float) -> Mess:
 	var m := Mess.new(kind, when, tint, big)
 	add_child(m)
-	m.position = in_room(Vector3(at.x, 0, at.z), 0.15)
+	m.position = on_dry(Vector3(at.x, 0, at.z), 0.15, 0.15)
 	m.rotation.y = randf() * TAU
 	messes.append(m)
 	return m
@@ -1246,13 +1432,14 @@ func _mess_at(at: Vector2) -> Mess:
 func toilet_spot(who: Cryptlin) -> Vector3:
 	if who.is_baby():
 		var a := randf() * TAU
-		return in_room(who.position + Vector3(cos(a), 0, sin(a)) * randf_range(0.2, 0.6), 0.3)
+		return on_dry(who.position + Vector3(cos(a), 0, sin(a)) * randf_range(0.2, 0.6), 0.3, 0.3)
 	var spots: Array[Vector3] = []
 	for x: float in [-1.0, 1.0]:
 		for z: float in [-1.0, 0.05]:
-			spots.append(in_room(Vector3(9.0 * x, 0, 9.0 * z), 0.4))
+			spots.append(on_dry(Vector3(9.0 * x, 0, 9.0 * z), 0.4, 0.3))
 	for d in decors:
-		spots.append(in_room(d.position + Vector3(0, 0, -d.radius - 0.35), 0.4))
+		if d.kind != Decor.Kind.POOL:
+			spots.append(on_dry(d.position + Vector3(0, 0, -d.radius - 0.35), 0.4, 0.3))
 	var best := spots[0]
 	var best_room := -INF
 	for s in spots:
@@ -1678,17 +1865,22 @@ func _reshape(room: Vector2, lamp: Vector3) -> void:
 		lamp_head.position = lamp_at
 		cord.position = lamp_at + Vector3(0, 4.0, 0)
 	move_nest(nest_pos)
+	# The pool is built again to the new walls (over the back, if its side no longer fits)
+	var pool := decor_of(Decor.Kind.POOL)
+	if pool != null:
+		_flood(pool, shore if shore in shores() else Shore.BACK)
 	for d in decors:
-		d.position = in_room(d.position, d.radius * 0.6)
+		if d != pool:
+			d.position = on_dry(d.position, d.radius * 0.6, d.radius)
 	if ball != null:
 		ball.position = in_room(ball.position, Ball.R)
 	for m in messes:
-		m.position = in_room(m.position, 0.15)
+		m.position = on_dry(m.position, 0.15, 0.15)
 	for s in snacks:
 		s.position = in_room(s.position, 0.2)
 	for r in residents:
 		if r.egg != null:
-			r.egg.position = in_room(r.egg.position, 0.4)
+			r.egg.position = on_dry(r.egg.position, 0.4, 0.4)
 
 
 func _mesh(mesh: Mesh, mat: Material, at: Vector3) -> MeshInstance3D:
@@ -2043,8 +2235,7 @@ func crumbs(at: Vector3, colour: Color) -> void:
 # way it was going, deeper and longer lasting on a soft floor. There are never more than
 # MAX_TRACKS of them; the oldest goes to make room. Water takes no print.
 func leave_print(shape: String, at: Vector3, facing: float, side: float, big: float) -> void:
-	var pool := decor_of(Decor.Kind.POOL)
-	if pool != null and Vector2(at.x - pool.position.x, at.z - pool.position.z).length() < pool.radius:
+	if wade(at) > 0.0:
 		return
 	while tracks.size() >= MAX_TRACKS:
 		tracks.pop_front().queue_free()
@@ -2058,7 +2249,7 @@ func leave_print(shape: String, at: Vector3, facing: float, side: float, big: fl
 
 # Water thrown up by something wading in the pool
 func splash(at: Vector3) -> void:
-	crumbs(Vector3(at.x, Decor.WATER + 0.05, at.z), Color(0.5, 0.75, 0.9))
+	crumbs(Vector3(at.x, Decor.WATER + 0.08, at.z), Color(0.5, 0.75, 0.9))
 	sfx.play("chomp", 0.9, -9.0)
 
 
@@ -2099,6 +2290,8 @@ func _process(delta: float) -> void:
 	bounce.position = light_point + Vector3(0, 1.1, 1.8)
 	motes.visible = light_level > 0.5
 	motes.position = Vector3(light_point.x * 0.5, 1.2, light_point.z * 0.5)
+	if decor_of(Decor.Kind.POOL) != null:
+		decor_of(Decor.Kind.POOL).glint(light_point, spot.light_color, light_level * float(mode["energy"]) / 3.0)
 
 	# A finger left on the cryptlin lifts it
 	if grab == Grab.PET and is_instance_valid(held_pet):
@@ -2226,13 +2419,16 @@ func call_all(to: Vector3) -> void:
 		all[i].call_to(to + (Vector3(cos(a), 0, sin(a)) * 0.55 if all.size() > 1 else Vector3.ZERO))
 
 
-# The thing standing in the room under a finger (the nest counts), or null
+# The thing standing in the room under a finger (the nest counts, and so does the pool,
+# anywhere on its water), or null
 func _thing_at(at: Vector2) -> Node3D:
 	for d in decors:
-		if _ray_hits(at, d.position + Vector3(0, minf(d.radius, 0.4), 0), maxf(d.radius, 0.34)):
+		if d.kind != Decor.Kind.POOL and _ray_hits(at, d.position + Vector3(0, minf(d.radius, 0.4), 0), maxf(d.radius, 0.34)):
 			return d
 	if _ray_hits(at, nest_pos + Vector3(0, 0.1, 0), 0.55):
 		return nest
+	if wade(_floor_at(at, 0.0, 0.0)) > 0.0:
+		return decor_of(Decor.Kind.POOL)
 	return null
 
 
@@ -2468,13 +2664,24 @@ func _pull(id: String, at: Vector2) -> void:
 			use(id)
 
 
-# A thing from the room following a finger across the floor
+# A thing from the room following a finger across the floor. Nothing but the pool goes in the
+# water; the pool itself goes to whichever part of the floor the finger is furthest into.
 func _drag_thing(at: Vector2) -> void:
 	if held_thing == nest:
 		move_nest(_floor_at(at, 0.0, 0.6))
+		return
+	var d := held_thing as Decor
+	if d.kind == Decor.Kind.POOL:
+		# Held over the shelf it is on its way back there: the floor is whole again
+		d.visible = not shelf.has_point(at)
+		floor_mat.set_shader_parameter("shore", shore if d.visible else Shore.NONE)
+		# (and it is not moved by a finger on its way down there across the front of the room)
+		var where := shore_near(_floor_at(at, 0.0, 0.0))
+		if d.visible and where != shore and into(where, _floor_at(at, 0.0, 0.0)) > 0.3:
+			_flood(d, where)
+			splash(d.position)
 	else:
-		var d := held_thing as Decor
-		d.position = _floor_at(at, 0.0, d.radius * 0.6)
+		d.position = on_dry(_floor_at(at, 0.0, 0.0), d.radius * 0.6, d.radius)
 		# Held over the shelf it is on its way back there
 		d.scale = Vector3.ONE * (0.6 if shelf.has_point(at) else 1.0)
 
@@ -2537,7 +2744,8 @@ func _release() -> void:
 					elif thing_new:
 						place_decor(d.kind, d.position)
 					elif moved < 14.0 and quick:
-						call_all(d.position + Vector3(0, 0, d.radius + 0.3))
+						# (a tap on the pool calls them to that place in it, or on its edge)
+						call_all(_floor_at(press_at, 0.0, 0.35) if d.kind == Decor.Kind.POOL else d.position + Vector3(0, 0, d.radius + 0.3))
 					else:
 						save_game()
 			held_thing = null

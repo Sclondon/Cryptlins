@@ -1,6 +1,9 @@
 shader_type spatial;
 // The floor, laid out from world position so it needs no UVs or textures. `style` picks which:
 // 0 flagstones, 1 floorboards, 2 moss, 3 checkered tiles, 4 dirt, 5 sand, 6 gravel.
+// Where the pool lies there is no floor: the water (water.gdshader) is a little below it.
+
+#include "res://shaders/shore.gdshaderinc"
 
 uniform int style = 0;
 
@@ -119,6 +122,10 @@ void vertex() {
 void fragment() {
 	// Cut into coarse texels, like a small texture laid over the floor
 	vec2 at = (floor(world_pos.xz * 18.0) + 0.5) / 18.0;
+	float off = wade(at);
+	if (off > 0.0) {
+		discard;
+	}
 	if (style == 1) {
 		ALBEDO = floorboards(at);
 	} else if (style == 2) {
@@ -134,6 +141,8 @@ void fragment() {
 	} else {
 		ALBEDO = flagstones(at);
 	}
+	// Damp and dark for a hand's breadth back from the water's edge
+	ALBEDO *= mix(0.5, 1.0, smoothstep(0.0, 0.3, -off));
 	ROUGHNESS = 0.96;
 	SPECULAR = 0.15;
 }

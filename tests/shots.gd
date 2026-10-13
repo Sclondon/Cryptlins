@@ -10,6 +10,7 @@ extends SceneTree
 ## them; fewer to a row with --per, for the wide ones; turned any way with --turn; with --with=K every
 ## other one is of kind K, to see two kinds side by side).
 ## With --wheel: the wheel of things at both of its stops and part of the way round.
+## With --pool (and no other of those): four in a room with the pool in it, in each place it fits and under each lamp.
 
 # The save this run uses: one for each kind and shape of screen, so that several can be run at once
 var save := "user://shots_test.json"
@@ -33,6 +34,7 @@ var bare := false
 var per_row := 4
 var turned := 0.0
 var wheel := false
+var pool := false
 
 
 func _initialize() -> void:
@@ -53,6 +55,8 @@ func _initialize() -> void:
 			ui_only = true
 		if arg == "--scan":
 			scan_only = true
+		if arg == "--pool":
+			pool = true
 		if arg == "--many":
 			many = true
 		if arg == "--variety":
@@ -80,14 +84,14 @@ func _initialize() -> void:
 	if variety:
 		_run_variety.call_deferred()
 		return
-	if many:
-		# Three of different kinds, grown, as a save holds them
+	if many or pool:
+		# Three of different kinds (or, for the pool, four), grown, as a save holds them
 		var three: Array = []
-		for i in 3:
+		for i in (4 if pool else 3):
 			var k := (kind + i * 5) % Cryptlin.KINDS.size()
-			three.append({"id": i + 1, "name": ["Mog", "Pim", "Zog"][i], "kind": Cryptlin.KINDS[k]["title"], "seed": maxi(look, 1) + i * 37, "hatched": true, "born": Time.get_unix_time_from_system() - 200000.0, "needs": {"belly": 70.0, "fun": 70.0, "energy": 90.0, "love": 50.0}})
+			three.append({"id": i + 1, "name": ["Mog", "Pim", "Zog", "Nib"][i], "kind": Cryptlin.KINDS[k]["title"], "seed": maxi(look, 1) + i * 37, "hatched": true, "born": Time.get_unix_time_from_system() - 200000.0, "needs": {"belly": 70.0, "fun": 70.0, "energy": 90.0, "love": 50.0}})
 		var f := FileAccess.open(save, FileAccess.WRITE)
-		f.store_string(JSON.stringify({"v": 3, "residents": three, "next_id": 4, "time": Time.get_unix_time_from_system()}))
+		f.store_string(JSON.stringify({"v": 3, "residents": three, "next_id": three.size() + 1, "time": Time.get_unix_time_from_system()}))
 		f.close()
 	elif not egg_only:
 		var f := FileAccess.open(save, FileAccess.WRITE)
@@ -98,7 +102,9 @@ func _initialize() -> void:
 	main.first_kind = kind
 	main.ask_names = false
 	root.add_child(main)
-	if many:
+	if pool:
+		_run_pool.call_deferred()
+	elif many:
 		_run_many.call_deferred()
 	elif wheel:
 		_run_wheel.call_deferred()
@@ -480,6 +486,76 @@ func _run_variety() -> void:
 	sheet.resize(sheet.get_width() * 2, sheet.get_height() * 2, Image.INTERPOLATE_NEAREST)
 	sheet.save_png("%s/k%d_variety%s.png" % [out, kind, tag])
 	quit()
+
+
+# Four in a room with the pool: in each place it fits (those that live in water wading, the rest
+# on the dry floor), under each lamp, one that does not live in water let go over the middle
+# of it, food and a toy thrown in, one come down for a drink, and all of them asleep
+func _run_pool() -> void:
+	await _wait(1.0)
+	var all := main.pets()
+	main.move_nest(Vector3(1.3, 0, 1.2))
+	for where in Den.shores():
+		main.place_decor(Decor.Kind.POOL, Den.middle(where))
+		await _spread(all)
+		await _snap("q1_place%d" % where)
+	for mode in [Den.Lamp.LOW, Den.Lamp.HEAT, Den.Lamp.OFF, Den.Lamp.BRIGHT]:
+		main.set_lamp(mode)
+		await _spread(all)
+		await _snap("q2_lamp_%s" % Den.LAMPS[mode]["title"])
+	var land := all.filter(func(pet: Cryptlin) -> bool: return not pet.needs_water())
+	if not land.is_empty():
+		land[0].position = Den.in_room(Den.shore_by(Vector3.ZERO, -1.7), 0.6)
+		land[0]._enter(Cryptlin.State.IDLE, 5.0)
+		await _wait(0.3)
+		await _snap("q3_flounder")
+		await _until(func() -> bool: return land[0].state != Cryptlin.State.FLOUNDER, 6.0)
+		await _wait(0.4)
+		await _snap("q3_out")
+	for pet in all:
+		pet.belly = 100.0
+		pet._enter(Cryptlin.State.IDLE, 30.0)
+	main.feed(Snack.Kind.FISH, Den.in_room(Den.shore_by(Vector3(0.5, 0, 0.5), -1.1), 0.6) + Vector3(0, 2.5, 0))
+	main.play_ball(Ball.Kind.BALL)
+	main.ball.position = Den.in_room(Den.shore_by(Vector3(-0.6, 0, -0.6), -1.2), 0.6) + Vector3(0, 1.5, 0)
+	main.ball.vel = Vector3.ZERO
+	for pet in all:
+		pet.ball_cooldown = 30.0
+	await _wait(1.3)
+	await _snap("q4_afloat")
+	await _wait(3.0)
+	await _snap("q4_drifted")
+	main._clear_toys()
+	if not land.is_empty():
+		land[0]._enter(Cryptlin.State.VISIT)
+		land[0].visiting = main.decor_of(Decor.Kind.POOL)
+		await _until(func() -> bool: return land[0].step >= 1, 8.0)
+		await _wait(1.0)
+		await _snap("q5_drink")
+	main.set_lamp(Den.Lamp.LOW)
+	for pet in all:
+		pet.energy = 30.0
+		pet.position = pet._bed() + Vector3(randf_range(-0.3, 0.3), 0, randf_range(-0.3, 0.3))
+		pet._enter(Cryptlin.State.SLEEP)
+	await _wait(2.5)
+	await _snap("q6_asleep")
+	quit()
+
+
+# Those that live in water out wading in the pool, and the rest stood about on the dry floor
+func _spread(all: Array[Cryptlin]) -> void:
+	var dry := 0
+	for pet in all:
+		pet.energy = 100.0
+		if pet.needs_water():
+			pet._enter(Cryptlin.State.VISIT)
+			pet.visiting = main.decor_of(Decor.Kind.POOL)
+		else:
+			pet.position = Den.on_dry(Den.shore_by(Vector3.ZERO, 0.9) + Den.place(-0.9 + dry * 1.3, 0.3 * (dry % 2)), 0.4, 0.4)
+			pet._enter(Cryptlin.State.STARE)
+			dry += 1
+	await _until(func() -> bool: return all.all(func(pet: Cryptlin) -> bool: return not pet.needs_water() or pet.step >= 1), 9.0)
+	await _wait(1.2)
 
 
 # Every face that goes up over its head, under the lamp, and then two of them in the dark
