@@ -1,11 +1,12 @@
 class_name Den
 extends Node
-## Cryptlins: a bare bulb in a brick basement and the little monster that lives under it.
+## Cryptlins: a bare bulb in a brick basement and the little monsters that live under it.
 ## This builds the room, the lamp and the shelf of things, reads the touches and keeps the save.
-## A cryptlin starts as an egg (scripts/egg.gd); `pet` is null until it hatches.
+## Up to four live here at once (see Resident): each starts as an egg (scripts/egg.gd) and is a
+## cryptlin once it hatches. `who()` is the one in question when a single one is meant.
 ## Nothing is written on the screen to say how any of it works: that is all in the notebook.
 
-enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP }
+enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER }
 enum Lamp { BRIGHT, LOW, HEAT, OFF }
 
 # How far below where its cord is fixed the lamp's bulb hangs
@@ -18,6 +19,8 @@ const LAMPS: Array[Dictionary] = [
 	{"title": "off", "energy": 0.0, "angle": 40.0, "colour": Color(0.2, 0.17, 0.15), "warmth": 0.0},
 ]
 const MAX_SNACKS := 3
+# How many eggs and cryptlins the room holds at once
+const MAX_RESIDENTS := 4
 const NAME_HEADS: Array[String] = ["Grub", "Mog", "Snag", "Fizz", "Bork", "Nib", "Skrit", "Womp", "Gloom", "Pim", "Zog", "Murk"]
 const NAME_TAILS: Array[String] = ["nik", "let", "wort", "bo", "gle", "kin", "zle", "by", "mort", "ix"]
 const EGG_SPOT := Vector3(0, 0, 0.3)
@@ -62,33 +65,27 @@ var motes: CPUParticles3D
 var crumb_puff: CPUParticles3D
 var ripple: MeshInstance3D
 var sfx: Sfx
-var pet: Cryptlin
-var egg: Egg
-var leaving := false
+# Everything that lives here, eggs and cryptlins, the eldest first; the number the next to
+# arrive will be given; and the one last tapped or scanned
+var residents: Array[Resident] = []
+var next_id := 1
+var chosen: Resident
 var ball: Ball
 var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
-# What the cryptlin has left on the floor (see Mess)
+# What the cryptlins have left on the floor (see Mess)
 var messes: Array[Mess] = []
 var nest: Node3D
 var nest_pos := Vector3(-1.6, 0, -1.2)
 
-var pet_name := ""
-var pet_seed := 1
-var pet_kind := 0
-var hatched := false
-var born := 0.0
-var saved_warmth := 0.0
-var saved_needs := {}
 var saved_decor: Array = []
 var saved_mess: Array = []
-# How long the game was shut, for the cryptlin to live through when it is put back in the room
+# How long the game was shut, for them to live through when they are put back in the room
 var away := 0.0
 var _muted_at_start := false
-# The room as it has been done up, and what has been found out about the cryptlin's tastes
+# The room as it has been done up
 var floor_style := 4
 var nest_style := 0
-var known := {}
 var floor_mat: ShaderMaterial
 # Played inside a site with a shop (see _bridge): what has been bought there, item id to how
 # many (-1 for as many as you like). By itself the game has everything.
@@ -135,7 +132,12 @@ var sliding := false
 var held_thing: Node3D
 var held_snack: Snack
 var thing_new := false
+# The cryptlin or the egg a finger came down on
+var held_pet: Cryptlin
+var held_egg: Egg
 
+# The scanner, and the one it is held up to
+var scanned: Resident
 var scanning := false
 var scan_time := 0.0
 var scanner: Node3D
@@ -148,6 +150,9 @@ var ask: PanelContainer
 var ask_text: Label
 var namer: PanelContainer
 var name_edit: LineEdit
+# The one the card that is up is about: being named, or about to be let go
+var naming: Resident
+var parting: Resident
 var toast: Label
 var card: StyleBoxFlat
 # The test panel (see dev_toggle)
@@ -160,7 +165,7 @@ var dev_tap_time := -10.0
 
 func _ready() -> void:
 	randomize()
-	var fresh := not _load_game()
+	_load_game()
 	_build_room()
 	_build_lamp()
 	sfx = Sfx.new()
@@ -178,11 +183,22 @@ func _ready() -> void:
 	_fit()
 	if OS.has_feature("web") and str(JavaScriptBridge.eval("window.location.search", true)).contains("dev"):
 		dev_toggle()
-	if hatched:
-		_spawn_pet(Vector3(randf_range(-1.0, 1.0), 0, randf_range(-0.6, 0.8)))
-	else:
-		_lay_egg(fresh)
-		_say("An egg!" if fresh else "Still an egg")
+	for r in residents:
+		if r.hatched:
+			_spawn_pet(r, Vector3(randf_range(-1.0, 1.0), 0, randf_range(-0.6, 0.8)))
+		else:
+			_lay_egg(r, false)
+	if residents.is_empty():
+		# A new game, or a room with nobody left in it: one egg for nothing
+		new_egg(first_kind)
+		_say("An egg!")
+	elif pets().is_empty():
+		_say("Still an egg")
+	# They have been living their lives while the game was shut (grown, asleep, hungry, glad to
+	# see you: they show all that themselves)
+	if away > 0.0:
+		pass_time(away)
+		away = 0.0
 	_bridge()
 
 
@@ -191,69 +207,143 @@ static func in_room(p: Vector3, margin := 0.0) -> Vector3:
 	return Vector3(clampf(p.x, -half.x + margin, half.x - margin), p.y, clampf(p.z, -half.y + margin, half.y - margin))
 
 
-# ---------------------------------------------------------------- egg and hatchling
+# ---------------------------------------------------------------- who lives here
 
-func _lay_egg(from_above: bool) -> void:
-	egg = Egg.new()
-	egg.world = self
-	egg.kind = pet_kind
-	egg.look_seed = pet_seed
-	egg.warmth = saved_warmth
-	add_child(egg)
-	egg.position = EGG_SPOT
-	if from_above:
-		egg.drop(EGG_SPOT + Vector3(0, 5.5, 0))
-	egg.cracked.connect(_on_cracked)
-	egg.hatched.connect(_on_hatched)
+# The one in question, when a single one is meant: the one last tapped or scanned, or else the
+# eldest. Never null once the room is built: an empty room is given an egg.
+func who() -> Resident:
+	if chosen != null and chosen in residents:
+		return chosen
+	return residents[0] if not residents.is_empty() else null
+
+
+# The cryptlins in the room: not the eggs, nor one that is on its way out
+func pets() -> Array[Cryptlin]:
+	var all: Array[Cryptlin] = []
+	for r in residents:
+		if r.pet != null and not r.leaving:
+			all.append(r.pet)
+	return all
+
+
+# The cryptlin nearest a place on the floor, or null if there is none
+func nearest_pet(to: Vector3) -> Cryptlin:
+	var best: Cryptlin = null
+	for pet in pets():
+		if best == null or pet.position.distance_squared_to(to) < best.position.distance_squared_to(to):
+			best = pet
+	return best
+
+
+func room_for_more() -> bool:
+	return residents.size() < MAX_RESIDENTS
+
+
+# Time that went by with nobody looking (the game shut, or covered by the page it is played
+# in): each of them lives through it, and is found asleep in the nest if that is how it ended
+func pass_time(seconds: float) -> void:
+	for pet in pets():
+		if pet.pass_time(seconds, not light_on):
+			pet.position = nest_pos + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.2))
+			pet._enter(Cryptlin.State.SLEEP)
+		elif pet.state == Cryptlin.State.SLEEP:
+			pet._enter(Cryptlin.State.IDLE)
 	_sync()
 
 
-func _on_cracked(_stage: int) -> void:
-	crumbs(egg.centre(), Egg.SHELLS[egg.kind])
+# ---------------------------------------------------------------- eggs and hatchlings
+
+# Drops a new egg into the room: of a given kind, or of any that is not here already (nor
+# `not_kind`, the kind of one that has just gone)
+func new_egg(kind := -1, not_kind := -1) -> Resident:
+	var r := Resident.new()
+	r.id = next_id
+	next_id += 1
+	r.look_seed = randi() % 1000000 + 1
+	r.kind = kind
+	if kind < 0:
+		var fresh: Array[int] = []
+		for k in Cryptlin.KINDS.size():
+			if k != not_kind and not residents.any(func(other: Resident) -> bool: return other.kind == k):
+				fresh.append(k)
+		r.kind = fresh.pick_random()
+	r.at = _clear_spot(EGG_SPOT, 1.1)
+	residents.append(r)
+	_lay_egg(r, true)
+	return r
+
+
+# The egg on the shelf: one more in the room, if there is room
+func lay_egg() -> void:
+	if not room_for_more() or not owns("egg"):
+		sfx.play("click", 0.7)
+		return
+	if not light_on:
+		set_lamp(Lamp.BRIGHT)
+	new_egg()
+	_spend("egg")
+	sfx.play("click")
+	save_game()
+
+
+func _lay_egg(r: Resident, from_above: bool) -> void:
+	var egg := Egg.new()
+	egg.world = self
+	egg.kind = r.kind
+	egg.look_seed = r.look_seed
+	egg.warmth = r.warmth
+	add_child(egg)
+	r.egg = egg
+	r.hatched = false
+	egg.position = in_room(r.at if r.at != Vector3.INF else EGG_SPOT, 0.4)
+	if from_above:
+		egg.drop(egg.position + Vector3(0, 5.5, 0))
+	egg.cracked.connect(_on_cracked.bind(r))
+	egg.hatched.connect(_on_hatched.bind(r))
+	_sync()
+
+
+func _on_cracked(_stage: int, r: Resident) -> void:
+	crumbs(r.egg.centre(), Egg.SHELLS[r.kind])
 	Input.vibrate_handheld(30)
 
 
-func _on_hatched() -> void:
-	var at := egg.position
-	crumbs(egg.centre(), Egg.SHELLS[egg.kind])
-	stop_scan()
-	egg.burst()
-	egg = null
-	hatched = true
-	born = Time.get_unix_time_from_system()
-	saved_needs = {"belly": 55.0, "fun": 50.0, "energy": 85.0, "love": 10.0, "age": 0.0}
-	known = {}
-	pet_name = roll_name()
-	_spawn_pet(at)
-	pet.boop()
-	pet.hearts.emitting = true
+func _on_hatched(r: Resident) -> void:
+	var at := r.egg.position
+	crumbs(r.egg.centre(), Egg.SHELLS[r.kind])
+	if scanned == r:
+		stop_scan()
+	r.egg.burst()
+	r.egg = null
+	r.hatched = true
+	r.born = Time.get_unix_time_from_system()
+	r.needs = {"belly": 55.0, "fun": 50.0, "energy": 85.0, "love": 10.0, "age": 0.0}
+	r.known = {}
+	r.name = roll_name()
+	_spawn_pet(r, at)
+	r.pet.boop()
+	r.pet.hearts.emitting = true
 	sfx.play("crack", 0.7)
 	Input.vibrate_handheld(60)
 	_say("It hatched!") # (what it is, is for the notebook)
 	# Once it has had its moment, it wants a name
 	if ask_names:
-		get_tree().create_timer(3.5).timeout.connect(open_namer)
+		get_tree().create_timer(3.5).timeout.connect(open_namer.bind(r))
 	save_game()
 
 
-func _spawn_pet(at: Vector3) -> void:
-	pet = Cryptlin.new()
+func _spawn_pet(r: Resident, at: Vector3) -> void:
+	var pet := Cryptlin.new()
 	pet.world = self
-	pet.kind = pet_kind
-	pet.look_seed = pet_seed
-	pet.set_needs(saved_needs)
+	pet.me = r
+	pet.kind = r.kind
+	pet.look_seed = r.look_seed
+	pet.set_needs(r.needs)
 	add_child(pet)
 	pet.position = at
 	pet.comfort = comfort_of(pet)
-	pet.left.connect(_on_left)
-	if away > 0.0:
-		# It has been living its life while the game was shut (grown, asleep, hungry, glad to see
-		# you: it shows all that itself)
-		var asleep := pet.pass_time(away, not light_on)
-		if asleep:
-			pet.position = nest_pos
-			pet._enter(Cryptlin.State.SLEEP)
-		away = 0.0
+	pet.left.connect(_on_left.bind(r))
+	r.pet = pet
 	_sync()
 
 
@@ -261,16 +351,18 @@ func roll_name() -> String:
 	return NAME_HEADS.pick_random() + NAME_TAILS.pick_random()
 
 
-# The card that asks what it is to be called. It has a name already (made up when it hatched),
-# so shutting the card without typing keeps that one.
-func open_namer() -> void:
-	if pet == null or leaving or ask.visible:
+# The card that asks what one of them is to be called: the one that has just hatched, or the
+# one whose page the notebook is open at. It has a name already (made up when it hatched), so
+# shutting the card without typing keeps that one.
+func open_namer(r: Resident) -> void:
+	if not r in residents or r.pet == null or r.leaving or ask.visible or namer.visible:
 		return
 	if finger != -1:
 		_release()
 	stop_scan()
 	notebook.visible = false
-	name_edit.text = pet_name
+	naming = r
+	name_edit.text = r.name
 	namer.visible = true
 	sfx.play("click")
 
@@ -286,24 +378,25 @@ func _name_done(_typed := "") -> void:
 	namer.visible = false
 	name_edit.release_focus()
 	var typed := name_edit.text.strip_edges().left(14)
-	if typed != "" and pet != null:
-		pet_name = typed
+	if typed != "":
+		naming.name = typed
 	sfx.play("click", 0.8)
-	_say("This is %s" % pet_name)
+	_say("This is %s" % naming.name)
 	_sync()
 	save_game()
 
 
-# "New egg" in the notebook: asks first, since it sends the cryptlin away for good
-func ask_new_egg() -> void:
-	if pet == null or leaving:
+# "Let go" on a cryptlin's page of the notebook: asks first, since it sends it away for good
+func ask_let_go(r: Resident) -> void:
+	if not r in residents or r.pet == null or r.leaving:
 		return
 	if finger != -1:
 		_release()
 	stop_scan()
 	notebook.visible = false
+	parting = r
 	ask_text.text = "Let %s go off into the dark,
-and hatch a new egg?" % pet_name
+and not come back?" % r.name
 	ask.visible = true
 	sfx.play("click")
 
@@ -311,29 +404,26 @@ and hatch a new egg?" % pet_name
 func _answer(yes: bool) -> void:
 	ask.visible = false
 	sfx.play("click", 0.8)
-	if yes and pet != null and not leaving:
-		leaving = true
-		pet.leave()
-		_say("Goodbye, %s" % pet_name)
+	if yes and parting in residents and parting.pet != null and not parting.leaving:
+		parting.leaving = true
+		parting.pet.leave()
+		_say("Goodbye, %s" % parting.name)
 		_sync()
 
 
-func _on_left() -> void:
-	pet.queue_free()
-	pet = null
-	leaving = false
-	hatched = false
-	_clear_toys()
-	# Never the same kind twice running
-	pet_kind = (pet_kind + randi_range(1, Cryptlin.KINDS.size() - 1)) % Cryptlin.KINDS.size()
-	pet_seed = randi() % 1000000 + 1
-	saved_warmth = 0.0
-	pet_name = ""
-	known = {}
-	if not light_on:
-		set_lamp(Lamp.BRIGHT)
-	_lay_egg(true)
-	_say("An egg!")
+func _on_left(r: Resident) -> void:
+	r.pet.queue_free()
+	r.pet = null
+	residents.erase(r)
+	if pets().is_empty():
+		_clear_toys()
+	if residents.is_empty():
+		# Nobody is left: an egg comes for nothing, and never the same kind twice running
+		if not light_on:
+			set_lamp(Lamp.BRIGHT)
+		new_egg(-1, r.kind)
+		_say("An egg!")
+	_sync()
 	save_game()
 
 
@@ -347,60 +437,63 @@ func dev_toggle() -> void:
 	_say("Test panel on" if dev.visible else "Test panel off")
 
 
-# Puts a cryptlin of this kind in the room at once, or its egg
+# Turns the one in question into a cryptlin of this kind at once, or its egg
 func dev_show(kind: int, as_egg := false, new_look := false) -> void:
 	if finger != -1:
 		_release()
 	stop_scan()
 	ask.visible = false
 	namer.visible = false
-	if pet != null:
-		pet.queue_free()
-		pet = null
-	if egg != null:
-		egg.queue_free()
-		egg = null
-	leaving = false
+	var r := who()
+	var at := EGG_SPOT
+	if r.body() != null:
+		at = Vector3(r.body().position.x, 0, r.body().position.z)
+		r.body().queue_free()
+	r.pet = null
+	r.egg = null
+	r.leaving = false
 	carrying = false
-	known = {}
+	r.known = {}
 	_clear_toys()
-	pet_kind = posmod(kind, Cryptlin.KINDS.size())
+	r.kind = posmod(kind, Cryptlin.KINDS.size())
 	if new_look:
-		pet_seed = randi() % 1000000 + 1
-	hatched = not as_egg
-	saved_warmth = 0.0
+		r.look_seed = randi() % 1000000 + 1
+	r.warmth = 0.0
+	r.at = at
 	if not light_on:
 		set_lamp(Lamp.BRIGHT)
 	if as_egg:
-		pet_name = ""
-		_lay_egg(true)
+		r.name = ""
+		_lay_egg(r, true)
 	else:
-		saved_needs = {"belly": 60.0, "fun": 55.0, "energy": 85.0, "love": 40.0, "age": Cryptlin.GROW_AGE}
-		born = Time.get_unix_time_from_system() - Cryptlin.GROW_AGE
-		if pet_name == "":
-			pet_name = roll_name()
-		_spawn_pet(EGG_SPOT)
+		r.hatched = true
+		r.needs = {"belly": 60.0, "fun": 55.0, "energy": 85.0, "love": 40.0, "age": Cryptlin.GROW_AGE}
+		r.born = Time.get_unix_time_from_system() - Cryptlin.GROW_AGE
+		if r.name == "":
+			r.name = roll_name()
+		_spawn_pet(r, at)
 	save_game()
 
 
 func _dev_step(by: int) -> void:
-	dev_show(pet_kind + by)
+	dev_show(who().kind + by)
 
 
 func _dev_look() -> void:
-	dev_show(pet_kind, egg != null, true)
+	dev_show(who().kind, who().egg != null, true)
 
 
 # With a cryptlin: its egg instead. With an egg: hatch it now.
 func _dev_egg() -> void:
-	if egg != null:
-		egg.warmth = 100.0
+	if who().egg != null:
+		who().egg.warmth = 100.0
 	else:
-		dev_show(pet_kind, true)
+		dev_show(who().kind, true)
 
 
 # Baby to adult and back
 func _dev_age() -> void:
+	var pet := who().pet
 	if pet != null:
 		pet.age = 0.0 if not pet.is_baby() else Cryptlin.GROW_AGE
 		_sync()
@@ -408,14 +501,10 @@ func _dev_age() -> void:
 
 # A day goes by, as if the game had been shut for it
 func _dev_day() -> void:
-	if pet != null and not leaving:
-		var asleep := pet.pass_time(86400.0, not light_on)
-		pet._enter(Cryptlin.State.SLEEP if asleep else Cryptlin.State.IDLE)
-		if asleep:
-			pet.position = nest_pos
-		born -= 86400.0
-		_say("A day later")
-		_sync()
+	pass_time(86400.0)
+	for r in residents:
+		r.born -= 86400.0
+	_say("A day later")
 
 
 func _clear_toys() -> void:
@@ -425,20 +514,20 @@ func _clear_toys() -> void:
 	_clear_ball()
 
 
-# ---------------------------------------------------------------- what the cryptlin lets on
+# ---------------------------------------------------------------- what a cryptlin lets on
 
-# It has shown a taste for the first time: "food" (its favourite), "yuck", "toy", "ground",
-# "lamp", a thing in its room it likes ("decor+rock") or cannot stand ("decor-rock"), or
-# whether it is one that needs water ("water")
-func learned(what: String) -> void:
-	if pet == null or known.get(what, false):
+# One of them has shown a taste for the first time: "food" (its favourite), "yuck", "toy",
+# "ground", "lamp", a thing in the room it likes ("decor+rock") or cannot stand ("decor-rock"),
+# or whether it is one that needs water ("water")
+func learned(pet: Cryptlin, what: String) -> void:
+	var known := pet.me.known
+	if known.get(what, false):
 		return
 	# (nothing is said about it on the screen: how it took it shows over its head, and what was
 	# learned is written in the notebook for whoever looks)
 	known[what] = true
 	_sync()
 	save_game()
-
 
 func fed_up() -> void:
 	pass # (it shows it: nothing is written up)
@@ -520,6 +609,8 @@ func use(id: String) -> void:
 			feed(n)
 		"toy":
 			play_ball(n)
+		"egg":
+			lay_egg()
 		"decor":
 			# In if it is out, out if it is in
 			var there := decor_of(n)
@@ -535,7 +626,7 @@ func use(id: String) -> void:
 
 # Drops something to eat into the light: a given food, or any
 func feed(which := -1, at := Vector3.INF) -> void:
-	if pet == null or leaving:
+	if pets().is_empty():
 		sfx.play("click", 0.7)
 		return
 	var kind := which if which >= 0 else randi() % Snack.NAMES.size()
@@ -553,7 +644,7 @@ func feed(which := -1, at := Vector3.INF) -> void:
 	sfx.play("click")
 
 
-# A bit of food let go of in the room: it is the cryptlin's now
+# A bit of food let go of in the room: it is for whichever of them gets there first
 func _serve(snack: Snack) -> void:
 	snack.thud.connect(func(strength: float) -> void: sfx.play("thud", 1.3, clampf(strength * 2.0 - 16.0, -24.0, -4.0)))
 	snacks.append(snack)
@@ -562,7 +653,7 @@ func _serve(snack: Snack) -> void:
 
 # Throws a toy in: a given one, or whichever is out already (the ball, if none is)
 func play_ball(which := -1) -> void:
-	if pet == null or leaving:
+	if pets().is_empty():
 		sfx.play("click", 0.7)
 		return
 	if ball != null and which >= 0 and which != ball.kind:
@@ -574,9 +665,15 @@ func play_ball(which := -1) -> void:
 	else:
 		var a := randf() * TAU
 		ball.vel += Vector3(cos(a) * 2.5, 4.2, sin(a) * 2.5) * ball.heft
-	pet.notice_ball()
+	_notice_ball()
 	sfx.play("click")
 	_sync()
+
+
+# The keeper has thrown the toy or taken hold of it: worth a chase to any of them
+func _notice_ball() -> void:
+	for pet in pets():
+		pet.notice_ball()
 
 
 func _new_ball(which: int) -> void:
@@ -612,7 +709,7 @@ func _stand(kind: int, at: Vector3, turn := 0.0) -> Decor:
 
 
 # Stands a thing in the room (or moves the one of its kind already there), and lets the
-# cryptlin come and see what it thinks of it
+# cryptlins come and see what they think of it
 func place_decor(kind: int, at: Vector3) -> Decor:
 	var d := decor_of(kind)
 	if d == null:
@@ -635,36 +732,59 @@ func remove_decor(d: Decor) -> void:
 	save_game()
 
 
-# The cryptlin goes over to a thing to show whether it likes it
+# Each cryptlin goes over to a thing to show whether it likes it, side by side if there are several
 func _judge(d: Decor) -> void:
-	if pet == null or leaving:
-		return
 	var id: String = Decor.IDS[d.kind]
-	var near := d.position + Vector3(0, 0, d.radius + 0.35)
-	if d.kind == Decor.Kind.POOL:
-		# Whether it needs water shows the first time it sees some
-		pet.look_over(near, 1 if pet.needs_water() else 0, "water")
-	elif d.kind in pet.like_decor:
-		pet.look_over(near, 1, "decor+" + id)
-	elif d.kind == pet.hate_decor:
-		pet.look_over(near, -1, "decor-" + id)
-	else:
-		pet.look_over(near, 0, "")
+	var all := pets()
+	for i in all.size():
+		var pet := all[i]
+		var near := d.position + Vector3((i - (all.size() - 1) * 0.5) * 0.55, 0, d.radius + 0.35)
+		if d.kind == Decor.Kind.POOL:
+			# Whether it needs water shows the first time it sees some
+			pet.look_over(near, 1 if pet.needs_water() else 0, "water")
+		elif d.kind in pet.like_decor:
+			pet.look_over(near, 1, "decor+" + id)
+		elif d.kind == pet.hate_decor:
+			pet.look_over(near, -1, "decor-" + id)
+		else:
+			pet.look_over(near, 0, "")
+
+
+# How much bare floor there is round a place: how far to the nearest thing, nest, egg or cryptlin
+func _clearance(p: Vector3) -> float:
+	var room := p.distance_to(nest_pos) - 0.6
+	for d in decors:
+		room = minf(room, p.distance_to(d.position) - d.radius)
+	for r in residents:
+		if r.body() != null:
+			room = minf(room, Vector2(p.x - r.body().position.x, p.z - r.body().position.z).length() - 0.4)
+	return room
 
 
 # Somewhere on the floor with nothing standing on it
 func _free_spot(radius: float) -> Vector3:
 	var best := Vector3.ZERO
-	var best_room := -1.0
+	var best_room := -INF
 	for i in 24:
 		var p := Vector3(randf_range(-half.x + radius + 0.2, half.x - radius - 0.2), 0, randf_range(-half.y + radius + 0.1, half.y - radius - 0.7))
-		var room := p.distance_to(nest_pos) - 0.6
-		for d in decors:
-			room = minf(room, p.distance_to(d.position) - d.radius)
-		if pet != null:
-			room = minf(room, p.distance_to(pet.position) - 0.4)
-		if room > best_room:
-			best_room = room
+		if _clearance(p) > best_room:
+			best_room = _clearance(p)
+			best = p
+	return best
+
+
+# A place for an egg: the given one if it is clear, or else the clearest to be found within
+# `reach` of it (near enough the middle for the lamp to warm it)
+func _clear_spot(centre: Vector3, reach: float) -> Vector3:
+	var best := in_room(centre, 0.4)
+	var best_room := _clearance(best)
+	for i in 24:
+		if best_room > 0.25:
+			break
+		var a := randf() * TAU
+		var p := in_room(centre + Vector3(cos(a), 0, sin(a)) * randf_range(0.5, reach), 0.4)
+		if _clearance(p) > best_room:
+			best_room = _clearance(p)
 			best = p
 	return best
 
@@ -673,7 +793,7 @@ func set_ground(style: int) -> void:
 	floor_style = clampi(style, 0, GROUNDS.size() - 1)
 	floor_mat.set_shader_parameter("style", floor_style)
 	sfx.play("thud", 0.7, -8.0)
-	if pet != null and not leaving:
+	for pet in pets():
 		var right := floor_style == pet.fav_ground
 		pet.look_over(pet.position, 1 if right else 0, "ground" if right else "")
 	_sync()
@@ -855,11 +975,11 @@ func set_lamp(mode: int) -> void:
 	lamp_mode = mode
 	light_dragging = false
 	sfx.play("click", 0.8 if light_on else 0.6)
-	if pet != null:
+	for pet in pets():
 		pet.caught()
-	if pet != null and not leaving and light_on:
-		var right := lamp_mode == pet.fav_lamp
-		pet.look_over(pet.position, 1 if right else 0, "lamp" if right else "")
+		if light_on:
+			var right := lamp_mode == pet.fav_lamp
+			pet.look_over(pet.position, 1 if right else 0, "lamp" if right else "")
 	_sync()
 	save_game()
 
@@ -887,18 +1007,23 @@ func toggle_sound() -> void:
 
 # ---------------------------------------------------------------- the scanner
 
-# Holds the scanner up to the cryptlin (or its egg) for a few seconds: its outline, its bones,
-# and how full, rested, amused and fond it is
-func start_scan() -> void:
-	if (pet == null and egg == null) or leaving or scanning:
+# Holds the scanner up to one of them (or its egg) for a few seconds: its outline, its bones,
+# and how full, rested, amused and fond it is. To the one it is given; or else the one last
+# tapped; or else whichever is nearest the middle of the room.
+func start_scan(r: Resident = null) -> void:
+	if r == null:
+		r = chosen if chosen in residents else _nearest_resident(Vector3.ZERO)
+	if r == null or r.leaving or r.body() == null or scanning:
 		sfx.play("click", 0.7)
 		return
+	chosen = r
+	scanned = r
 	scanning = true
 	scan_time = 0.0
 	scanner.visible = true
-	if pet != null:
-		pet.xray(true)
-		pet.hold_still()
+	if r.pet != null:
+		r.pet.xray(true)
+		r.pet.hold_still()
 	sfx.play("jingle", 0.6, -8.0)
 	_sync()
 
@@ -908,14 +1033,27 @@ func stop_scan() -> void:
 		return
 	scanning = false
 	scanner.visible = false
-	if pet != null:
-		pet.xray(false)
+	if scanned.pet != null:
+		scanned.pet.xray(false)
+	scanned = null
 	scan_notes.queue_redraw()
 	_sync()
 
 
+# The egg or cryptlin nearest a place on the floor, or null if the room is empty
+func _nearest_resident(to: Vector3) -> Resident:
+	var best: Resident = null
+	var best_way := INF
+	for r in residents:
+		if r.body() != null and not r.leaving and r.body().position.distance_to(to) < best_way:
+			best_way = r.body().position.distance_to(to)
+			best = r
+	return best
+
+
 func _aim_scanner() -> void:
-	var middle := egg.centre() if pet == null else pet.global_position + Vector3(0, pet.tall() * 0.5, 0)
+	var pet := scanned.pet
+	var middle := scanned.egg.centre() if pet == null else pet.global_position + Vector3(0, pet.tall() * 0.5, 0)
 	var tall := 0.9 if pet == null else pet.tall()
 	var size := maxf(tall, 0.5) / 0.6
 	var toward := (camera.global_position - middle).normalized()
@@ -934,10 +1072,11 @@ func _paint_notes() -> void:
 	if not scanning:
 		return
 	var screen_size := get_viewport().get_visible_rect().size
+	var pet := scanned.pet
 	if pet == null:
-		if egg != null:
-			var warm: Array[String] = ["stone cold", "lukewarm", "warm", "about to hatch"]
-			_note(screen_of(egg.centre()), Vector2(170, -90), "Egg", _word(egg.warmth, warm), egg.warmth, Color(1.0, 0.6, 0.25), screen_size)
+		var egg := scanned.egg
+		var warm: Array[String] = ["stone cold", "lukewarm", "warm", "about to hatch"]
+		_note(screen_of(egg.centre()), Vector2(170, -90), "Egg", _word(egg.warmth, warm), egg.warmth, Color(1.0, 0.6, 0.25), screen_size)
 		return
 	var belly: Array[String] = ["empty", "peckish", "half full", "full", "stuffed"]
 	var rest: Array[String] = ["worn out", "tired", "fresh", "wide awake"]
@@ -989,7 +1128,10 @@ func _sync() -> void:
 		have.append(id)
 		if item["group"] in Items.SPENT and left_of(id) >= 0:
 			counts[id] = left_of(id)
+	# The marks are what is known of the one in question
+	var pet := who().pet if who() != null else null
 	if pet != null:
+		var known := who().known
 		if known.get("food", false):
 			marks[Items.id_of("food", pet.fav_food)] = "heart"
 		if known.get("yuck", false):
@@ -1017,8 +1159,9 @@ func _sync() -> void:
 	shelf.counts = counts
 	shelf.out = out
 	shelf.stock(have)
-	dev_label.text = "%d/%d\n%s" % [pet_kind + 1, Cryptlin.KINDS.size(), Cryptlin.KINDS[pet_kind]["title"]]
-	dev_egg.text = "Hatch" if egg != null else "Egg"
+	if who() != null:
+		dev_label.text = "%d/%d\n%s" % [who().kind + 1, Cryptlin.KINDS.size(), Cryptlin.KINDS[who().kind]["title"]]
+		dev_egg.text = "Hatch" if who().egg != null else "Egg"
 	if notebook.visible:
 		notebook.refresh()
 
@@ -1171,8 +1314,9 @@ func _reshape(room: Vector2, lamp: Vector3) -> void:
 		m.position = in_room(m.position, 0.15)
 	for s in snacks:
 		s.position = in_room(s.position, 0.2)
-	if egg != null:
-		egg.position = in_room(egg.position, 0.4)
+	for r in residents:
+		if r.egg != null:
+			r.egg.position = in_room(r.egg.position, 0.4)
 
 
 func _mesh(mesh: Mesh, mat: Material, at: Vector3) -> MeshInstance3D:
@@ -1385,7 +1529,7 @@ func _build_hud() -> void:
 	answers.alignment = BoxContainer.ALIGNMENT_CENTER
 	answers.add_theme_constant_override("separation", 16)
 	column.add_child(answers)
-	for b: Button in [icon_button(answers, "heart", _answer.bind(false), "Keep"), icon_button(answers, "egg", _answer.bind(true), "Let go")]:
+	for b: Button in [icon_button(answers, "heart", _answer.bind(false), "Keep"), icon_button(answers, "moon", _answer.bind(true), "Let go")]:
 		b.custom_minimum_size = Vector2(170, 130)
 	layer.add_child(ask)
 	_centre(ask)
@@ -1493,12 +1637,23 @@ func hover_fresh() -> bool:
 	return clock - hover_time < 2.0
 
 
-func nearest_snack(from: Vector3) -> Snack:
+# The nearest bit of food to a cryptlin that it has not already turned its nose up at, or null
+func snack_for(who: Cryptlin) -> Snack:
 	var best: Snack = null
 	for s in snacks:
-		if best == null or s.position.distance_squared_to(from) < best.position.distance_squared_to(from):
+		if s.get_instance_id() in who.spurned:
+			continue
+		if best == null or s.position.distance_squared_to(who.position) < best.position.distance_squared_to(who.position):
 			best = s
 	return best
+
+
+# Whether any of the others might yet eat a bit of food that this one will not
+func wanted_by_another(snack: Snack, who: Cryptlin) -> bool:
+	for pet in pets():
+		if pet != who and pet.yuck_food != snack.kind and pet.belly < 97.0:
+			return true
+	return false
 
 
 func remove_snack(snack: Snack) -> void:
@@ -1557,14 +1712,19 @@ func _process(delta: float) -> void:
 	motes.position = Vector3(light_point.x * 0.5, 1.2, light_point.z * 0.5)
 
 	# A finger left on the cryptlin lifts it
-	if grab == Grab.PET and pet != null:
+	if grab == Grab.PET and is_instance_valid(held_pet):
 		if not carrying and clock - press_time > 0.45 and moved < 14.0:
 			carrying = true
 			hold_point = _floor_at(last_at, 0.0, 0.4) + Vector3(0, 0.8, 0)
-			pet.pick_up()
+			held_pet.pick_up()
 			Input.vibrate_handheld(30)
 		if carrying:
-			pet.carry(hold_point)
+			held_pet.carry(hold_point)
+	# The scanner on its way up from the shelf, on the end of the finger
+	if grab == Grab.SCANNER:
+		scanner.scale = Vector3.ONE
+		scanner.position = scanner.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
+		scanner.rotation = Vector3.ZERO
 
 	if grab == Grab.BALL and ball != null:
 		var before := ball.position
@@ -1576,7 +1736,7 @@ func _process(delta: float) -> void:
 
 	if scanning:
 		scan_time += delta
-		if (pet == null and egg == null) or scan_time > SCAN_SECONDS:
+		if not scanned in residents or scanned.body() == null or scan_time > SCAN_SECONDS:
 			stop_scan()
 		else:
 			_aim_scanner()
@@ -1637,10 +1797,39 @@ func _floor_at(at: Vector2, height := 0.0, margin := 0.2) -> Vector3:
 
 
 func _ray_hits(at: Vector2, centre: Vector3, radius: float) -> bool:
+	return _ray_off(at, centre) < radius
+
+
+# How far wide of a place in the room the line from a point on the screen passes
+func _ray_off(at: Vector2, centre: Vector3) -> float:
 	var from := camera.project_ray_origin(_in_view(at))
 	var dir := camera.project_ray_normal(_in_view(at))
 	var along := (centre - from).dot(dir)
-	return along > 0.0 and (from + dir * along).distance_to(centre) < radius
+	return (from + dir * along).distance_to(centre) if along > 0.0 else INF
+
+
+# The egg or cryptlin under a finger (the nearest to it, if there are two), or null
+func _resident_at(at: Vector2) -> Resident:
+	var best: Resident = null
+	var best_off := INF
+	for r in residents:
+		var off := INF
+		if r.egg != null:
+			off = _ray_off(at, r.egg.centre()) / 0.6
+		elif r.pet != null and not r.leaving:
+			off = _ray_off(at, r.pet.body_centre()) / (0.7 * maxf(r.pet.grow, 0.75))
+		if off < 1.0 and off < best_off:
+			best_off = off
+			best = r
+	return best
+
+
+# A tap on the floor calls every one of them over: they gather round the place, not on it
+func call_all(to: Vector3) -> void:
+	var all := pets()
+	for i in all.size():
+		var a := TAU * i / all.size() + 0.6
+		all[i].call_to(to + (Vector3(cos(a), 0, sin(a)) * 0.55 if all.size() > 1 else Vector3.ZERO))
 
 
 # The thing standing in the room under a finger (the nest counts), or null
@@ -1671,11 +1860,13 @@ func _input(event: InputEvent) -> void:
 			Grab.PET:
 				if carrying:
 					hold_point = _floor_at(event.position, 0.0, 0.4) + Vector3(0, 0.8, 0)
-				elif moved > 14.0 and pet != null:
-					pet.stroke()
+				elif moved > 14.0 and is_instance_valid(held_pet):
+					held_pet.stroke()
 			Grab.EGG:
-				if moved > 14.0 and egg != null:
-					egg.rub()
+				if moved > 14.0 and is_instance_valid(held_egg):
+					held_egg.rub()
+			Grab.SCANNER:
+				hold_point = _floor_at(event.position, 0.0, 0.3)
 			Grab.THING:
 				if moved > 14.0 and is_instance_valid(held_thing):
 					_drag_thing(event.position)
@@ -1743,11 +1934,14 @@ func _press(e: InputEventScreenTouch) -> void:
 		grab = Grab.LAMP
 	elif ball != null and _ray_hits(e.position, ball.global_position, 0.5):
 		_hold_ball(e.position)
-	elif egg != null and _ray_hits(e.position, egg.centre(), 0.6):
-		grab = Grab.EGG
-	elif pet != null and not leaving and _ray_hits(e.position, pet.body_centre(), 0.7 * maxf(pet.grow, 0.75)):
-		grab = Grab.PET
+	elif _resident_at(e.position) != null:
+		# One of them: it is the one in question from now on
+		chosen = _resident_at(e.position)
+		held_pet = chosen.pet
+		held_egg = chosen.egg
+		grab = Grab.EGG if held_egg != null else Grab.PET
 		carrying = false
+		_sync()
 	else:
 		held_thing = _thing_at(e.position)
 		if held_thing != null:
@@ -1763,8 +1957,7 @@ func _hold_ball(at: Vector2) -> void:
 	ball.vel = Vector3.ZERO
 	hold_vel = Vector3.ZERO
 	hold_point = _floor_at(at, 0.75, 0.3)
-	if pet != null:
-		pet.notice_ball()
+	_notice_ball()
 
 
 # A finger that came down on the shelf: sideways slides it, upwards pulls the thing off it
@@ -1786,7 +1979,7 @@ func _pull(id: String, at: Vector2) -> void:
 	var n: int = item["n"]
 	match item["group"]:
 		"food":
-			if pet == null or leaving or snacks.size() >= MAX_SNACKS:
+			if pets().is_empty() or snacks.size() >= MAX_SNACKS:
 				return
 			held_snack = Snack.new(n)
 			held_snack.set_process(false)
@@ -1795,7 +1988,7 @@ func _pull(id: String, at: Vector2) -> void:
 			held_snack.position = hold_point
 			grab = Grab.SNACK
 		"toy":
-			if pet == null or leaving:
+			if pets().is_empty():
 				return
 			if ball != null and ball.kind != n:
 				_clear_ball()
@@ -1817,8 +2010,14 @@ func _pull(id: String, at: Vector2) -> void:
 			held_thing = nest
 			grab = Grab.THING
 			moved = 15.0
+		"tool" when id == "scanner" and not scanning:
+			# Carried up to whichever of them it is let go over
+			grab = Grab.SCANNER
+			hold_point = _floor_at(at, 0.0, 0.3)
+			scanner.position = hold_point
+			scanner.visible = true
 		_:
-			# Grounds, the notebook and the scanner have nothing to carry: dragging one up uses it
+			# Grounds, eggs and the notebook have nothing to carry: dragging one up uses it
 			shelf_item = ""
 			use(id)
 
@@ -1855,8 +2054,11 @@ func _release() -> void:
 			if ball != null:
 				ball.held = false
 				ball.vel = hold_vel.limit_length(7.5)
-			if pet != null:
-				pet.notice_ball()
+			_notice_ball()
+		Grab.SCANNER:
+			scanner.visible = false
+			if not shelf.has_point(last_at):
+				start_scan(_resident_at(last_at))
 		Grab.SNACK:
 			if held_snack != null:
 				if shelf.has_point(last_at):
@@ -1877,13 +2079,15 @@ func _release() -> void:
 						remove_decor(d)
 					elif thing_new:
 						place_decor(d.kind, d.position)
-					elif moved < 14.0 and quick and pet != null:
-						pet.call_to(d.position + Vector3(0, 0, d.radius + 0.3))
+					elif moved < 14.0 and quick:
+						call_all(d.position + Vector3(0, 0, d.radius + 0.3))
 					else:
 						save_game()
 			held_thing = null
 		Grab.PET:
-			if pet == null:
+			var pet := held_pet
+			held_pet = null
+			if not is_instance_valid(pet):
 				pass
 			elif carrying:
 				pet.put_down()
@@ -1898,16 +2102,17 @@ func _release() -> void:
 					Input.vibrate_handheld(20)
 			carrying = false
 		Grab.EGG:
-			if quick and egg != null:
-				egg.tap()
+			if quick and is_instance_valid(held_egg):
+				held_egg.tap()
 				Input.vibrate_handheld(20)
+			held_egg = null
 		Grab.FLOOR:
 			var mess := _mess_at(press_at) if quick and not light_dragging_was else null
 			if mess != null:
 				clear_mess(mess)
-			elif quick and not light_dragging_was and pet != null:
+			elif quick and not light_dragging_was and not pets().is_empty():
 				var there := _floor_at(press_at, 0.0, 0.35)
-				pet.call_to(there)
+				call_all(there)
 				ripple.position = Vector3(there.x, 0.02, there.z)
 				ripple.scale = Vector3(0.08, 0.02, 0.08)
 				ripple.visible = true
@@ -1959,7 +2164,7 @@ func _message(args: Array) -> void:
 
 
 # Out of sight (the page has covered the game, or not yet shown it): it saves, stops drawing
-# and goes quiet, keeping its last picture. Back in front, the cryptlin lives through the time
+# and goes quiet, keeping its last picture. Back in front, each cryptlin lives through the time
 # that went by, as it does when the game has been shut.
 func rest(on: bool) -> void:
 	if on == resting:
@@ -1970,10 +2175,10 @@ func rest(on: bool) -> void:
 			_release()
 		save_game()
 		rested_at = Time.get_unix_time_from_system()
-	elif pet != null and not leaving:
+	else:
 		var gone := Time.get_unix_time_from_system() - rested_at
 		if gone > 30.0:
-			pet.pass_time(gone, not light_on)
+			pass_time(gone)
 	var draws := SubViewport.UPDATE_DISABLED if on else SubViewport.UPDATE_ALWAYS
 	view.render_target_update_mode = draws
 	shelf.view.render_target_update_mode = draws
@@ -1994,15 +2199,13 @@ func save_game() -> void:
 	var left: Array = []
 	for m in messes:
 		left.append({"k": m.kind, "x": m.position.x, "z": m.position.z, "t": m.made, "c": m.tint.to_html(false), "s": m.size})
+	var living: Array = []
+	for r in residents:
+		living.append(r.to_save())
 	file.store_string(JSON.stringify({
-		"v": 2,
-		"name": pet_name,
-		"kind": Cryptlin.KINDS[pet_kind]["title"],
-		"seed": pet_seed,
-		"hatched": hatched,
-		"born": born,
-		"warmth": egg.warmth if egg != null else 0.0,
-		"needs": pet.get_needs() if pet != null else {},
+		"v": 3,
+		"residents": living,
+		"next_id": next_id,
 		"floor": floor_style,
 		"nest": nest_style,
 		"nest_at": [nest_pos.x, nest_pos.z],
@@ -2010,29 +2213,40 @@ func save_game() -> void:
 		"mess": left,
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
-		"known": known,
 		"time": Time.get_unix_time_from_system(),
 	}))
 
 
-# Reads the save and notes how long it has been; false if there was none (a new cryptlin)
-func _load_game() -> bool:
+# Reads the save and notes how long it has been. With no save the room is left empty, and
+# _ready puts the first egg in it.
+func _load_game() -> void:
 	var data: Variant = null
 	if FileAccess.file_exists(save_path):
 		data = JSON.parse_string(FileAccess.get_file_as_string(save_path))
 	if not data is Dictionary:
-		pet_seed = randi() % 1000000 + 1
-		pet_kind = first_kind if first_kind >= 0 else randi() % Cryptlin.KINDS.size()
-		return false
+		return
 	var d: Dictionary = data
 	var now := Time.get_unix_time_from_system()
-	pet_name = str(d.get("name", "Grubnik"))
-	pet_seed = int(d.get("seed", 1))
-	# Saves from before there were eggs hold a hatched gremlin
-	pet_kind = Cryptlin.kind_of(d.get("kind", 0))
-	hatched = bool(d.get("hatched", true))
-	saved_warmth = clampf(float(d.get("warmth", 0.0)), 0.0, 99.0)
-	saved_needs = d.get("needs", {})
+	if d.get("residents") is Array:
+		for saved: Variant in d["residents"]:
+			if saved is Dictionary and residents.size() < MAX_RESIDENTS:
+				residents.append(Resident.from_save(saved))
+	elif int(d.get("v", 1)) < 3:
+		# Saves from when there was only ever one: a room with that one in it. (The oldest of
+		# them, from before there were eggs, hold a hatched gremlin.)
+		var only := Resident.from_save(d)
+		only.name = str(d.get("name", "Grubnik"))
+		if int(d.get("v", 1)) < 2 and only.needs.has("age"):
+			# Saves from when a baby grew up in seven minutes: as far along now as it was then
+			only.needs["age"] = clampf(float(only.needs["age"]) / 420.0, 0.0, 1.0) * Cryptlin.GROW_AGE
+		only.born = float(d.get("born", now - float(only.needs.get("age", Cryptlin.GROW_AGE))))
+		residents.append(only)
+	# Each has a number of its own (those from older saves are given theirs now)
+	next_id = int(d.get("next_id", 1))
+	for r in residents:
+		if r.id <= 0:
+			r.id = next_id
+		next_id = maxi(next_id, r.id + 1)
 	floor_style = clampi(int(d.get("floor", 0)), 0, GROUNDS.size() - 1)
 	nest_style = clampi(int(d.get("nest", 0)), 0, Decor.NESTS.size() - 1)
 	if d.get("nest_at") is Array and d["nest_at"].size() == 2:
@@ -2042,15 +2256,8 @@ func _load_game() -> bool:
 	if d.get("mess") is Array:
 		saved_mess = d["mess"]
 	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
-	if d.get("known") is Dictionary:
-		known = d["known"]
-	if int(d.get("v", 1)) < 2 and saved_needs.has("age"):
-		# Saves from when a baby grew up in seven minutes: as far along now as it was then
-		saved_needs["age"] = clampf(float(saved_needs["age"]) / 420.0, 0.0, 1.0) * Cryptlin.GROW_AGE
-	born = float(d.get("born", now - float(saved_needs.get("age", Cryptlin.GROW_AGE))))
 	away = maxf(now - float(d.get("time", now)), 0.0)
 	_muted_at_start = bool(d.get("muted", false))
-	return true
 
 
 func _notification(what: int) -> void:

@@ -1,12 +1,13 @@
 class_name Items
 extends RefCounted
-## Everything that sits on the shelf under the tank: the notebook and the scanner, food, toys,
+## Everything that sits on the shelf under the tank: the notebook and the scanner, eggs, food, toys,
 ## things to stand on the floor, nests and grounds. `n` is the item's number within its
 ## group (Snack.Kind, Ball.Kind, Decor.Kind, and so on).
 
 const LIST: Array[Dictionary] = [
 	{"id": "notebook", "group": "tool", "n": 0, "name": "Notebook"},
 	{"id": "scanner", "group": "tool", "n": 1, "name": "Scanner"},
+	{"id": "egg", "group": "egg", "n": 0, "name": "Egg"},
 	{"id": "bone", "group": "food", "n": 0, "name": "Bone"},
 	{"id": "toadstool", "group": "food", "n": 1, "name": "Toadstool"},
 	{"id": "candy", "group": "food", "n": 2, "name": "Candy corn"},
@@ -47,8 +48,8 @@ const LIST: Array[Dictionary] = [
 # What every keeper has without buying it. The rest come from the shop when the game is played
 # inside a site that keeps one (see Den.stock); played by itself, everything is on the shelf.
 const FREE: Array[String] = ["notebook", "scanner", "bone", "ball", "rags", "dirt"]
-# Used up when used: each one fed is one fewer on the shelf
-const SPENT: Array[String] = ["food"]
+# Used up when used: each one fed, or each egg laid, is one fewer on the shelf
+const SPENT: Array[String] = ["food", "egg"]
 
 
 static func find(id: String) -> Dictionary:
@@ -91,6 +92,10 @@ static func model(id: String) -> Node3D:
 			var bed := Decor.nest(n)
 			bed.scale = Vector3.ONE * 0.55
 			holder.add_child(bed)
+		"egg":
+			# A plain pale egg: what is painted on the one that drops in is anybody's guess
+			Ps1.part(holder, Ps1.ball(), Ps1.mat(Color(0.86, 0.82, 0.7)), Vector3(0, 0.36, 0), Vector3(Egg.WIDTH, Egg.HEIGHT, Egg.WIDTH) * 0.95)
+			Ps1.part(holder, Ps1.ball(), Ps1.mat(Color(0.3, 0.24, 0.18)), Vector3(0, 0.02, 0), Vector3(0.3, 0.04, 0.3))
 		"ground":
 			# A tray of it
 			var mat := ShaderMaterial.new()

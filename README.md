@@ -1,6 +1,6 @@
 # Cryptlins
 
-A bare bulb in a brick basement, and the little monster that lives under it. A virtual pet: it hatches from an egg,
+A bare bulb in a brick basement, and the little monsters that live under it. A virtual pet: each hatches from an egg,
 runs about, eats, plays, sleeps, makes a mess and looks at you. Godot 4.7 (GL Compatibility), made for phones and
 the web, and drawn like a PlayStation game.
 
@@ -55,8 +55,9 @@ Tap a thing to use it, or drag it up off the row and let go where you want it.
 
 | Thing | What it does |
 | --- | --- |
-| **Notebook** (N) | The only words in the game: a page on the cryptlin (or the egg), how to look after it, the row of things, what a finger can do, and the odds and ends (its name, the sound, a new egg). |
-| **Scanner** (X) | Held up to the cryptlin for a few seconds: its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and a note for how at home it is. Works on an egg too. |
+| **Notebook** (N) | The only words in the game: a page on each egg and cryptlin in the room (leaf through them; a cryptlin can be renamed or let go from its own), how to look after them, the row of things, what a finger can do, and the odds and ends (the sound). |
+| **Egg** | One more for the room, of a kind that is not there already. The room holds four, eggs and cryptlins together; with four in it the egg only clicks. |
+| **Scanner** (X) | Held up to one of them for a few seconds (dragged up onto it; or tapped, when it goes to the one last touched, or else the one nearest the middle): its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and a note for how at home it is. Works on an egg too. |
 | **Food**: bone (F), toadstool, candy corn, fish, beetle, berries | It runs over and eats what you drop, loves its favourite, and spits out the one it can't stand. |
 | **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Pick the toy up with a finger and it jumps for it; let go to throw. |
 | **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the row to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
@@ -67,7 +68,7 @@ Tap a thing to use it, or drag it up off the row and let go where you want it.
 
 | You | It |
 | --- | --- |
-| Tap the floor | Calls it over. |
+| Tap the floor | Calls them over. |
 | Hold or drag on the floor | Swings the lamp. It chases the pool of light and pounces on it. |
 | Tap the lamp (L puts it out) | Bright, low, heat, off. In the dark all you can see are its eyes, and before long it goes to its nest and sleeps. |
 | Rub it | It purrs. Builds the bond. |
@@ -86,8 +87,18 @@ cleared up and spoils the place for it meanwhile; it pees more often, and puddle
 baby goes more often and wherever it happens to be. A grown one, content and left to itself, will now and then get
 over-fond of its nest the way a dog does of a cushion, and is mortified if it is caught at it. M mutes the sound.
 
-**New egg** (in the notebook) asks first, then the cryptlin waves and walks off into the dark and an egg of a
-different kind drops in.
+## More than one
+
+The room holds up to four, eggs and cryptlins together. A new game starts with one egg; the **egg** on the row of
+things drops in another (played by itself there is no end of them; inside a page with a shop an egg is stock, used
+up when it is laid). Each has its own name, needs, age, natures, tastes and idea of a good home, so one room cannot
+please them all. Food dropped in is for whoever gets there first: a greedy or a bold one pushes in, a shy one hangs
+back, two at one bit of food share it bite by bite, and one that will not eat a thing leaves it for the others. More
+than one will chase a toy. They walk round each other as they do round the things in the room, and sleep side by
+side in the one nest. The marks on the row of things are what is known of the one last tapped or scanned.
+
+**Let go** (on a cryptlin's page of the notebook) asks first, then that one waves and walks off into the dark. No
+egg comes in its place, unless the room is left with nobody in it: an empty room is always sent an egg for nothing.
 
 Phone-first: on an upright phone the room is narrow, deep and tall with the lamp near the top of the screen, the
 row of things is bigger, touch targets are generous, and nothing needs a keyboard or hover.
@@ -108,8 +119,11 @@ odd-sized eyes, its natures and its tastes.
   same order, so a saved cryptlin stays who it was. `_wear()` is time passing, used both live and for time away.
 - `scripts/egg.gd`: the egg, the picture painted on its shell, its warmth, cracks and hatching.
 - `scripts/main.gd` (`Den`): the room, the lamp, the touches, the scanner and the save (`user://cryptlin.json`).
-  `pet` is null while there is an egg. `comfort_of()` is how well the room suits a cryptlin; `learned()` is told
-  when it has shown one of its tastes.
+  `residents` is the list of those that live there (`scripts/resident.gd`: an egg or a cryptlin, and what the save
+  keeps of it), `pets()` the cryptlins among them, and `who()` the one in question when a single one is meant (the
+  one last tapped or scanned, or else the eldest). `comfort_of()` is how well the room suits a cryptlin; `learned()`
+  is told when one has shown one of its tastes. The save is version 3 (`residents` is a list); a version 2 save, of
+  one cryptlin or one egg, loads as a room with that one in it.
 - `scripts/shelf.gd`: the row of things along the bottom, its own little 3D picture with nothing behind it.
   `scripts/items.gd` lists what can be on it; inside a site that keeps a shop, only what comes free and what has been
   bought.
@@ -138,7 +152,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, new egg
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, or of every face
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, old saves, eggs as stock
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, or of three sharing the room
 godot --headless --path . --export-release Web build/index.html
 ```

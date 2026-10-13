@@ -1,49 +1,54 @@
 class_name Notebook
 extends PanelContainer
 ## The keeper's notebook, opened from the shelf. Everything the game has to say in words is in
-## here: what has been found out about the cryptlin, how to look after it, what a finger can
-## do, and the few odds and ends (its name, the sound, a new egg).
+## here: a page on each egg and cryptlin in the room and what has been found out about it, how
+## to look after them, what a finger can do, and the few odds and ends (the sound).
 
 const INK := Color(0.17, 0.14, 0.2)
 const FAINT := Color(0.17, 0.14, 0.2, 0.55)
 const PAPER := Color(0.87, 0.82, 0.68)
-const TITLES: Array[String] = ["", "Looking after it", "The shelf", "Hands", "Odds and ends"]
-const CARE := "It lives by the clock on the wall, whether you are here or not.
+# The pages that come after the one for each of those in the room
+const TITLES: Array[String] = ["Looking after them", "The shelf", "Hands", "Odds and ends"]
+const CARE := "They live by the clock on the wall, whether you are here or not.
 
-Feed it once or twice a day. A full belly lasts most of a day.
+Feed each once or twice a day. A full belly lasts most of a day. Food is for whoever gets to it first.
 
-Play with it when it is bored. It takes a day or two to grow up.
+Play with them when they are bored. One takes a day or two to grow up.
 
-It sleeps when it is worn out. Put the lamp out at night and it goes to its nest.
+They sleep when they are worn out. Put the lamp out at night and they go to the nest.
 
-It leaves droppings. Tap one to clear it up: they spoil the place for it. Puddles dry by themselves.
+They leave droppings. Tap one to clear it up: they spoil the place. Puddles dry by themselves.
 
-The scanner on the shelf shows what is going on inside it: how full its stomach is, how rested and how amused it is, how fond of you, and whether it likes its home."
+The scanner on the shelf shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, and whether it likes its home. Drag it up onto the one you mean."
 const SHELF := "Everything you have is on the shelf. Slide it sideways to see the rest.
 
 Tap a thing to put it in, or drag it up off the shelf and let go where you want it.
 
+An egg is one more for the room, which holds four.
+
 Food gets eaten. Toys get thrown: pick one up and throw it again.
 
-Rocks, logs and the like stay put. Drag them about, or back down to the shelf to put them away. It will sit on them, drink from them, wade in them and hide in them.
+Rocks, logs and the like stay put. Drag them about, or back down to the shelf to put them away. They will sit on them, drink from them, wade in them and hide in them.
 
-A tray of ground changes the floor. A nest changes its bed.
+A tray of ground changes the floor. A nest changes their bed.
 
-Every cryptlin has its own idea of a good home. Watch what it does when you change something."
-const HANDS := "Tap the floor to call it.
+Every cryptlin has its own idea of a good home, and one room cannot please them all. The marks on the shelf are what you know of the one you last touched."
+const HANDS := "Tap the floor to call them.
 
-Hold and drag on the floor to swing the lamp. It chases the light.
+Hold and drag on the floor to swing the lamp. They chase the light.
 
 Tap the lamp to change it: bright, low, heat, off.
 
-Rub it to pet it. Tap it to poke it.
+Rub one to pet it. Tap it to poke it.
 
-Hold a finger on it to pick it up. Flick it to push it.
+Hold a finger on one to pick it up. Flick it to push it.
 
-Drag its nest to move it. It may well drag it back.
+Drag the nest to move it. It may well get dragged back.
 
 An egg wants warmth: the lamp, and the heat lamp most of all. Rub it to warm it faster. Tap it and it knocks back."
-const ODDS := "A new egg sends this one off into the dark for good, and you start again with whatever hatches."
+const ODDS := "Each of them has a page at the front of this book. A cryptlin can be given a new name there, or let go: it walks off into the dark for good.
+
+A room with nobody left in it is sent an egg."
 
 var world: Den
 var page := 0
@@ -53,7 +58,7 @@ var tools: HBoxContainer
 var folio: Label
 var rename: IconButton
 var sound: IconButton
-var new_egg: IconButton
+var let_go: IconButton
 
 
 func _init(den: Den) -> void:
@@ -78,10 +83,10 @@ func _init(den: Den) -> void:
 	tools = HBoxContainer.new()
 	tools.add_theme_constant_override("separation", 12)
 	rows.add_child(tools)
-	rename = world.icon_button(tools, "pencil", world.open_namer, "Rename")
+	rename = world.icon_button(tools, "pencil", func() -> void: world.open_namer(resident()), "Rename")
+	let_go = world.icon_button(tools, "moon", func() -> void: world.ask_let_go(resident()), "Let go")
 	sound = world.icon_button(tools, "sound_on", world.toggle_sound, "Sound")
-	new_egg = world.icon_button(tools, "egg", world.ask_new_egg, "New egg")
-	for b: Button in [rename, sound, new_egg]:
+	for b: Button in [rename, let_go, sound]:
 		b.custom_minimum_size = Vector2(124, 104)
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 12)
@@ -111,10 +116,12 @@ func fit(screen: Vector2) -> void:
 	position = (screen - size) * 0.5
 
 
+# Opens at the page of the one in question
 func open() -> void:
 	if world.finger != -1:
 		world._release()
 	world.stop_scan()
+	page = maxi(world.residents.find(world.who()), 0)
 	visible = true
 	refresh()
 	world.sfx.play("click")
@@ -125,49 +132,62 @@ func close() -> void:
 	world.sfx.play("click", 0.8)
 
 
+# How many pages there are just now: one for each in the room, and the rest
+func pages() -> int:
+	return world.residents.size() + TITLES.size()
+
+
 func turn(by: int) -> void:
-	page = posmod(page + by, TITLES.size())
+	page = posmod(page + by, pages())
 	refresh()
 	world.sfx.play("click", 1.1)
 
 
+# Whose page it is open at, or null on the pages that are about no one of them
+func resident() -> Resident:
+	return world.residents[page] if page < world.residents.size() else null
+
+
 func refresh() -> void:
-	var pet := world.pet
-	rename.visible = page == 0 and pet != null
-	sound.visible = page == 4
-	new_egg.visible = page == 4
-	new_egg.disabled = pet == null or world.leaving
+	page = mini(page, pages() - 1)
+	var r := resident()
+	var pet := r.pet if r != null else null
+	var rest := page - world.residents.size()
+	rename.visible = pet != null
+	let_go.visible = pet != null
+	let_go.disabled = r != null and r.leaving
+	sound.visible = rest == TITLES.size() - 1
 	sound.symbol = "sound_off" if world.sfx.muted else "sound_on"
 	sound.caption = "Muted" if world.sfx.muted else "Sound"
 	tools.visible = rename.visible or sound.visible
-	folio.text = "%d / %d" % [page + 1, TITLES.size()]
-	heading.text = TITLES[page]
-	match page:
-		0:
-			heading.text = world.pet_name if pet != null else "The egg"
-			body.text = _notes(pet) if pet != null else "%s.
+	folio.text = "%d / %d" % [page + 1, pages()]
+	if pet != null:
+		heading.text = r.name
+		body.text = _notes(pet)
+	elif r != null:
+		heading.text = "An egg"
+		body.text = "%s.
 
-Who knows what is inside? Keep it warm and it will hatch." % (world.egg.title() if world.egg != null else "Nothing here")
-		1: body.text = CARE
-		2: body.text = SHELF
-		3: body.text = HANDS
-		4: body.text = ODDS
+Who knows what is inside? Keep it warm and it will hatch." % r.egg.title()
+	else:
+		heading.text = TITLES[rest]
+		body.text = [CARE, SHELF, HANDS, ODDS][rest]
 
 
 # What is known of this cryptlin. Its tastes are blank until it has shown them (the test panel
 # gives them away).
 func _notes(pet: Cryptlin) -> String:
 	var open := world.dev.visible
-	var known := world.known
+	var known := pet.me.known
 	var likes: Array[String] = []
 	for kind in pet.like_decor:
 		if open or known.get("decor+" + Decor.IDS[kind], false):
 			likes.append("the " + Decor.PLAIN[kind])
 	var hates: String = Decor.PLAIN[pet.hate_decor]
 	var water := "yes, a pool to wade in" if pet.needs_water() else "no more than a drink"
-	var grown := "Hatched %s ago, and all grown up." % _span(Time.get_unix_time_from_system() - world.born)
+	var grown := "Hatched %s ago, and all grown up." % _span(Time.get_unix_time_from_system() - pet.me.born)
 	if pet.is_baby():
-		grown = "Hatched %s ago. Grown in about %s." % [_span(Time.get_unix_time_from_system() - world.born), _span(pet.growing_left())]
+		grown = "Hatched %s ago. Grown in about %s." % [_span(Time.get_unix_time_from_system() - pet.me.born), _span(pet.growing_left())]
 	return "A %s %s%s.
 %s
 Just now it is feeling %s.

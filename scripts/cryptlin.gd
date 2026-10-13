@@ -200,6 +200,8 @@ const EYES: Array[Array] = [
 ]
 
 var world: Den
+# What the room keeps of it: its name, and what has been found out about it
+var me: Resident
 var kind: int = Kind.GREMLIN
 var look_seed := 1
 
@@ -308,10 +310,14 @@ var yaw := 0.0
 var target := Vector3.ZERO
 var gaze := Vector3.ZERO
 var snack: Snack
+# Food it has tasted and left for the others (instance ids), so as not to go back to it
+var spurned: Array[int] = []
 var kicks := 0
 var kicks_total := 0
 var kick_limit := 3
 var ball_cooldown := 0.0
+# How long after finishing a bit of food before it goes for the next (the others get a look in)
+var food_cooldown := 0.0
 var beg_cooldown := 6.0
 var pounce_cooldown := 0.0
 var last_stroke := -10.0
@@ -2039,6 +2045,7 @@ func _process(delta: float) -> void:
 	anim_t += delta
 	state_time += delta
 	ball_cooldown -= delta
+	food_cooldown -= delta
 	beg_cooldown -= delta
 	pounce_cooldown -= delta
 	nest_cooldown -= delta
@@ -2200,7 +2207,7 @@ func _interrupt() -> bool:
 		_enter(State.GO_SLEEP)
 	elif bowel >= 100.0 or bladder >= 100.0:
 		_enter(State.TOILET)
-	elif belly < 97.0 and not world.snacks.is_empty():
+	elif belly < 97.0 and world.snack_for(self) != null and not _hangs_back():
 		_enter(State.GO_FOOD)
 	elif world.light_dragging:
 		_enter(State.CHASE_LIGHT)
@@ -2428,7 +2435,7 @@ func _think(delta: float) -> void:
 					else:
 						_cry("chirp", 0.9)
 					if inspect_key != "":
-						world.learned(inspect_key)
+						world.learned(self, inspect_key)
 			else:
 				_halt(delta)
 				if inspect_liking > 0:
@@ -2458,7 +2465,7 @@ func _think(delta: float) -> void:
 						world.splash(at)
 						hearts.emitting = true
 						feel(Feeling.LOVING, 4.0)
-						world.learned("water")
+						world.learned(self, "water")
 			else:
 				_halt(delta)
 				match visiting.kind:
@@ -2686,7 +2693,7 @@ func _think(delta: float) -> void:
 			gaze = target + Vector3(0, 0.2, 0)
 			if state_time < 0.9:
 				_halt(delta)
-			elif _steer(target, WALK * 0.85, delta, 0.12) or state_time > 12.0:
+			elif _steer(target, WALK * 0.85, delta, 0.5 if _bed_taken() else 0.12) or state_time > 12.0:
 				_enter(State.SLEEP)
 		State.LEAVE:
 			if step == 0:
@@ -2718,16 +2725,41 @@ func _think(delta: float) -> void:
 				state_len = -1.0
 
 
+# Whether another is asleep in the nest already (the next one in lies down beside it)
+func _bed_taken() -> bool:
+	for other in world.pets():
+		if other != self and other.state == State.SLEEP and other.position.distance_to(world.nest_pos) < 0.6:
+			return true
+	return false
+
+
+# Whether it leaves the food to the others for now: one that has just eaten gives them a moment
+# (a greedy one does not), and a shy one lets them go first. Not if it is properly hungry.
+func _hangs_back() -> bool:
+	if belly < 20.0 or world.pets().size() < 2:
+		return false
+	if food_cooldown > 0.0 and not _is(0):
+		return true
+	if not _is(2) or belly < 30.0:
+		return false
+	for other in world.pets():
+		if other != self and other.state in [State.GO_FOOD, State.EAT]:
+			return true
+	return false
+
+
 func _go_food(delta: float) -> void:
 	if not is_instance_valid(snack):
-		snack = world.nearest_snack(position)
+		snack = world.snack_for(self)
 		if snack == null:
 			_enter(State.IDLE, 0.6)
 			return
 	gaze = snack.global_position
 	var away := Vector2(snack.position.x - position.x, snack.position.z - position.z).length()
 	mouth_goal = 0.6 if away < 1.2 else 0.12
-	if _steer(snack.position, RUN, delta, 0.42) and snack.landed:
+	# A greedy or a bold one pushes in ahead of the rest
+	var haste := 1.25 if _is(0) or _is(5) else 1.0
+	if _steer(snack.position, RUN * haste, delta, 0.42) and snack.landed:
 		var s := snack
 		_enter(State.EAT)
 		snack = s
@@ -2751,33 +2783,40 @@ func _eat(delta: float) -> void:
 		world.crumbs(snack.global_position + Vector3(0, 0.1, 0), snack.colour)
 		var eaten := snack.kind
 		if eaten == yuck_food and belly >= 15.0:
-			# One taste is enough, unless it is starving
-			world.remove_snack(snack)
+			# One taste is enough, unless it is starving; it is left lying if one of the others
+			# might have it
+			if world.wanted_by_another(snack, self):
+				spurned.append(snack.get_instance_id())
+			else:
+				world.remove_snack(snack)
 			snack = null
 			love = maxf(love - 1.0, 0.0)
 			_cry("grumble", 1.3)
 			_enter(State.STARTLED, 1.0)
 			roll_goal = 0.35
 			feel(Feeling.DISGUSTED, 5.0)
-			world.learned("yuck")
+			world.learned(self, "yuck")
 			return
+		# Each bite is whoever's took it, so two at one bit of food share it as they come
+		var loved := eaten == fav_food
+		var share := 1.0 / Snack.BITES
+		digest += 100.0 * share
+		belly = minf(belly + Snack.VALUE * share * (1.3 if loved else (0.5 if eaten == yuck_food else 1.0)), 100.0)
+		love = minf(love + (6.0 if loved else 2.0) * share, 100.0)
+		if loved:
+			fun = minf(fun + 8.0 * share, 100.0)
+			feel(Feeling.LOVING, 5.0)
+			world.learned(self, "food")
 		if snack.bite():
-			digest += 100.0
 			world.remove_snack(snack)
 			snack = null
-			var loved := eaten == fav_food
-			belly = minf(belly + Snack.VALUE * (1.3 if loved else (0.5 if eaten == yuck_food else 1.0)), 100.0)
-			love = minf(love + (6.0 if loved else 2.0), 100.0)
+			food_cooldown = 4.0
 			_cry("coo")
 			hop(2.0)
 			_enter(State.IDLE, 1.2)
 			arm_goal = BELLY_ARM
 			eye_goal = 0.5
-			if loved:
-				fun = minf(fun + 8.0, 100.0)
-				hearts.emitting = true
-				feel(Feeling.LOVING, 5.0)
-				world.learned("food")
+			hearts.emitting = loved
 
 
 func _chase_ball(delta: float) -> void:
@@ -2823,7 +2862,7 @@ func _kick(b: Ball) -> void:
 	if loved:
 		love = minf(love + 1.0, 100.0)
 		feel(Feeling.EXCITED, 4.0)
-		world.learned("toy")
+		world.learned(self, "toy")
 	if kicks >= kick_limit:
 		ball_cooldown = 4.0
 		_cry("coo")
@@ -2865,10 +2904,27 @@ func _steer(point: Vector3, speed: float, delta: float, arrive := 0.18) -> bool:
 func _keep_off(centre: Vector3, room: float, delta: float) -> void:
 	var off := Vector2(position.x - centre.x, position.z - centre.z)
 	if off.length() < room:
-		off = (off.normalized() if off.length() > 0.001 else Vector2.RIGHT) * room
+		# (two on the very same spot part to either side, by the numbers they were given)
+		off = (off.normalized() if off.length() > 0.001 else Vector2.from_angle(me.id * 2.4)) * room
 		var clear := Vector2(position.x, position.z).move_toward(Vector2(centre.x, centre.z) + off, delta * 4.0)
 		position.x = clear.x
 		position.z = clear.y
+
+
+# The others in the room, and any eggs, push it aside as softly as the things do, so that no
+# two ever stand in one another. One that is asleep is not shifted by one that is up and about;
+# sleepers in the one nest lie close.
+func _keep_off_others(delta: float) -> void:
+	for r in world.residents:
+		if r.egg != null and r.egg.landed:
+			_keep_off(r.egg.position, 0.3 + 0.2 * grow, delta)
+	for other in world.pets():
+		if other == self or other.lift > 0.05:
+			continue
+		if state == State.SLEEP and other.state != State.SLEEP:
+			continue
+		var room := 0.3 * (grow + other.grow)
+		_keep_off(other.position, room * (0.7 if state == State.SLEEP else 1.0), delta)
 
 
 func _move(delta: float) -> void:
@@ -2888,6 +2944,7 @@ func _move(delta: float) -> void:
 				for m in world.messes:
 					if m.kind != Mess.Kind.HEAP:
 						_keep_off(m.position, 0.08 + 0.18 * grow, delta)
+			_keep_off_others(delta)
 		var kept := Den.in_room(position, 0.3)
 		position.x = kept.x
 		position.z = kept.z

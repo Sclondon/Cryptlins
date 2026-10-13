@@ -6,7 +6,8 @@ extends SceneTree
 ## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]
 ## (touches are sent as window pixels, like a real finger)
 
-const SAVE := "user://smoke_test.json"
+# The save this run uses: one for each kind, so that several can be run at once
+var save := "user://smoke_test.json"
 
 var main: Den
 var failures := 0
@@ -17,14 +18,15 @@ func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--kind="):
 			kind = int(arg.trim_prefix("--kind="))
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
+	save = "user://smoke_test_%d.json" % kind
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
 	main = _start()
 	_run.call_deferred()
 
 
 func _start() -> Den:
 	var m: Den = load("res://main.tscn").instantiate()
-	m.save_path = SAVE
+	m.save_path = save
 	m.first_kind = kind
 	m.ask_names = false
 	root.add_child(m)
@@ -44,9 +46,9 @@ func _come_back_after(seconds: float) -> void:
 	main.save_game()
 	main.queue_free()
 	await _frames(3)
-	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SAVE))
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(save))
 	data["time"] = float(data["time"]) - seconds
-	var f := FileAccess.open(SAVE, FileAccess.WRITE)
+	var f := FileAccess.open(save, FileAccess.WRITE)
 	f.store_string(JSON.stringify(data))
 	f.close()
 	main = _start()
@@ -127,46 +129,46 @@ func _settled(pet: Cryptlin) -> bool:
 func _run() -> void:
 	# The egg
 	await _frames(5)
-	check(main.egg != null and main.pet == null, "a new game starts with an egg (%s)" % main.egg.title())
-	check(main.shelf.ids.has("bone") and main.shelf.ids.has("notebook") and main.shelf.ids.size() == Items.LIST.size(), "everything is on the shelf (%d things)" % main.shelf.ids.size())
+	check(main.who().egg != null and main.who().pet == null, "a new game starts with an egg (%s)" % main.who().egg.title())
+	check(main.shelf.ids.has("bone") and main.shelf.ids.has("notebook") and main.shelf.ids.size() == Items.LIST.size() and main.shelf.ids.has("egg"), "everything is on the shelf (%d things)" % main.shelf.ids.size())
 	main.use("bone")
 	check(main.snacks.is_empty(), "but there is nothing to feed yet")
-	check(await _until(func() -> bool: return main.egg.landed, 300), "the egg drops into the light")
-	var warm := main.egg.warmth
+	check(await _until(func() -> bool: return main.who().egg.landed, 300), "the egg drops into the light")
+	var warm := main.who().egg.warmth
 	await _frames(90)
-	var gained := main.egg.warmth - warm
-	check(gained > 0.0, "the lamp warms it (%.1f)" % main.egg.warmth)
+	var gained := main.who().egg.warmth - warm
+	check(gained > 0.0, "the lamp warms it (%.1f)" % main.who().egg.warmth)
 	main.set_lamp(Den.Lamp.HEAT)
-	warm = main.egg.warmth
+	warm = main.who().egg.warmth
 	await _frames(90)
-	check(main.egg.warmth - warm > gained * 1.8, "the heat lamp warms it faster")
+	check(main.who().egg.warmth - warm > gained * 1.8, "the heat lamp warms it faster")
 	main.set_lamp(Den.Lamp.OFF)
 	await _frames(20)
-	warm = main.egg.warmth
+	warm = main.who().egg.warmth
 	await _frames(60)
-	check(is_equal_approx(main.egg.warmth, warm), "and not at all when it is out")
+	check(is_equal_approx(main.who().egg.warmth, warm), "and not at all when it is out")
 	main.set_lamp(Den.Lamp.BRIGHT)
-	warm = main.egg.warmth
-	await _tap(_screen(main.egg.centre()))
-	check(main.egg.warmth > warm + 2.0, "a tap warms it a little")
-	main.egg.warmth = 40.0
+	warm = main.who().egg.warmth
+	await _tap(_screen(main.who().egg.centre()))
+	check(main.who().egg.warmth > warm + 2.0, "a tap warms it a little")
+	main.who().egg.warmth = 40.0
 	main.save_game()
 	await _restart()
-	check(main.egg != null and main.pet_kind == kind and main.egg.warmth > 39.0, "a saved egg is still there, as warm")
-	check(main.egg.stage == 1, "and as cracked")
-	var at := _screen(main.egg.centre())
+	check(main.who().egg != null and main.who().kind == kind and main.who().egg.warmth > 39.0, "a saved egg is still there, as warm")
+	check(main.who().egg.stage == 1, "and as cracked")
+	var at := _screen(main.who().egg.centre())
 	_touch(at, true)
 	var most := 0
 	for i in 1500:
-		if main.pet != null:
+		if main.who().pet != null:
 			break
-		most = maxi(most, main.egg.stage)
+		most = maxi(most, main.who().egg.stage)
 		_drag(at + Vector2(sin(i * 0.5) * 6.0, 0), Vector2(3, 0))
 		await _frames(1)
 	_touch(at, false)
 	check(most == 2, "rubbing it cracks it further")
-	check(main.pet != null and main.egg == null, "and then it hatches")
-	var pet := main.pet
+	check(main.who().pet != null and main.who().egg == null, "and then it hatches")
+	var pet := main.who().pet
 	await _frames(30)
 	check(pet.kind == kind, "what was in the egg is a %s" % pet.kind_name())
 	check(pet.legs.size() == 2 and pet.eyes.size() >= 1, "a cryptlin is built")
@@ -174,13 +176,13 @@ func _run() -> void:
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name
-	check(main.pet_name != "", "it has a name made up for it (%s)" % main.pet_name)
-	main.open_namer()
+	check(main.who().name != "", "it has a name made up for it (%s)" % main.who().name)
+	main.open_namer(main.who())
 	check(main.namer.visible, "and you are asked what to call it")
 	main._name_roll()
 	main.name_edit.text = "  Smoke  "
 	main._name_done()
-	check(not main.namer.visible and main.pet_name == "Smoke", "what you type is its name")
+	check(not main.namer.visible and main.who().name == "Smoke", "what you type is its name")
 	await _until(func() -> bool: return _settled(pet), 600)
 
 	# Feeding, from the shelf
@@ -289,20 +291,20 @@ func _run() -> void:
 	await _frames(60 * 20)
 	check(pet.belly > 79.5 and pet.fun > 79.0, "twenty seconds leaves it as full as it was (%.2f)" % pet.belly)
 	pet.belly = 64.0
-	var name := main.pet_name
-	var seed_was := main.pet_seed
+	var name := main.who().name
+	var seed_was := main.who().look_seed
 	await _restart()
-	check(main.pet_name == name and main.pet_seed == seed_was and main.pet != null and main.pet.kind == kind, "the same cryptlin is there next time")
-	check(absf(main.pet.belly - 64.0) < 1.0, "as full as it was left (%.0f)" % main.pet.belly)
-	main.pet.belly = 100.0
-	main.pet.energy = 90.0
+	check(main.who().name == name and main.who().look_seed == seed_was and main.who().pet != null and main.who().pet.kind == kind, "the same cryptlin is there next time")
+	check(absf(main.who().pet.belly - 64.0) < 1.0, "as full as it was left (%.0f)" % main.who().pet.belly)
+	main.who().pet.belly = 100.0
+	main.who().pet.energy = 90.0
 	await _come_back_after(6.0 * 3600.0)
-	pet = main.pet
+	pet = main.who().pet
 	check(pet.belly < 75.0 and pet.belly > 30.0, "six hours away and it is hungrier, not starving (%.0f)" % pet.belly)
 	check(pet.is_baby(), "and still a baby")
 	pet.belly = 100.0
 	await _come_back_after(40.0 * 3600.0)
-	pet = main.pet
+	pet = main.who().pet
 	check(pet.belly < 15.0, "left for a day and a half, it is starving (%.0f)" % pet.belly)
 	check(not pet.is_baby() and is_equal_approx(pet.grow, pet.adult_size), "and has grown up, %.2f times the usual size" % pet.adult_size)
 	# (what it left on the floor in that time is cleared away, so as not to be underfoot for what follows)
@@ -311,17 +313,17 @@ func _run() -> void:
 
 	# Tastes: its favourite food, the one it cannot stand, and its favourite toy
 	pet.set_needs({"belly": 40.0, "fun": 50.0, "energy": 90.0, "love": 40.0})
-	main.known = {}
+	main.who().known = {}
 	pet._enter(Cryptlin.State.IDLE, 0.5)
 	pet.position = Vector3(0.3, 0, 0.4)
 	main.feed(pet.yuck_food)
-	check(await _until(func() -> bool: return main.known.get("yuck", false), 1500), "it spits out %s" % Snack.PLURALS[pet.yuck_food])
+	check(await _until(func() -> bool: return main.who().known.get("yuck", false), 1500), "it spits out %s" % Snack.PLURALS[pet.yuck_food])
 	check(pet.feeling == Cryptlin.Feeling.DISGUSTED and main.snacks.is_empty(), "and is disgusted")
 	check(main.toast.text.findn(Snack.PLURALS[pet.yuck_food]) < 0, "nothing is written on the screen about it")
 	pet.belly = 40.0
 	pet.flash_time = 0.0
 	main.feed(pet.fav_food)
-	check(await _until(func() -> bool: return main.known.get("food", false), 1500), "it loves %s" % Snack.PLURALS[pet.fav_food])
+	check(await _until(func() -> bool: return main.who().known.get("food", false), 1500), "it loves %s" % Snack.PLURALS[pet.fav_food])
 	check(pet.feeling == Cryptlin.Feeling.LOVING, "and shows it")
 	check(main.shelf.marks.get(Items.id_of("food", pet.fav_food)) == "heart" and main.shelf.marks.get(Items.id_of("food", pet.yuck_food)) == "cross", "the shelf marks what it loves and what it hates")
 	await _until(func() -> bool: return _settled(pet), 600)
@@ -329,7 +331,7 @@ func _run() -> void:
 	pet.set_needs({"fun": 20.0, "bowel": 0.0, "bladder": 0.0})
 	main.play_ball(pet.fav_toy)
 	check(main.ball != null and main.ball.kind == pet.fav_toy, "the %s comes out" % Ball.PLAIN[pet.fav_toy])
-	check(await _until(func() -> bool: return main.known.get("toy", false), 2400), "and turns out to be its favourite")
+	check(await _until(func() -> bool: return main.who().known.get("toy", false), 2400), "and turns out to be its favourite")
 	main._clear_toys()
 
 	# Doing up its room: things it likes, one it hates, and the ground
@@ -341,13 +343,13 @@ func _run() -> void:
 	await _tap(_on_shelf(Decor.IDS[liked]))
 	check(main.decor_of(liked) != null, "a tap on the %s stands it in the room" % Decor.PLAIN[liked])
 	check(pet.state == Cryptlin.State.INSPECT, "and the cryptlin goes to look it over")
-	check(await _until(func() -> bool: return main.known.get("decor+" + Decor.IDS[liked], false), 900), "it likes having it about")
+	check(await _until(func() -> bool: return main.who().known.get("decor+" + Decor.IDS[liked], false), 900), "it likes having it about")
 	check(main.comfort_of(pet) > comfort, "and is more at home for it (%.0f)" % main.comfort_of(pet))
 	await _until(func() -> bool: return _settled(pet), 600)
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	comfort = main.comfort_of(pet)
 	main.use(Decor.IDS[pet.hate_decor])
-	check(await _until(func() -> bool: return main.known.get("decor-" + Decor.IDS[pet.hate_decor], false), 900), "it cannot stand the %s" % Decor.PLAIN[pet.hate_decor])
+	check(await _until(func() -> bool: return main.who().known.get("decor-" + Decor.IDS[pet.hate_decor], false), 900), "it cannot stand the %s" % Decor.PLAIN[pet.hate_decor])
 	check(main.comfort_of(pet) < comfort, "and is less at home for it")
 	main.use(Decor.IDS[pet.hate_decor])
 	check(main.decor_of(pet.hate_decor) == null, "a second tap puts it away again")
@@ -393,14 +395,14 @@ func _run() -> void:
 	await _until(func() -> bool: return _settled(pet), 900)
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	pet.position = Vector3(0, 0, 0.9)
-	main.known.erase("water")
+	main.who().known.erase("water")
 	var dry := main.comfort_of(pet)
 	check(pet.dry() == pet.needs_water() and not main.notebook._notes(pet).contains("pool"), "nothing says yet whether it needs water")
 	await _tap(_on_shelf("pool"))
 	var pool := main.decor_of(Decor.Kind.POOL)
 	check(pool != null and pool.radius > Decor.RADII[Decor.Kind.DISH] * 2.0, "a tap on the pool stands it in the room, a good deal bigger than the dish")
 	check(not Decor.Kind.POOL in pet.like_decor and pet.hate_decor != Decor.Kind.POOL, "the pool is no part of its likes and dislikes")
-	check(await _until(func() -> bool: return main.known.get("water", false), 900), "the cryptlin goes to look, and whether it needs water is found out")
+	check(await _until(func() -> bool: return main.who().known.get("water", false), 900), "the cryptlin goes to look, and whether it needs water is found out")
 	check(main.toast.text.findn("water") < 0 and main.toast.text.findn("pool") < 0, "nothing is written on the screen about it")
 	if pet.needs_water():
 		check(main.comfort_of(pet) > dry + 30.0, "a water kind is far more at home with a pool (%.0f, from %.0f)" % [main.comfort_of(pet), dry])
@@ -422,7 +424,7 @@ func _run() -> void:
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	await _tap(_on_shelf(Items.id_of("ground", pet.fav_ground)))
 	check(main.floor_style == pet.fav_ground, "a tray of %s changes the floor" % Den.GROUND_PLAIN[pet.fav_ground])
-	check(await _until(func() -> bool: return main.known.get("ground", false), 600), "which is the ground it is happiest on")
+	check(await _until(func() -> bool: return main.who().known.get("ground", false), 600), "which is the ground it is happiest on")
 
 	# What goes in comes out: some hours after a meal it goes off and leaves a dropping
 	await _until(func() -> bool: return _settled(pet), 900)
@@ -456,10 +458,10 @@ func _run() -> void:
 	await _until(func() -> bool: return _settled(pet), 600)
 	pet.set_needs({"belly": 100.0, "energy": 95.0, "digest": 100.0, "bowel": 0.0, "bladder": 0.0})
 	await _come_back_after(6.0 * 3600.0)
-	pet = main.pet
+	pet = main.who().pet
 	check(main.droppings() == 1, "left alone for six hours after a meal, there is a dropping waiting")
 	await _restart()
-	pet = main.pet
+	pet = main.who().pet
 	check(main.droppings() == 1, "and it is still there next time")
 	for m in main.messes.duplicate():
 		main.clear_mess(m)
@@ -546,7 +548,7 @@ func _run() -> void:
 	check(main.notebook.body.text.contains(Snack.PLURALS[pet.fav_food]) and main.notebook.body.text.contains(pet.nature_name()), "which says what has been found out")
 	main.use("bone")
 	check(main.snacks.is_empty(), "nothing on the shelf answers while it is open")
-	for i in Notebook.TITLES.size() - 1:
+	for i in main.notebook.pages() - 1:
 		main.notebook.turn(1)
 		check(main.notebook.body.text.length() > 60, "page %d: %s" % [i + 2, main.notebook.heading.text])
 	main.notebook.close()
@@ -558,17 +560,17 @@ func _run() -> void:
 	var nest_at := main.nest_pos
 	main.save_game()
 	await _restart()
-	check(main.floor_style == main.pet.fav_ground and main.nest_style == 1 and main.lamp_mode == Den.Lamp.LOW, "the floor, the nest and the lamp are kept")
+	check(main.floor_style == main.who().pet.fav_ground and main.nest_style == 1 and main.lamp_mode == Den.Lamp.LOW, "the floor, the nest and the lamp are kept")
 	check(main.decor_of(Decor.Kind.SKULL) != null and main.nest_pos.distance_to(nest_at) < 0.01, "and where things stand")
-	check(main.known.get("food", false) and main.known.get("ground", false) and main.pet_name == "Smoke", "and what you know of it")
+	check(main.who().known.get("food", false) and main.who().known.get("ground", false) and main.who().name == "Smoke", "and what you know of it")
 
 	# Played inside a site with a shop: only what comes free and what was bought
 	main.embedded = true
 	main.stock = {"fish": 2, "cave": -1}
 	main._sync()
 	check(main.shelf.ids.has("fish") and main.shelf.ids.has("cave") and main.shelf.ids.has("bone") and not main.shelf.ids.has("berries"), "with a shop, the shelf holds what is free and what was bought")
-	main.pet._enter(Cryptlin.State.IDLE, 3.0)
-	main.pet.belly = 30.0
+	main.who().pet._enter(Cryptlin.State.IDLE, 3.0)
+	main.who().pet.belly = 30.0
 	main.feed(Snack.Kind.FISH)
 	check(main.left_of("fish") == 1 and main.shelf.counts.get("fish") == 1, "and food bought gets used up")
 	main.feed(Snack.Kind.BERRIES)
@@ -579,20 +581,185 @@ func _run() -> void:
 
 	# A new egg
 	main.set_lamp(Den.Lamp.BRIGHT)
-	main.pet._enter(Cryptlin.State.IDLE, 3.0)
-	main.ask_new_egg()
+	main.who().pet._enter(Cryptlin.State.IDLE, 3.0)
+	main.ask_let_go(main.who())
 	check(main.ask.visible, "asking for a new egg asks first")
 	main._answer(false)
 	await _frames(5)
-	check(not main.ask.visible and main.pet != null and not main.leaving, "saying no keeps it")
-	main.ask_new_egg()
+	check(not main.ask.visible and main.who().pet != null and not main.who().leaving, "saying no keeps it")
+	main.ask_let_go(main.who())
 	main._answer(true)
-	check(main.leaving and main.pet.state == Cryptlin.State.LEAVE, "saying yes sends it off")
-	check(await _until(func() -> bool: return main.egg != null, 1200), "and a new egg comes")
-	check(main.pet == null and main.ball == null and main.pet_kind != kind, "holding a different kind (%s)" % main.egg.title())
+	check(main.who().leaving and main.who().pet.state == Cryptlin.State.LEAVE, "saying yes sends it off")
+	check(await _until(func() -> bool: return main.who().egg != null, 1200), "and a new egg comes")
+	check(main.who().pet == null and main.ball == null and main.who().kind != kind, "holding a different kind (%s)" % main.who().egg.title())
 	await _tap(_on_shelf("scanner"))
 	check(main.scanning, "the scanner works on an egg too")
 	main.stop_scan()
+
+	# More than one: the egg on the shelf drops another in
+	var first := main.who()
+	await _tap(_on_shelf("egg"))
+	check(main.residents.size() == 2 and main.residents[1].egg != null, "a tap on the egg on the shelf drops another egg in (%s)" % main.residents[1].egg.title())
+	check(main.residents[1].kind != first.kind and main.residents[1].id != first.id, "of a different kind, with a number of its own")
+	await _until(func() -> bool: return main.residents[0].egg.landed and main.residents[1].egg.landed, 400)
+	check(main.residents[0].egg.position.distance_to(main.residents[1].egg.position) > 0.5, "clear of the first")
+	await _tap(_on_shelf("notebook"))
+	check(main.notebook.pages() == Notebook.TITLES.size() + 2 and main.notebook.heading.text == "An egg", "the notebook has a page for each")
+	main.notebook.close()
+	for r in main.residents:
+		r.egg.warmth = 100.0
+	check(await _until(func() -> bool: return main.pets().size() == 2, 400), "both hatch")
+	var one: Cryptlin = main.residents[0].pet
+	var two: Cryptlin = main.residents[1].pet
+	check(one.me.name != "" and two.me.name != "" and one.me == main.residents[0] and two.me.born > 0.0, "each with a name and a birthday of its own")
+	main.open_namer(two.me)
+	main.name_edit.text = "Second"
+	main._name_done()
+	check(two.me.name == "Second" and one.me.name != "Second", "the card names the one it was opened for")
+	await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+
+	# Food is for whoever gets there, and neither stands in the other
+	var both_eat := 0
+	while both_eat == one.yuck_food or both_eat == two.yuck_food:
+		both_eat += 1
+	for p: Cryptlin in [one, two]:
+		p.set_needs({"belly": 25.0, "energy": 90.0, "fun": 80.0, "bowel": 0.0, "bladder": 0.0})
+	var fed := 0
+	while fed < 6 and (one.belly <= 30.0 or two.belly <= 30.0):
+		fed += 1
+		main.feed(both_eat)
+		main.feed(both_eat)
+		await _until(func() -> bool: return main.snacks.is_empty(), 2400)
+	check(one.belly > 30.0 and two.belly > 30.0, "food dropped in feeds them both in the end (%.0f, %.0f)" % [one.belly, two.belly])
+	await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+	for p: Cryptlin in [one, two]:
+		p._enter(Cryptlin.State.IDLE, 6.0)
+		p.position = Vector3(0.2, 0, 0.5)
+	await _frames(120)
+	check(one.position.distance_to(two.position) > 0.2, "put on the same spot, they push apart (%.2f)" % one.position.distance_to(two.position))
+
+	# What is known is known of each, and the shelf shows it for the one last touched
+	one.me.known = {}
+	two.me.known = {}
+	main.learned(one, "food")
+	await _tap(_screen(two.body_centre()))
+	check(main.who() == two.me and main.shelf.marks.is_empty() and not two.me.known.has("food"), "a tap on one makes it the one in question: nothing is known of it yet")
+	await _until(func() -> bool: return _settled(two), 600)
+	one.position = Vector3(-1.0, 0, 0.6)
+	two.position = Vector3(1.0, 0, 0.6)
+	for p: Cryptlin in [one, two]:
+		p._enter(Cryptlin.State.IDLE, 6.0)
+	await _frames(3)
+	await _slide(_on_shelf("scanner"), _screen(one.body_centre()), 16, _on_shelf("scanner") - Vector2(0, 160))
+	check(main.scanning and main.scanned == one.me and one.xrayed and not two.xrayed, "the scanner dragged up onto one of them scans that one")
+	check(main.shelf.marks.get(Items.id_of("food", one.fav_food)) == "heart", "and the shelf shows what is known of it")
+	main.stop_scan()
+	main.chosen = two.me
+	main.start_scan()
+	check(main.scanned == two.me, "tapped, it goes to the one last touched")
+	main.stop_scan()
+	main.chosen = null
+	one.position = Vector3(0.1, 0, 0.2)
+	two.position = Vector3(1.6, 0, 1.0)
+	main.start_scan()
+	check(main.scanned == one.me, "or else to the one nearest the middle")
+	main.stop_scan()
+
+	# One room, and each its own idea of it
+	await _until(func() -> bool: return _settled(one) and _settled(two), 900)
+	var thing_one: int = one.like_decor[0]
+	if main.decor_of(thing_one) != null:
+		main.remove_decor(main.decor_of(thing_one))
+	var home_one := main.comfort_of(one)
+	var home_two := main.comfort_of(two)
+	main.place_decor(thing_one, Vector3(-1.4, 0, -1.0))
+	check(main.comfort_of(one) > home_one + 10.0 and (main.comfort_of(two) > home_two + 10.0) == (thing_one in two.like_decor), "what one likes having about is not for that reason to the other's liking")
+	main.remove_decor(main.decor_of(thing_one))
+
+	# Saved and restored, and time away is lived through by each
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	one.set_needs({"belly": 41.0, "digest": 0.0, "bowel": 0.0, "bladder": 0.0})
+	two.set_needs({"belly": 77.0, "digest": 0.0, "bowel": 0.0, "bladder": 0.0})
+	var names: Array[String] = [one.me.name, two.me.name]
+	var seeds: Array[int] = [one.look_seed, two.look_seed]
+	await _restart()
+	check(main.residents.size() == 2 and main.pets().size() == 2, "both are there next time")
+	one = main.residents[0].pet
+	two = main.residents[1].pet
+	check(one.me.name == names[0] and two.me.name == names[1] and one.look_seed == seeds[0] and two.look_seed == seeds[1], "each who it was")
+	check(absf(one.belly - 41.0) < 1.0 and absf(two.belly - 77.0) < 1.0 and one.me.known.get("food", false) and not two.me.known.has("food"), "as full as it was left, with what was known of it")
+	for p: Cryptlin in [one, two]:
+		p.set_needs({"belly": 100.0, "energy": 90.0, "digest": 100.0, "bowel": 0.0, "bladder": 0.0})
+	await _come_back_after(6.0 * 3600.0)
+	one = main.residents[0].pet
+	two = main.residents[1].pet
+	check(one.belly < 75.0 and two.belly < 75.0, "six hours away and both are hungrier (%.0f, %.0f)" % [one.belly, two.belly])
+	check(main.droppings() == 2, "and each has left a dropping")
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+
+	# The room holds four and no more
+	await _tap(_on_shelf("egg"))
+	await _tap(_on_shelf("egg"))
+	check(main.residents.size() == Den.MAX_RESIDENTS, "two more eggs make four")
+	await _tap(_on_shelf("egg"))
+	check(main.residents.size() == Den.MAX_RESIDENTS, "and the room refuses a fifth")
+	await _tap(_on_shelf("notebook"))
+	check(main.notebook.pages() == Notebook.TITLES.size() + 4, "the notebook has a page for each of the four")
+	main.notebook.close()
+
+	# Letting one go, from its page in the notebook: no egg comes in its place
+	main.chosen = two.me
+	main.notebook.open()
+	check(main.notebook.resident() == two.me and main.notebook.let_go.visible, "its page has the means of letting it go")
+	main.notebook.let_go.pressed.emit()
+	check(main.ask.visible and not main.notebook.visible, "which asks first")
+	main._answer(true)
+	check(await _until(func() -> bool: return main.residents.size() == 3, 1200) and not main.parting in main.residents, "saying yes sends that one off, and the rest stay")
+
+	# A save from when there was only ever one
+	main.queue_free()
+	await _frames(3)
+	var old := FileAccess.open(save, FileAccess.WRITE)
+	old.store_string(JSON.stringify({"v": 2, "name": "Old", "kind": Cryptlin.KINDS[kind]["title"], "seed": 7, "hatched": true, "born": Time.get_unix_time_from_system() - 5000.0, "needs": {"belly": 52.0, "fun": 50.0, "energy": 90.0, "love": 30.0, "age": 5000.0}, "known": {"toy": true}, "floor": 2, "time": Time.get_unix_time_from_system()}))
+	old.close()
+	main = _start()
+	await _frames(5)
+	check(main.residents.size() == 1 and main.who().name == "Old" and main.who().pet != null and main.who().pet.kind == kind and main.who().look_seed == 7, "a save from when there was only one loads as a room with that one in it")
+	check(absf(main.who().pet.belly - 52.0) < 1.0 and main.who().known.get("toy", false) and main.who().pet.is_baby() and main.floor_style == 2, "as it was")
+	await _restart()
+	check(main.residents.size() == 1 and main.who().name == "Old" and main.who().id > 0, "and is saved again as one of a list")
+	main.queue_free()
+	await _frames(3)
+	old = FileAccess.open(save, FileAccess.WRITE)
+	old.store_string(JSON.stringify({"v": 2, "name": "", "kind": Cryptlin.KINDS[kind]["title"], "seed": 7, "hatched": false, "warmth": 40.0, "needs": {}, "known": {}, "time": Time.get_unix_time_from_system()}))
+	old.close()
+	main = _start()
+	await _frames(5)
+	check(main.residents.size() == 1 and main.who().egg != null and main.who().kind == kind and main.who().egg.warmth > 39.0, "an old save of an egg loads as that egg")
+
+	# Inside a site with a shop, eggs are stock; but nobody is left without one
+	main.dev_show(kind)
+	await _frames(10)
+	main.embedded = true
+	main.stock = {}
+	main._sync()
+	check(not main.shelf.ids.has("egg"), "with a shop, there are no eggs on the shelf until one is bought")
+	main.use("egg")
+	check(main.residents.size() == 1, "and none to lay")
+	main.ask_let_go(main.who())
+	main._answer(true)
+	check(await _until(func() -> bool: return main.who().egg != null, 1200) and main.residents.size() == 1, "but a room left empty is still sent an egg for nothing")
+	main.stock = {"egg": 1}
+	main._sync()
+	check(main.shelf.ids.has("egg") and main.shelf.counts.get("egg") == 1, "an egg bought is on the shelf")
+	main.use("egg")
+	check(main.residents.size() == 2 and main.left_of("egg") == 0 and not main.shelf.ids.has("egg"), "and is used up when it is laid")
+	main.use("egg")
+	check(main.residents.size() == 2, "after which there are no more")
+	main.embedded = false
+	main._sync()
 
 	# The test panel: five taps in the corner open it, and it can put any kind in the room
 	var corner_tap := root.get_final_transform() * Vector2(40, 40)
@@ -602,16 +769,16 @@ func _run() -> void:
 	for k in Cryptlin.KINDS.size():
 		main.dev_show(k)
 		await _frames(20)
-		check(main.pet != null and main.pet.kind == k and main.egg == null and not main.pet.is_baby(), "the panel shows a %s" % main.pet.kind_name())
+		check(main.who().pet != null and main.who().pet.kind == k and main.who().egg == null and not main.who().pet.is_baby(), "the panel shows a %s" % main.who().pet.kind_name())
 		main.start_scan()
 		await _frames(3)
-		check(main.pet.xrayed and main.pet.inside_at("brain").y > main.pet.inside_at("stomach").y, "  with its insides in the right order")
+		check(main.who().pet.xrayed and main.who().pet.inside_at("brain").y > main.who().pet.inside_at("stomach").y, "  with its insides in the right order")
 		main.stop_scan()
 	main._dev_egg()
 	await _frames(20)
-	check(main.pet == null and main.egg != null, "and its egg")
+	check(main.who().pet == null and main.who().egg != null, "and its egg")
 	main._dev_egg()
 	await _frames(170)
-	check(main.pet != null and main.egg == null, "which hatches when told to")
+	check(main.who().pet != null and main.who().egg == null, "which hatches when told to")
 	print("smoke: %d failure(s)" % failures)
 	quit(failures)

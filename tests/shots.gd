@@ -1,11 +1,12 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --faces:
-## each of the faces that go up over its head.
+## each of the faces that go up over its head. With --many: three of different kinds sharing the room.
 
-const SAVE := "user://shots_test.json"
+# The save this run uses: one for each kind and shape of screen, so that several can be run at once
+var save := "user://shots_test.json"
 
 var main: Den
 var out := "user://shots"
@@ -16,6 +17,7 @@ var ui_only := false
 var egg_only := false
 var faces_only := false
 var baby := false
+var many := false
 
 
 func _initialize() -> void:
@@ -34,21 +36,35 @@ func _initialize() -> void:
 			faces_only = true
 		if arg == "--ui":
 			ui_only = true
+		if arg == "--many":
+			many = true
 		if arg == "--portrait":
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
+	save = "user://shots_test_%d%s.json" % [kind, "_p" if portrait else ""]
 	DisplayServer.window_set_size(Vector2i(540, 1170) if portrait else Vector2i(1280, 720))
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
-	if not egg_only:
-		var f := FileAccess.open(SAVE, FileAccess.WRITE)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
+	if many:
+		# Three of different kinds, grown, as a save holds them
+		var three: Array = []
+		for i in 3:
+			var k := (kind + i * 5) % Cryptlin.KINDS.size()
+			three.append({"id": i + 1, "name": ["Mog", "Pim", "Zog"][i], "kind": Cryptlin.KINDS[k]["title"], "seed": maxi(look, 1) + i * 37, "hatched": true, "born": Time.get_unix_time_from_system() - 200000.0, "needs": {"belly": 70.0, "fun": 70.0, "energy": 90.0, "love": 50.0}})
+		var f := FileAccess.open(save, FileAccess.WRITE)
+		f.store_string(JSON.stringify({"v": 3, "residents": three, "next_id": 4, "time": Time.get_unix_time_from_system()}))
+		f.close()
+	elif not egg_only:
+		var f := FileAccess.open(save, FileAccess.WRITE)
 		f.store_string(JSON.stringify({"name": "Seed %d" % look, "kind": Cryptlin.KINDS[kind]["title"], "seed": maxi(look, 1), "hatched": true, "needs": {}, "time": Time.get_unix_time_from_system()}))
 		f.close()
 	main = load("res://main.tscn").instantiate()
-	main.save_path = SAVE
+	main.save_path = save
 	main.first_kind = kind
 	main.ask_names = false
 	root.add_child(main)
-	if ui_only:
+	if many:
+		_run_many.call_deferred()
+	elif ui_only:
 		_run_ui.call_deferred()
 	elif faces_only:
 		_run_faces.call_deferred()
@@ -78,7 +94,7 @@ func _until(done: Callable, seconds: float) -> void:
 # card that asks for a name, and the test panel
 func _run_ui() -> void:
 	await _wait(1.0)
-	var pet := main.pet
+	var pet := main.who().pet
 	pet.set_needs({"belly": 35.0, "fun": 70.0, "energy": 80.0, "love": 55.0, "age": 0.0 if baby else Cryptlin.GROW_AGE})
 	pet.position = Vector3(0.3, 0, 0.6)
 	pet._enter(Cryptlin.State.STARE)
@@ -90,7 +106,7 @@ func _run_ui() -> void:
 	main.place_decor(Decor.Kind.PUMPKIN, Vector3(-0.3, 0, -1.5))
 	main.place_decor(Decor.Kind.DISH, Vector3(-1.5, 0, 0.9))
 	main.move_nest(Vector3(0.9, 0, -1.4))
-	main.known = {"food": true, "yuck": true, "toy": true}
+	main.who().known = {"food": true, "yuck": true, "toy": true}
 	main._sync()
 	pet._enter(Cryptlin.State.STARE)
 	await _wait(1.5)
@@ -150,11 +166,11 @@ func _run_ui() -> void:
 	main.notebook.turn(1)
 	await _wait(0.2)
 	await _snap("u9_care")
-	main.notebook.turn(3)
+	main.notebook.turn(main.notebook.pages() - 2)
 	await _wait(0.2)
 	await _snap("u10_odds")
 	main.notebook.close()
-	main.open_namer()
+	main.open_namer(main.who())
 	await _wait(0.3)
 	await _snap("u11_name")
 	main._name_done()
@@ -164,9 +180,64 @@ func _run_ui() -> void:
 	quit()
 
 
+# Three of different kinds in the one room: standing about, called over, eating, asleep in the
+# nest, each one's page in the notebook, and the scanner on one of them
+func _run_many() -> void:
+	await _wait(1.0)
+	var all := main.pets()
+	for i in all.size():
+		all[i].position = Vector3(-1.1 + i * 1.1, 0, 0.5 - 0.5 * (i % 2))
+		all[i]._enter(Cryptlin.State.STARE)
+	await _wait(1.5)
+	await _snap("m1_three")
+	main.call_all(Vector3(0.2, 0, 0.9))
+	await _wait(2.5)
+	await _snap("m2_called")
+	for pet in all:
+		pet.belly = 25.0
+	main.feed(0, Vector3(-0.3, 4.0, 0.6))
+	main.feed(0, Vector3(0.5, 4.0, 0.7))
+	await _until(func() -> bool: return all.any(func(pet: Cryptlin) -> bool: return pet.state == Cryptlin.State.EAT), 8.0)
+	await _wait(0.5)
+	await _snap("m3_eating")
+	await _until(func() -> bool: return main.snacks.is_empty(), 10.0)
+	main.move_nest(Vector3(-0.4, 0, 0.3))
+	for pet in all:
+		pet.energy = 30.0
+	main.set_lamp(Den.Lamp.LOW)
+	for pet in all:
+		pet.position = main.nest_pos + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.2))
+		pet._enter(Cryptlin.State.SLEEP)
+	await _wait(2.5)
+	await _snap("m4_asleep")
+	main.set_lamp(Den.Lamp.BRIGHT)
+	for i in all.size():
+		all[i].energy = 90.0
+		all[i].position = Vector3(-1.1 + i * 1.1, 0, 0.6)
+		all[i]._enter(Cryptlin.State.IDLE, 30.0)
+	main.new_egg()
+	await _wait(2.0)
+	main.start_scan(all[1].me)
+	await _wait(1.6)
+	await _snap("m5_scan")
+	main.stop_scan()
+	main.chosen = all[0].me
+	main.notebook.open()
+	for i in main.residents.size():
+		await _wait(0.3)
+		await _snap("m6_page%d" % i)
+		main.notebook.turn(1)
+	await _wait(0.3)
+	await _snap("m7_care")
+	main.notebook.turn(main.notebook.pages() - main.residents.size() - 1)
+	await _wait(0.3)
+	await _snap("m8_odds")
+	quit()
+
+
 # Every face that goes up over its head, under the lamp, and then two of them in the dark
 func _run_faces() -> void:
-	var pet := main.pet
+	var pet := main.who().pet
 	pet.set_needs({"belly": 60.0, "fun": 60.0, "energy": 90.0, "love": 40.0})
 	pet.position = Vector3(0.2, 0, 0.6)
 	pet._enter(Cryptlin.State.STARE)
@@ -189,26 +260,26 @@ func _run_faces() -> void:
 func _run_egg() -> void:
 	await _wait(0.4)
 	await _snap("e0_drop")
-	await _until(func() -> bool: return main.egg.landed, 4.0)
+	await _until(func() -> bool: return main.who().egg.landed, 4.0)
 	await _wait(1.0)
 	await _snap("e1_egg")
-	main.egg.warmth = 33.5
+	main.who().egg.warmth = 33.5
 	await _wait(1.2)
 	await _snap("e2_crack")
-	main.egg.warmth = 67.5
+	main.who().egg.warmth = 67.5
 	await _wait(1.2)
 	await _snap("e3_peek")
 	main.toggle_lamp()
 	await _wait(1.0)
 	await _snap("e4_dark")
 	main.toggle_lamp()
-	main.egg.warmth = 99.9
-	await _until(func() -> bool: return main.pet != null, 6.0)
+	main.who().egg.warmth = 99.9
+	await _until(func() -> bool: return main.who().pet != null, 6.0)
 	await _wait(0.12)
 	await _snap("e5_hatch")
 	await _wait(1.6)
 	await _snap("e6_hatched")
-	main.ask_new_egg()
+	main.ask_let_go(main.who())
 	await _wait(0.3)
 	await _snap("e7_ask")
 	main._answer(true)
@@ -218,7 +289,7 @@ func _run_egg() -> void:
 
 
 func _run() -> void:
-	var pet := main.pet
+	var pet := main.who().pet
 	pet.set_needs({"belly": 60.0, "fun": 60.0, "energy": 90.0, "love": 40.0})
 	pet.position = Vector3(0.2, 0, 0.6)
 	pet.yaw = 0.3
