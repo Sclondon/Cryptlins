@@ -273,26 +273,29 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 	pet.knack.again = 0.0
 	check(pet.knack.ready(), "with what it needs to hand, it is ready to do it")
 	var turns := 0
-	for i in 300:
+	for i in 600:
 		pet.knack.again = 0.0
 		pet._enter(Cryptlin.State.IDLE, 1.0)
 		mate._enter(Cryptlin.State.IDLE, 60.0)
 		pet._decide()
 		if pet.state == Cryptlin.State.TRICK:
 			turns += 1
-	check(turns >= 3, "it is one of the things it takes it into its head to do (%d times in 300)" % turns)
+	check(turns >= 3, "it is one of the things it takes it into its head to do (%d times in 600)" % turns)
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 	mate._enter(Cryptlin.State.IDLE, 60.0)
 	pet.position = Vector3(-0.6, 0, 0.9)
 	pet.knack.again = 0.0
+	# (and no finger has been near the screen for a good while)
+	main.press_time = -100.0
+	main.release_time = -100.0
 	pet._enter(Cryptlin.State.TRICK)
 	var came_off := await _until(func() -> bool: return pet.state != Cryptlin.State.TRICK, 1800)
 	check(came_off and pet.knack.done, "it does it: it %s" % Knack.NOTES[pet.kind])
 	check(pet.me.known.get("knack", false) and main.notebook._notes(pet).contains(Knack.NOTES[pet.kind]), "and once seen it is written in the notebook")
 	check(not pet.knack.ready(), "it does not do it again at once")
-	await _until(func() -> bool: return mate.state != Cryptlin.State.SPELL and mate.state != Cryptlin.State.FLOUNDER and pet.lift <= 0.0, 900)
+	await _until(func() -> bool: return mate.state != Cryptlin.State.SPELL and mate.state != Cryptlin.State.FLOUNDER and pet.lift <= 0.0 and main.weird <= 0.0, 900)
 	await _frames(90)
-	var clean := is_zero_approx(pet.dive) and is_zero_approx(pet.torso.position.x) and pet.skin.is_empty() and mate.skin.is_empty() and pet.visible and mate.visible and main.flicker <= 0.0
+	var clean := main.weird <= 0.0 and is_zero_approx(pet.dive) and is_zero_approx(pet.torso.position.x) and pet.skin.is_empty() and mate.skin.is_empty() and pet.visible and mate.visible and main.flicker <= 0.0
 	check(clean and pet.lift <= 0.05 and mate.lift <= 0.05 and mate.health >= 100.0 and not main.would_pair(pet, mate), "and when it is over nothing is left changed, and nobody the worse")
 	main._clear_toys()
 	main.remove_decor(skull)

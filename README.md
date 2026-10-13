@@ -149,6 +149,11 @@ of the notebook ("Its knack", a "?" until then).
 | slide-rock bolter | Goes to one side of the room, opens its mouth as far as it will go, and comes down the length of the floor like a landslide. Any food lying in its way goes in. |
 | wendigo | Where it stands still, frost creeps out over the floor round it, and is gone again in half a minute (a pale `Track`). And while it is hungry (belly under 35) the others give it a wide berth and will not go up to it. |
 | kelpie | Wades in, turns and calls to one of those that do not live in water, which comes down the bank and in after it as if walking in its sleep, wakes up wet, and has to scramble out. It needs the pool and somebody to call. |
+| merling | Sings, and it settles the room: a fight that is going on stops, any two that have fallen out think a little better of each other and leave each other be for a minute and a half, and any that are tired go off to bed. It sings three times as often when there is a quarrel to settle. It needs somebody to sing to. |
+| Cthulhu spawn | While it sleeps, the room goes strange: the lamp burns in the wrong colours (and a little even when it is out), and the whole room tilts slowly one way and the other (`Den.strange`). All of it passes when it wakes. As a turn of its own it nods off where it sits for a few seconds. |
+| gnome | Will not be seen to move. Left alone it creeps over to some small thing (a skull, a crystal, the pumpkin, the fern, the dish, the flowerpot, the toy, a bit of food) and shifts it somewhere else; with a finger only just off the screen it stands like an ornament, not blinking, until it has been left a while. |
+| fae | Flits over to one of the others and shakes its dust out over it, and that one has to dance until the dust wears off. About one time in three it leaves a few berries behind, which are nobody's stock. It needs somebody to dust. |
+| living fungus | Sits down and puffs out clouds of spores, and when it has got up and gone tiny toadstools come up where it sat, to stand for three quarters of a minute (a `Track`). |
 
 ## Health, and dying
 
@@ -242,7 +247,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `shaders/water.gdshader`, the sheet a little below it: the two have to be changed together. A cryptlin that does
   not live in water is stopped at the edge in `Cryptlin._move()`, and gets itself out (`State.FLOUNDER`) if it is
   ever further in.
-  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint or a patch of frost (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
+  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint, a patch of frost or a clump of toadstools (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/knack.gd`: the one thing each kind does that no other does (see Knacks above).
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
   `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes. The scanner itself is

@@ -10,7 +10,7 @@ extends SceneTree
 ## them; fewer to a row with --per, for the wide ones; turned any way with --turn; with --with=K every
 ## other one is of kind K, to see two kinds side by side).
 ## With --wheel: the wheel of things at both of its stops and part of the way round.
-## With --knack [--at=SECONDS] [--then=SECONDS]: the kind taking a turn at the one thing only it does, with another beside it: two moments of it side by side (so long after it gets going, and so long after that).
+## With --knack [--step=N] [--at=SECONDS] [--then=SECONDS]: the kind taking a turn at the one thing only it does, with another beside it: two moments of it side by side (so long after it gets to part N of it, and so long after that).
 ## With --pool (and no other of those): four in a room with the pool in it, in each place it fits and under each lamp.
 
 # The save this run uses: one for each kind and shape of screen, so that several can be run at once
@@ -37,6 +37,7 @@ var turned := 0.0
 var wheel := false
 var pool := false
 var knack := false
+var from_step := 1
 var first_wait := 0.8
 var second_wait := 1.8
 
@@ -61,6 +62,8 @@ func _initialize() -> void:
 			scan_only = true
 		if arg == "--knack":
 			knack = true
+		if arg.begins_with("--step="):
+			from_step = int(arg.trim_prefix("--step="))
 		if arg.begins_with("--at="):
 			first_wait = float(arg.trim_prefix("--at="))
 		if arg.begins_with("--then="):
@@ -541,7 +544,7 @@ func _run_knack() -> void:
 	var sheet := Image.create(cut.size.x * 2, cut.size.y, false, Image.FORMAT_RGB8)
 	for moment in 2:
 		if moment == 0:
-			await _until(func() -> bool: return pet.step >= 1, 6.0)
+			await _until(func() -> bool: return pet.step >= from_step, 6.0)
 			await _wait(first_wait)
 		else:
 			await _wait(second_wait)

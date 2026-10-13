@@ -21,13 +21,20 @@ const NOTES: Array[String] = [
 	"slides the length of the room with its mouth wide open, and scoops up any food in its way",
 	"makes frost creep over the floor where it stands, and the others keep their distance when it is hungry",
 	"calls one of the others down into the water after it",
-	"", "", "", "", "", "", "", "", "", "",
+	"sings a tune that settles a quarrel and sends the tired ones off to bed",
+	"makes the room go strange while it sleeps",
+	"stands as still as an ornament while it is watched, and shifts small things about when it is not",
+	"shakes its dust over one of the others, which has to dance, and now and then leaves a little something to eat",
+	"puffs out spores where it sits, and tiny toadstools come up there",
+	"", "", "", "", "",
 ]
 # How likely it is to take a turn at it, next to the 34 of wandering off
 const WEIGHT := 7.0
 # How long before it will do it again, at least and at most (seconds)
 const REST := Vector2(45.0, 110.0)
 const STONE := Color(0.42, 0.42, 0.44)
+# What the merling sings, as how high each note is next to the first
+const TUNE: Array[float] = [1.0, 1.19, 1.33, 1.5, 1.33, 1.19, 1.0, 0.89, 1.0, 1.33, 1.19, 1.0]
 
 var pet: Cryptlin
 # What it has picked to work its knack on: a thing, or another of them
@@ -43,6 +50,8 @@ var caster: Cryptlin
 var stone: ShaderMaterial
 # The tongue of the frogman, while it is out
 var tongue: MeshInstance3D
+# How long the gnome has stood stock still this turn
+var stiff := 0.0
 
 
 func _init(whose: Cryptlin) -> void:
@@ -74,12 +83,23 @@ func ready() -> bool:
 			return Den.wade(pet.position) <= 0.0
 		Cryptlin.Kind.KELPIE:
 			return Den.shore != Den.Shore.NONE and _dupe() != null
+		Cryptlin.Kind.MERFOLK:
+			return world.pets().size() > 1
+		Cryptlin.Kind.SPAWN:
+			return true
+		Cryptlin.Kind.GNOME:
+			return _trinket() != null
+		Cryptlin.Kind.FAE:
+			return pet._someone() != null
+		Cryptlin.Kind.FUNGUS:
+			return Den.wade(pet.position) <= 0.0
 	return false
 
 
 func weight() -> float:
 	# The mothman is up at the bulb a good deal more when there is trouble on the way
-	if pet.kind == Cryptlin.Kind.MOTHMAN and _trouble():
+	# (as the merling sings a good deal more when there is a quarrel to settle)
+	if pet.kind in [Cryptlin.Kind.MOTHMAN, Cryptlin.Kind.MERFOLK] and _trouble():
 		return WEIGHT * 3.0
 	return WEIGHT
 
@@ -87,6 +107,11 @@ func weight() -> float:
 # Time passing, whatever it is doing
 func always(delta: float) -> void:
 	again -= delta
+	# The room goes strange for as long as a Cthulhu spawn is asleep in it, or dreaming on its feet
+	if pet.kind == Cryptlin.Kind.SPAWN and (pet.state == Cryptlin.State.SLEEP or (pet.state == Cryptlin.State.TRICK and pet.state_time > 0.8)):
+		pet.world.strange = 1.0
+		if pet.world.weird > 0.9 and not pet.world.resting:
+			pet.world.learned(pet, "knack")
 
 
 func begin() -> void:
@@ -111,6 +136,11 @@ func begin() -> void:
 			# From whichever side it is nearer, and through the food if there is any lying about
 			var along := pet.position.z if world.snacks.is_empty() else world.snacks[0].position.z
 			pet.target = pet._footing(Vector3(Den.half.x * (1.0 if pet.position.x > 0.0 else -1.0), 0, along), 0.5)
+		Cryptlin.Kind.GNOME:
+			mark = _trinket()
+			stiff = 0.0
+		Cryptlin.Kind.FAE:
+			victim = pet._someone()
 		Cryptlin.Kind.KELPIE:
 			victim = _dupe()
 			if victim != null:
@@ -140,6 +170,16 @@ func tick(delta: float) -> void:
 			_frost(delta)
 		Cryptlin.Kind.KELPIE:
 			_lure(delta)
+		Cryptlin.Kind.MERFOLK:
+			_sing(delta)
+		Cryptlin.Kind.SPAWN:
+			_dream(delta)
+		Cryptlin.Kind.GNOME:
+			_meddle(delta)
+		Cryptlin.Kind.FAE:
+			_dust(delta)
+		Cryptlin.Kind.FUNGUS:
+			_spore(delta)
 		_:
 			finish()
 
@@ -213,6 +253,17 @@ func spelled(delta: float) -> void:
 			pet.twitch = 0.0
 			if is_instance_valid(caster):
 				pet.gaze = caster.global_position + Vector3(0, caster.top() * 0.8, 0)
+		"dance":
+			# Its feet will not keep still
+			pet._halt(delta)
+			pet.arm_goal = Cryptlin.UP_ARM
+			pet.wag = 10.0
+			pet.wiggle = sin(pet.anim_t * 7.0) * 0.18
+			pet.yaw += delta * 2.2
+			pet.eye_goal = 1.2
+			if not pet.airborne:
+				pet.hop(1.9)
+				pet.fun = minf(pet.fun + 1.0, 100.0)
 		"lured":
 			# Down the bank and in, as if it were walking in its sleep
 			pet.eye_goal = 0.55
@@ -625,3 +676,175 @@ func _dupe() -> Cryptlin:
 		if other != pet and not other.needs_water() and other.state in Cryptlin.INTERRUPTIBLE and other.health >= Cryptlin.POORLY and Den.wade(other.position) <= 0.0:
 			fair.append(other)
 	return fair.pick_random() if not fair.is_empty() else null
+
+
+# The merling sings. It settles the room: a fight that is going on stops, two that have fallen
+# out think a little better of each other and leave each other be for a while, and any that
+# are tired go off to bed
+func _sing(delta: float) -> void:
+	var world := pet.world
+	pet._halt(delta)
+	pet.gaze = world.bulb.global_position
+	pet.arm_goal = Vector3(-0.6, 0.0, 1.2)
+	pet.arm_wave = 0.25
+	pet.wiggle = sin(pet.state_time * 3.0) * 0.1
+	pet.mouth_goal = 0.5 + 0.4 * absf(sin(pet.state_time * 7.0))
+	pet.eye_goal = 0.5
+	if _beat(0.42, delta):
+		var note := int(pet.state_time / 0.42) % TUNE.size()
+		pet._cry("coo", TUNE[note], -3.0)
+		world.crumbs(pet.global_position + Vector3(0, pet.top() + 0.15, 0), Color(0.6, 0.85, 1.0))
+	if pet.step == 0 and pet.state_time > 2.4:
+		_next()
+		pet.state_time = 2.4
+		if world.scuffle != null:
+			world.end_fight(true)
+		for other in world.pets():
+			if other == pet:
+				continue
+			other.fight_cooldown = maxf(other.fight_cooldown, 90.0)
+			for third in world.pets():
+				if third != other and world.standing(other, third) < 45.0:
+					world.warm(other, third, 2.0)
+			if other.state in Cryptlin.INTERRUPTIBLE:
+				if other.energy < 55.0:
+					other._enter(Cryptlin.State.GO_SLEEP)
+				else:
+					other.feel(Cryptlin.Feeling.HAPPY, 5.0)
+					other.glance_time = 2.0
+					other.glance_point = pet.global_position + Vector3(0, pet.top(), 0)
+		done = true
+	if pet.state_time > 5.0:
+		finish()
+
+
+# The Cthulhu spawn dreams, and the room goes strange with it (see Den.strange). It does so
+# whenever it is asleep; as a turn of its own it nods off where it sits for a few seconds
+func _dream(delta: float) -> void:
+	pet._halt(delta)
+	pet.sit_goal = 1.0
+	pet.eye_goal = 0.0
+	pet.droop_goal = 1.0
+	pet.nod = 0.3 + sin(pet.state_time * 1.4) * 0.06
+	pet.wag = 0.6
+	if _beat(1.6, delta):
+		pet._cry("snore", 0.7, -6.0)
+	if pet.state_time > 2.5:
+		done = true
+	if pet.state_time > 6.0:
+		pet._cry("yawn", 0.6)
+		finish()
+
+
+# The gnome will not be seen to move. With a finger just off the screen it stands like an
+# ornament; left alone, it creeps over to some small thing and shifts it somewhere else
+func _meddle(delta: float) -> void:
+	var world := pet.world
+	if world.left_alone() < 2.5:
+		# Caught at it: not a twitch, eyes front, until the keeper has looked away a while
+		pet._halt(delta)
+		pet.blink = 1.0
+		pet.eye_goal = 1.0
+		pet.wag = 0.0
+		pet.twitch = 0.0
+		pet.gaze = pet.global_position + Vector3(sin(pet.yaw), 0.25, cos(pet.yaw)) * 3.0
+		stiff += delta
+		if stiff > 1.5:
+			done = true
+		if pet.state_time > 14.0:
+			finish()
+		return
+	if not is_instance_valid(mark):
+		finish()
+		return
+	var at := Vector3(mark.position.x, 0, mark.position.z)
+	pet.gaze = mark.global_position + Vector3(0, 0.1, 0)
+	if pet.step == 0:
+		pet.sit_goal = 0.3
+		if pet._steer(at, Cryptlin.WALK * 0.8, delta, 0.3 * pet.grow + 0.15):
+			var away := Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU) * randf_range(0.7, 1.1)
+			pet.target = Den.on_dry(at + away, 0.5, 0.4)
+			_next()
+		elif pet.state_time > 8.0:
+			finish()
+		return
+	# It has hold of it, and off they go
+	pet.arm_goal = Vector3(-1.3, 0.0, 0.3)
+	var to := at.move_toward(pet.target, delta * 0.45)
+	mark.position = Vector3(to.x, mark.position.y, to.z)
+	pet._steer(to - (pet.target - at).normalized() * (0.3 * pet.grow + 0.12), Cryptlin.WALK * 0.8, delta, 0.05)
+	if to.distance_to(pet.target) < 0.02 or pet.state_time > 5.0:
+		done = true
+		pet._cry("chirp", 0.8, -8.0)
+		world.save_game()
+		finish()
+
+
+# Some small thing for the gnome to shift: one of the smaller things that stand in the room,
+# the toy if it is lying still, or a bit of food
+func _trinket() -> Node3D:
+	var world := pet.world
+	var fair: Array[Node3D] = []
+	for d in world.decors:
+		if d.kind in [Decor.Kind.SKULL, Decor.Kind.CRYSTAL, Decor.Kind.PUMPKIN, Decor.Kind.FERN, Decor.Kind.DISH, Decor.Kind.POT] and d != world.held_thing:
+			fair.append(d)
+	if world.ball != null and not world.ball.held and world.ball.speed() < 0.3 and Den.wade(world.ball.position) <= 0.0:
+		fair.append(world.ball)
+	for food in world.snacks:
+		if food.landed and not food.held and Den.wade(food.position) <= 0.0:
+			fair.append(food)
+	return fair.pick_random() if not fair.is_empty() else null
+
+
+# The fae flits over to one of the others and shakes its dust out over it, and that one has to
+# dance until the dust wears off. Now and then it leaves a little something to eat behind
+func _dust(delta: float) -> void:
+	var world := pet.world
+	if not is_instance_valid(victim) or victim.me.leaving:
+		finish()
+		return
+	var over := victim.global_position + Vector3(0, victim.top() + 0.1, 0)
+	pet.gaze = over
+	match pet.step:
+		0:
+			if pet._steer(victim.position, Cryptlin.RUN * 0.7, delta, 0.55) or pet.state_time > 6.0:
+				_next()
+		1:
+			pet._halt(delta)
+			pet._face(victim.position, delta)
+			pet.arm_goal = Cryptlin.UP_ARM
+			pet.arm_wave = 0.8
+			pet.wiggle = sin(pet.state_time * 12.0) * 0.1
+			if _beat(0.18, delta):
+				world.crumbs(over + Vector3(randf_range(-0.15, 0.15), 0, randf_range(-0.15, 0.15)), Color(1.0, 0.85, 0.35))
+				world.sfx.play("jingle", randf_range(1.0, 1.6), -12.0)
+			if pet.state_time > 1.1 and not done:
+				done = victim.knack.bewitch("dance", pet, 4.0)
+			if pet.state_time > 1.8:
+				if done and randf() < 0.35:
+					world.gift(pet.position + Vector3(sin(pet.yaw), 0, cos(pet.yaw)) * 0.3)
+				pet._cry("chirp", 1.2)
+				finish()
+
+
+# The living fungus sits down and puffs out a cloud of spores; and when it has got up and gone,
+# tiny toadstools come up where it sat
+func _spore(delta: float) -> void:
+	var world := pet.world
+	if pet.step == 0:
+		pet._halt(delta)
+		pet.sit_goal = 1.0
+		pet.eye_goal = 0.6
+		if pet.state_time > 0.9 and _beat(0.5, delta):
+			pet.squash_v = 2.4
+			world.crumbs(pet.global_position + Vector3(0, pet.top() * 0.8, 0), Color(0.72, 0.8, 0.5))
+			world.sfx.play("thud", 1.8, -14.0)
+		if pet.state_time > 2.8:
+			world.leave_print("toadstools", pet.position, randf() * TAU, 1.0, pet.grow)
+			done = true
+			pet.target = pet._footing(pet.position + Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU) * 0.8, 0.4)
+			_next()
+		return
+	pet.gaze = pet.target + Vector3(0, 0.3, 0)
+	if pet._steer(pet.target, Cryptlin.WALK, delta, 0.2) or pet.state_time > 3.0:
+		finish()

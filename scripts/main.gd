@@ -122,6 +122,10 @@ var tracks: Array[Track] = []
 # left to flicker, and the things that are shrivelled, each with how long it has left to be
 var flicker := 0.0
 var shrivelled := {}
+# How strange the room is asked to be just now (a Cthulhu spawn asleep in it sets this every
+# frame: see Knack), and how strange it has got
+var strange := 0.0
+var weird := 0.0
 var nest: Node3D
 var nest_pos := Vector3(-1.6, 0, -1.2)
 
@@ -2006,6 +2010,7 @@ func _build_lamp() -> void:
 func _aim_camera() -> void:
 	camera.position = eye + Vector3(sin(clock * 0.21) * 0.1, sin(clock * 0.17) * 0.04, 0)
 	camera.look_at(eye_on)
+	camera.rotation.z = sin(clock * 0.45) * 0.07 * weird
 
 
 # Phones held upright keep the whole room in view by fixing the width instead of the height
@@ -2268,6 +2273,20 @@ func leave_print(shape: String, at: Vector3, facing: float, side: float, big: fl
 	tracks.append(print)
 
 
+# Something to eat that turns up for nothing (a fae leaves it): berries, set down at a place for
+# whoever gets there first. It is not out of the stock of the keeper, and there is none if as
+# much is lying about already as the room holds.
+func gift(at: Vector3) -> void:
+	if snacks.size() >= MAX_SNACKS:
+		return
+	var snack := Snack.new(Snack.Kind.BERRIES)
+	add_child(snack)
+	snack.drop(on_dry(at, 0.3, 0.1) + Vector3(0, 0.5, 0))
+	snack.thud.connect(func(strength: float) -> void: sfx.play("thud", 1.3, clampf(strength * 2.0 - 16.0, -24.0, -4.0)))
+	snacks.append(snack)
+
+
+
 # Leaves a thing in the room (or the toy) shrivelled for so many seconds: sunk in on itself,
 # and filling out again at the end of them
 func shrivel(thing: Node3D, seconds: float) -> void:
@@ -2324,6 +2343,14 @@ func _process(delta: float) -> void:
 	_plump(delta)
 	spot.spot_angle = lamp_angle
 	spot.visible = light_level > 0.001
+	# A dreamer in the room: the light goes the wrong colours, a little of it comes even from a
+	# dark bulb, and the whole room tilts slowly one way and the other (see _aim_camera)
+	weird = move_toward(weird, strange, delta * 0.5)
+	strange = 0.0
+	if weird > 0.0:
+		spot.light_color = spot.light_color.lerp(Color.from_hsv(0.33 + 0.42 * (0.5 + 0.5 * sin(clock * 0.7)), 0.75, 1.0), weird * 0.75)
+		spot.light_energy = maxf(spot.light_energy, weird * 0.7)
+		spot.visible = true
 	bulb.material_override.set_shader_parameter("tint", Color(0.2, 0.17, 0.15).lerp(spot.light_color, light_level))
 	bulb.material_override.set_shader_parameter("glow", light_level)
 	beam.set_shader_parameter("tint", spot.light_color)
