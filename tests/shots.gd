@@ -1,6 +1,6 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]|--poses [--baby]|--strides [--baby]]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..22] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]|--poses [--baby]|--strides [--baby]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --scan: the
 ## scanner on the wheel, on the finger, and pointed at a grown one, a baby and an egg. With --faces:
@@ -810,6 +810,9 @@ func _run_knack() -> void:
 	if pet.kind in [Cryptlin.Kind.NESSIE, Cryptlin.Kind.KELPIE]:
 		main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
 	main.place_decor(Decor.Kind.SKULL, Vector3(1.4, 0, 0.9))
+	if pet.kind == Cryptlin.Kind.NIGHTCRAWLER:
+		# (something worth walking through)
+		main.place_decor(Decor.Kind.ROCK, Vector3(-1.5, 0, 0.3))
 	main.play_ball(Ball.Kind.BALL)
 	main.ball.position = Vector3(-1.5, 0.2, 1.1)
 	main.ball.vel = Vector3.ZERO

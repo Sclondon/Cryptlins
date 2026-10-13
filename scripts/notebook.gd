@@ -96,6 +96,9 @@ const KIND_NOTES: Array[String] = [
 	"A great soft heap of white fur with a small face low down. Gentle, heavy and hungry.",
 	"Three heads on one pup. The middle one leads. All three are hungry.",
 	"One of the people from underneath. Slow and short in the sight, and it digs up everything.",
+	"A pair of white legs with a lump of a head on top and no arms at all. It walks as if on stilts, and it would sooner stand than sit.",
+	"A monkey with wings, and some of them come in a jacket or a little round hat. Quick and loud, and up on top of things.",
+	"A stout boar with tusks, and wings a size too small for it. It flies a little, with effort, and trots the rest. It roots.",
 ]
 # And on each nature (Cryptlin.NATURES): each of them has two
 const NATURE_NOTES: Array[String] = [

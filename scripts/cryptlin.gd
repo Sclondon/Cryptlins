@@ -15,6 +15,7 @@ enum State {
 enum Kind {
 	GREMLIN, SQUATCH, COCKATRICE, MOTHMAN, CHUPACABRA, FROGMAN, NESSIE, BOLTER, WENDIGO,
 	KELPIE, MERFOLK, SPAWN, GNOME, FAE, FUNGUS, JACKALOPE, ALIEN, YETI, CERBERUS, MOLE,
+	NIGHTCRAWLER, MONKEY, BOAR,
 }
 
 # What sets the kinds apart besides their looks: pace on the ground, appetite, how fast they tire,
@@ -23,7 +24,8 @@ enum Kind {
 # much more than the rest one digs (and it will dig any floor); "dim" is one from underground,
 # as happy with the lamp off as low and unhappy under the bright one; "sight" is how far one that
 # is short-sighted can see a toy or the moving light; "print" is the footprint a heavy one leaves
-# (see Track).
+# (see Track); "fly" is one with wings it can use, and how often in a second on the move it takes
+# to the air for a short hop (it also perches: see ROOSTS).
 const KINDS: Array[Dictionary] = [
 	{"title": "gremlin", "pace": 1.0, "hunger": 1.0, "tire": 1.0, "spring": 1.0, "voice": 1.0, "lurk": 1.0, "zoom": 1.0, "dance": 1.0, "stare": 1.0},
 	{"title": "squatchling", "pace": 0.85, "hunger": 1.25, "tire": 1.1, "spring": 0.7, "voice": 0.55, "lurk": 2.2, "zoom": 0.5, "dance": 1.1, "stare": 1.4, "print": "sasquatch"},
@@ -45,9 +47,19 @@ const KINDS: Array[Dictionary] = [
 	{"title": "yeti", "pace": 0.85, "hunger": 1.4, "tire": 1.0, "spring": 0.7, "voice": 0.5, "lurk": 1.6, "zoom": 0.6, "dance": 1.0, "stare": 1.2},
 	{"title": "Cerberus", "pace": 1.15, "hunger": 1.7, "tire": 1.0, "spring": 1.1, "voice": 0.7, "lurk": 0.7, "zoom": 1.6, "dance": 0.9, "stare": 1.3},
 	{"title": "mole person", "pace": 0.72, "hunger": 1.2, "tire": 1.0, "spring": 0.6, "voice": 0.65, "lurk": 2.8, "zoom": 0.4, "dance": 0.7, "stare": 0.5, "dig": 5.0, "dim": true, "sight": 1.3},
+	{"title": "Fresno nightcrawler", "pace": 0.8, "hunger": 0.7, "tire": 0.8, "spring": 0.6, "voice": 1.25, "lurk": 1.4, "zoom": 0.5, "dance": 0.7, "stare": 2.0},
+	{"title": "flying monkey", "pace": 1.2, "hunger": 1.1, "tire": 1.1, "spring": 1.3, "voice": 1.35, "lurk": 0.7, "zoom": 1.8, "dance": 1.4, "stare": 0.9, "fly": 0.8},
+	{"title": "flying boar", "pace": 1.05, "hunger": 1.6, "tire": 1.15, "spring": 0.8, "voice": 0.6, "lurk": 0.6, "zoom": 1.3, "dance": 0.7, "stare": 0.8, "fly": 0.14, "dig": 2.5},
 ]
 # What the numbers in saves from before this list stood for (gremlin, bogle, spook, flit)
 const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MOTHMAN]
+# What one that flies will perch on top of, and how high up that is (the rest only climb the rock)
+const ROOSTS := {
+	Decor.Kind.ROCK: 0.4, Decor.Kind.LOG: 0.4, Decor.Kind.GRAVESTONE: 0.52, Decor.Kind.CAVE: 1.42,
+	Decor.Kind.BARREL: 1.32, Decor.Kind.CRATE: 1.15,
+}
+# What a flier is doing when it might take off (see _flit)
+const FLITS: Array[int] = [State.WANDER, State.COME, State.ZOOMIES, State.TAG, State.FLEE, State.FOLLOW, State.CHASE_LIGHT]
 
 # What it can beg for, with a picture of it in a thought bubble
 enum Want { FOOD, BALL, WATER }
@@ -103,7 +115,7 @@ const NATURES: Array[Dictionary] = [
 # with one, and pleased with themselves when it breaks; the rest are startled), and each kind:
 # the heavy and the fierce wear one out fast, and the slight ones slowly
 const NATURE_ROUGH: Array[float] = [1.0, 1.15, 0.8, 0.85, 0.8, 1.25, 1.3, 1.2]
-const ROUGH: Array[float] = [1.0, 1.3, 1.0, 0.8, 1.4, 0.9, 1.1, 1.6, 1.4, 1.2, 0.9, 1.1, 0.8, 0.6, 0.7, 1.0, 0.8, 1.4, 1.6, 1.1]
+const ROUGH: Array[float] = [1.0, 1.3, 1.0, 0.8, 1.4, 0.9, 1.1, 1.6, 1.4, 1.2, 0.9, 1.1, 0.8, 0.6, 0.7, 1.0, 0.8, 1.4, 1.6, 1.1, 0.7, 1.2, 1.5]
 # The two foods and two toys each kind leans towards (Snack.Kind, Ball.Kind); one of each is its favourite
 const FOOD_LIKES: Array[Array] = [
 	[Snack.Kind.CANDY, Snack.Kind.BONE], [Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.BEETLE, Snack.Kind.BERRIES],
@@ -113,6 +125,7 @@ const FOOD_LIKES: Array[Array] = [
 	[Snack.Kind.TOADSTOOL, Snack.Kind.BERRIES], [Snack.Kind.BERRIES, Snack.Kind.CANDY], [Snack.Kind.BONE, Snack.Kind.BEETLE],
 	[Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.CANDY, Snack.Kind.BEETLE], [Snack.Kind.BONE, Snack.Kind.BERRIES],
 	[Snack.Kind.BONE, Snack.Kind.FISH], [Snack.Kind.BEETLE, Snack.Kind.TOADSTOOL],
+	[Snack.Kind.TOADSTOOL, Snack.Kind.CANDY], [Snack.Kind.BERRIES, Snack.Kind.BEETLE], [Snack.Kind.TOADSTOOL, Snack.Kind.BEETLE],
 ]
 const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL], [Ball.Kind.BELL, Ball.Kind.STONE],
@@ -122,6 +135,7 @@ const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BELL, Ball.Kind.STONE], [Ball.Kind.BELL, Ball.Kind.GLOW], [Ball.Kind.GLOW, Ball.Kind.STONE],
 	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL],
 	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.STONE, Ball.Kind.BELL],
+	[Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.BELL, Ball.Kind.BALL], [Ball.Kind.STONE, Ball.Kind.BALL],
 ]
 # Natures that will not go together (shy and bold, sleepy and restless, cuddly and grumpy)
 const OPPOSED: Array[Array] = [[2, 5], [3, 7], [4, 6]]
@@ -136,12 +150,14 @@ const DECOR_LIKES: Array[Array] = [
 	[Decor.Kind.PUMPKIN, Decor.Kind.LOG], [Decor.Kind.FERN, Decor.Kind.CRYSTAL], [Decor.Kind.LOG, Decor.Kind.GRAVESTONE],
 	[Decor.Kind.FERN, Decor.Kind.LOG], [Decor.Kind.CRYSTAL, Decor.Kind.SKULL], [Decor.Kind.ROCK, Decor.Kind.CAVE],
 	[Decor.Kind.SKULL, Decor.Kind.GRAVESTONE], [Decor.Kind.LOG, Decor.Kind.ROCK],
+	[Decor.Kind.GRAVESTONE, Decor.Kind.CRYSTAL], [Decor.Kind.PUMPKIN, Decor.Kind.ROCK], [Decor.Kind.LOG, Decor.Kind.FERN],
 ]
 const GROUND_LIKES: Array[Array] = [
 	[1, 3], [2, 4], [4, 5], [1, 3], [5, 4], [2, 4], [6, 5], [6, 0], [2, 0],
 	[6, 2], [5, 6], [5, 0], [2, 4], [2, 3], [2, 4], [4, 5], [3, 6], [6, 0], [0, 6], [4, 4],
+	[3, 0], [1, 3], [4, 2],
 ]
-const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2, 1]
+const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2, 1, 1, 0, 2]
 # It lives in real time, like a pet: these are hours of the clock on the wall, and they pass
 # whether or not anyone is looking. A full belly lasts most of a day, and a baby is grown in a
 # day and a half.
@@ -200,6 +216,9 @@ const FURS: Array[Array] = [
 	[Color(0.92, 0.94, 1.0), Color(0.82, 0.9, 1.0), Color(0.95, 0.92, 0.84), Color(0.76, 0.8, 0.88)],
 	[Color(0.16, 0.15, 0.17), Color(0.3, 0.16, 0.12), Color(0.26, 0.25, 0.28), Color(0.34, 0.26, 0.18)],
 	[Color(0.2, 0.19, 0.23), Color(0.3, 0.26, 0.24), Color(0.36, 0.34, 0.37), Color(0.24, 0.22, 0.31), Color(0.4, 0.33, 0.27)],
+	[Color(0.94, 0.94, 0.91), Color(0.86, 0.9, 0.97), Color(0.97, 0.94, 0.87), Color(0.84, 0.86, 0.85)],
+	[Color(0.4, 0.28, 0.18), Color(0.36, 0.4, 0.5), Color(0.24, 0.22, 0.24), Color(0.5, 0.3, 0.16), Color(0.42, 0.42, 0.44)],
+	[Color(0.3, 0.22, 0.16), Color(0.2, 0.19, 0.2), Color(0.5, 0.3, 0.18), Color(0.4, 0.38, 0.36), Color(0.72, 0.52, 0.48)],
 ]
 const EYES: Array[Array] = [
 	[Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.3), Color(1.0, 0.45, 0.7), Color(0.4, 0.95, 1.0)],
@@ -222,6 +241,9 @@ const EYES: Array[Array] = [
 	[Color(0.5, 0.9, 1.0), Color(0.8, 1.0, 1.0), Color(1.0, 0.4, 0.3)],
 	[Color(1.0, 0.3, 0.1), Color(1.0, 0.55, 0.1), Color(1.0, 0.85, 0.2)],
 	[Color(1.0, 0.95, 0.85), Color(0.85, 0.95, 1.0), Color(1.0, 0.85, 0.8)],
+	[Color(1.0, 1.0, 0.9), Color(1.0, 0.3, 0.2), Color(0.6, 0.9, 1.0)],
+	[Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.4)],
+	[Color(1.0, 0.8, 0.3), Color(1.0, 0.4, 0.2), Color(0.9, 1.0, 0.5)],
 ]
 # A seed up to this is one from before there were more colours to draw from, and keeps to the
 # lists above so that it stays the colour it has always been; a seed over it draws from these too
@@ -247,6 +269,9 @@ const FURS_MORE: Array[Array] = [
 	[Color(0.88, 0.86, 0.8), Color(0.8, 0.86, 0.9)],
 	[Color(0.22, 0.2, 0.24), Color(0.38, 0.2, 0.14)],
 	[Color(0.5, 0.46, 0.43), Color(0.15, 0.14, 0.19)],
+	[Color(0.95, 0.88, 0.91), Color(0.84, 0.93, 0.88)],
+	[Color(0.6, 0.46, 0.22), Color(0.26, 0.32, 0.4)],
+	[Color(0.6, 0.5, 0.34), Color(0.34, 0.24, 0.26)],
 ]
 const EYES_MORE: Array[Array] = [
 	[Color(0.8, 0.6, 1.0)], [Color(1.0, 0.95, 0.6)], [Color(1.0, 0.45, 0.6)], [Color(1.0, 0.4, 0.0)],
@@ -254,6 +279,7 @@ const EYES_MORE: Array[Array] = [
 	[Color(0.9, 0.7, 1.0)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.5, 0.7)], [Color(0.9, 0.6, 1.0)],
 	[Color(1.0, 0.6, 0.4)], [Color(0.8, 1.0, 0.7)], [Color(1.0, 0.7, 0.5)], [Color(0.8, 1.0, 0.5)],
 	[Color(1.0, 0.8, 0.4)], [Color(0.7, 1.0, 0.8)], [Color(1.0, 0.2, 0.3)], [Color(0.9, 1.0, 0.9)],
+	[Color(0.8, 0.6, 1.0)], [Color(0.5, 0.9, 1.0)], [Color(0.6, 0.9, 1.0)],
 ]
 # How far one of a kind can be from the next in its proportions, each as the least and the most
 # of what its body was drawn at: the size of its head, of its eyes and how far apart they sit,
@@ -272,6 +298,9 @@ const SHAPES: Array[Dictionary] = [
 	{"crest": [0.6, 1.4]}, {"head": [0.85, 1.25]}, {"crest": [0.75, 1.3]}, {}, {"head": [0.86, 1.2], "crest": [0.85, 1.25]},
 	{"eye": [0.85, 1.25], "marks": [Mark.PATCHES, Mark.BELLY]}, {"limb": [0.8, 1.25], "eye": [0.75, 1.2]},
 	{"head": [0.88, 1.22], "eye": [0.75, 1.15], "limb": [0.85, 1.2], "crest": [0.75, 1.35], "tail": [0.6, 1.5]},
+	{"head": [0.85, 1.25], "eye": [0.75, 1.3], "limb": [0.82, 1.3], "crest": [0.7, 1.4], "marks": [Mark.BELLY, Mark.SOCKS, Mark.BLAZE, Mark.FRECKLES]},
+	{"head": [0.88, 1.2], "limb": [0.85, 1.25], "crest": [0.7, 1.4], "tail": [0.7, 1.3]},
+	{"head": [0.88, 1.2], "limb": [0.85, 1.2], "crest": [0.7, 1.45], "tail": [0.7, 1.5]},
 ]
 # What can be painted on a coat, and how likely each is for most kinds
 enum Mark { PLAIN, SPOTS, PATCHES, STRIPES, BELLY, SOCKS, BLAZE, FRECKLES, POINTS }
@@ -292,6 +321,7 @@ const EXTRAS: Array[Array] = [
 	["whiskers", "tooth", "torn", "odd", "split", "broken"], ["odd", "split"],
 	["tooth", "odd", "split", "broken"], ["tooth", "torn", "odd", "split"],
 	["tuft", "whiskers", "tooth", "odd", "split"],
+	["odd", "split"], ["tuft", "tooth", "torn", "odd", "split"], ["tuft", "whiskers", "torn", "odd", "split", "broken"],
 ]
 
 var world: Den
@@ -323,6 +353,13 @@ var wings := false
 var flaps: Array[Node3D] = []
 var flap_rate := 0.0
 var flap_reach := 0.0
+# How much faster and further they beat in the air than on the ground; whether it is flying just
+# now (a hop it has taken wing for, or its way up to a perch); how hard it takes off and how
+# little of its weight it has on the wing
+var flap_air := 1.6
+var flap_far := 1.0
+var flying := false
+var flight := Vector2(2.0, 0.4)
 # More heads than the one on its neck: they follow it round, a little behind
 var heads: Array[Node3D] = []
 # A dummy it wears in front of it (the cockatrice's stuffed rooster): the dummy, its two wings
@@ -358,6 +395,14 @@ var hop_run := 0.0
 var hop_tip := 0.0
 var hop_y := 0.0
 var hop_lag := 0.0
+# How far its legs swing at a walk, how far it folds up when it sits (not at all, for one that
+# is all legs), how far the whole of such a one comes down when it curls up to sleep, and how
+# long the bone in each leg is
+var stride := 0.9
+var sits := 1.0
+var crouch := 0.0
+var shin := 0.16
+var hip := 0.0
 # A body that is rounder on a baby (the yeti's, a ball of fluff that grows into its shape): the
 # body and its size grown and newly hatched, what carries its arms and head, how far that is
 # lower on a baby, and how long its arms are grown
@@ -940,6 +985,12 @@ func _build() -> void:
 			_build_cerberus(chub)
 		Kind.MOLE:
 			_build_mole(chub)
+		Kind.NIGHTCRAWLER:
+			_build_nightcrawler(chub)
+		Kind.MONKEY:
+			_build_monkey(chub, rng)
+		Kind.BOAR:
+			_build_boar(chub, ear_len)
 		_:
 			_build_gremlin(chub, ear_len, horns)
 
@@ -2183,6 +2234,253 @@ func _build_mole(chub: float) -> void:
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.04))
 
 
+# A length of body through these points, from so thick at the first to so thick at the last
+func _rope(parent: Node3D, mat: Material, points: Array[Vector3], from: float, to: float) -> void:
+	for i in points.size():
+		var thick := lerpf(from, to, float(i) / (points.size() - 1))
+		_part(parent, _sphere(), mat, points[i], Vector3.ONE * thick)
+		if i > 0:
+			var along := points[i] - points[i - 1]
+			_spike(parent, mat, points[i - 1], along, along.length(), (thick + lerpf(from, to, float(i - 1) / (points.size() - 1))) * 0.5, _drum(1.0, 1.0, 1.0))
+
+
+# The Fresno nightcrawler: a pair of walking trousers. Two long pale legs that run up into one
+# small lump of a head, no arms, no neck to speak of, and two dark eyes; it goes about stiffly,
+# as if on stilts, and stands rather than sits
+func _build_nightcrawler(chub: float) -> void:
+	neck_y = 0.87
+	head_y = 0.08
+	centre_y = 0.82
+	top_y = 1.04
+	gut = 0.42
+	head_turn = 0.7
+	stride = 0.3
+	sits = 0.0
+	crouch = 0.5
+	shin = 0.58
+	brain_at = Vector3(0, 0.07, 0)
+	# As near white as anything down here gets
+	fur.set_shader_parameter("tint", fur_colour * 0.94)
+	pale = Ps1.mat(Color(0.95, 0.95, 0.93), 0.0, 0.35)
+	# Wide at the hip and narrow at the ankle, like a trouser leg: more so on some than others
+	var flare := 0.1 * lerpf(1.0, crest, 0.6)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.095 * chub * side, 0.74, 0))
+		leg.rotation.z = 0.07 * side
+		_part(leg, _drum(flare, 0.04, 0.72), fur, Vector3(0, -0.34, 0), Vector3(chub, 1.0, 1.0))
+		_part(leg, _sphere(), pale, Vector3(0, -0.705, 0.03), Vector3(0.058, 0.035, 0.095))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	# Where the two legs meet: no more of a body than that
+	_part(torso, _sphere(), fur, Vector3(0, 0.79, 0), Vector3(0.19 * chub, 0.115, 0.115))
+	tail = _pivot(torso, Vector3(0, 0.74, -0.1))
+	for side: float in [-1.0, 1.0]:
+		arms.append(_pivot(torso, Vector3(0.06 * side, 0.84, 0)))
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.04, 0), Vector3(0.135 * chub, 0.125, 0.11))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.052 * side, 0.065, 0.088), 0.036, true)
+	mouth_node = _pivot(neck, Vector3(0, 0.0, 0.103))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.025, 0.016, 0.02))
+
+
+# A wing of feathers or of skin for one that flies, hung on `parent` at `at`: so long, of these
+# two stuffs, and beaten up and down by the rig (which turns `flaps` about their own upright:
+# this one is laid over on its side to make that the line from front to back)
+func _wing(parent: Node3D, at: Vector3, side: float, long: float, first: Material, second: Material, bat: bool) -> void:
+	var holder := _pivot(parent, at)
+	holder.rotation.x = PI * 0.5
+	var flap := _pivot(holder, Vector3.ZERO)
+	var w := _pivot(flap, Vector3.ZERO)
+	w.rotation.x = -PI * 0.5
+	flaps.append(flap)
+	# The arm of it, out and a little back
+	_part(w, _capsule(long * 0.07, long), second, Vector3(long * 0.46 * side, 0, 0), Vector3.ONE, Vector3(0, 0, PI * 0.5))
+	if bat:
+		# Skin stretched between three long fingers, scalloped along the bottom
+		for i in 3:
+			var out := (0.3 + i * 0.32) * long
+			var drop := (0.62 + i * 0.12) * long
+			_part(w, _cone(), first, Vector3(out * side, -drop * 0.5, 0), Vector3(long * 0.3, drop, 0.012), Vector3(0, 0, PI + 0.3 * side * (i - 0.5)))
+			_spike(w, second, Vector3(out * 0.7 * side, 0, 0.004), Vector3(0.45 * side * (i - 0.3), -1.0, 0), drop * 1.02, long * 0.035)
+		return
+	# Feathers hanging off it in a row, longest at the tip, light and dark by turns
+	for i in 5:
+		var out := (0.12 + i * 0.21) * long
+		var drop := (0.42 + i * 0.1) * long
+		_part(w, _cone(), first if i % 2 == 0 else second, Vector3(out * side + drop * 0.12 * side * i * 0.4, -drop * 0.5, 0), Vector3(long * 0.17, drop, 0.014), Vector3(0, 0, PI + 0.13 * side * i))
+
+
+# The winged monkey of the witch's castle: long arms, a bare face, a tail that curls up behind it,
+# wings of feathers or of skin, and as often as not the bellhop's jacket and the little round hat
+# it was given to wear
+func _build_monkey(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.62
+	head_y = 0.2
+	centre_y = 0.44
+	top_y = 1.08
+	ear_splay = 1.35
+	gravity = 10.0
+	flap_rate = 3.0
+	flap_reach = 0.14
+	flap_air = 5.0
+	flap_far = 4.0
+	flight = Vector2(1.7, 0.32)
+	var liveries: Array[Color] = [Color(0.66, 0.1, 0.1), Color(0.66, 0.1, 0.1), Color(0.14, 0.22, 0.6), Color(0.42, 0.14, 0.5), Color(0.1, 0.4, 0.3)]
+	var livery := Ps1.mat(liveries[rng.randi() % liveries.size()], 0.0, 0.35)
+	var jacket := rng.randf() < 0.65
+	var hat := rng.randf() < 0.6
+	var bat := rng.randf() < 0.4
+	var braid := Ps1.mat(Color(0.92, 0.72, 0.22), 0.0, 0.35)
+	var flesh := Ps1.mat(Color(0.74, 0.58, 0.46), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.11 * side, 0.2, 0))
+		_part(leg, _capsule(0.055, 0.2), fur, Vector3(0, -0.08, 0))
+		_part(leg, _sphere(), flesh, Vector3(0, -0.165, 0.05), Vector3(0.075, 0.04, 0.13))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.42, 0), Vector3(0.25 * chub, 0.28, 0.22 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.38, 0.14 * chub), Vector3(0.17 * chub, 0.19, 0.1))
+	if jacket:
+		# Cut short, with a braided hem, a stand-up collar and two rows of buttons
+		_part(torso, _sphere(), livery, Vector3(0, 0.5, 0), Vector3(0.27 * chub, 0.2, 0.24 * chub))
+		_part(torso, _sphere(), braid, Vector3(0, 0.4, 0), Vector3(0.262 * chub, 0.022, 0.232 * chub))
+		_part(torso, _sphere(), braid, Vector3(0, 0.655, 0.01), Vector3(0.15, 0.03, 0.14))
+		for side: float in [-1.0, 1.0]:
+			for i in 3:
+				_part(torso, _sphere(), braid, Vector3(0.06 * side, 0.45 + i * 0.07, (0.225 - i * 0.022) * chub), Vector3.ONE * 0.024)
+	# A long tail, up behind it and curled over at the end
+	tail = _pivot(torso, Vector3(0, 0.26, -0.2 * chub))
+	var curl_up: Array[Vector3] = [
+		Vector3(0, 0, 0), Vector3(0, -0.03, -0.12), Vector3(0, 0.05, -0.24), Vector3(0, 0.2, -0.3), Vector3(0, 0.34, -0.3),
+		Vector3(0, 0.44, -0.25), Vector3(0, 0.46, -0.16), Vector3(0, 0.4, -0.12), Vector3(0, 0.36, -0.17),
+	]
+	_rope(tail, fur, curl_up, 0.036, 0.022)
+
+	var plume := Ps1.mat(fur_colour.darkened(0.45) * 0.9, 0.0, 0.35)
+	var quill := Ps1.mat(fur_colour.lerp(Color(0.8, 0.8, 0.86), 0.55), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		_wing(torso, Vector3(0.1 * side, 0.6, -0.17 * chub), side, 0.46 * lerpf(1.0, crest, 0.8), quill, plume, bat)
+		# Arms long enough to go on its knuckles
+		var a := _pivot(torso, Vector3(0.25 * chub * side, 0.58, 0.02))
+		_part(a, _capsule(0.042, 0.4), fur, Vector3(0, -0.17, 0))
+		_part(a, _sphere(), flesh, Vector3(0, -0.37, 0.01), Vector3(0.055, 0.06, 0.065))
+		if jacket:
+			_part(a, _capsule(0.056, 0.2), livery, Vector3(0, -0.05, 0))
+			_part(a, _sphere(), braid, Vector3(0, -0.15, 0), Vector3(0.06, 0.02, 0.06))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.03))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.24, 0.225, 0.225))
+	# A bare face the shape of a heart, and a muzzle standing out of it
+	for side: float in [-1.0, 1.0]:
+		_part(neck, _sphere(), flesh, Vector3(0.062 * side, 0.235, 0.16), Vector3(0.09, 0.095, 0.07))
+	_part(neck, _sphere(), flesh, Vector3(0, 0.12, 0.185), Vector3(0.115, 0.09, 0.09))
+	for side: float in [-1.0, 1.0]:
+		_part(neck, _sphere(), black, Vector3(0.022 * side, 0.15, 0.272), Vector3.ONE * 0.012)
+		var ear := _pivot(neck, Vector3(0.21 * side, 0.2, -0.01))
+		_part(ear, _sphere(), flesh, Vector3(0, 0.055, 0), Vector3(0.07, 0.07, 0.022))
+		_part(ear, _sphere(), dark, Vector3(0, 0.05, 0.016), Vector3(0.038, 0.04, 0.01))
+		ears.append(ear)
+		_eye(Vector3(0.075 * side, 0.25, 0.2), 0.058)
+	if hat:
+		# The pillbox, worn well over to one side
+		var cap := _pivot(neck, Vector3(0.045, 0.41, 0.0))
+		cap.rotation = Vector3(-0.1, 0, -0.26)
+		_part(cap, _drum(1.0, 1.0, 1.0), livery, Vector3(0, 0.055, 0), Vector3(0.115, 0.11, 0.115))
+		_part(cap, _drum(1.0, 1.0, 1.0), braid, Vector3(0, 0.012, 0), Vector3(0.12, 0.03, 0.12))
+		_part(cap, _sphere(), braid, Vector3(0, 0.115, 0), Vector3.ONE * 0.026)
+		top_y = neck_y + 0.56
+	else:
+		crown = Vector3(0, 0.42, 0.0)
+	mouth_node = _pivot(neck, Vector3(0, 0.085, 0.262))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.07, 0.03, 0.03))
+
+
+# A boar that flies, after a fashion: stout and low on four short legs, a long snout with a flat
+# end to it and two tusks curving up, a ridge of bristles down its back, a curl of a tail, and a
+# pair of wings a good deal too small for the job
+func _build_boar(chub: float, ear_len: float) -> void:
+	neck_y = 0.38
+	head_y = 0.06
+	centre_y = 0.36
+	top_y = 0.74
+	ear_splay = 0.75
+	gut = 0.95
+	back_y = 0.5
+	fours = true
+	head_turn = 0.85
+	gravity = 13.0
+	flap_rate = 5.0
+	flap_reach = 0.16
+	flap_air = 9.0
+	flap_far = 3.2
+	flight = Vector2(1.5, 0.22)
+	brain_at = Vector3(0, 0.08, 0.02)
+	crown = Vector3(0, 0.2, 0.02)
+	chub *= 1.08
+	var bristle := Ps1.mat(fur_colour.darkened(0.6) * 0.8, 0.0, 0.35)
+	var snout := Ps1.mat(fur_colour.lerp(Color(0.86, 0.56, 0.54), 0.6), 0.0, 0.35)
+	var feather := Ps1.mat(Color(0.9, 0.88, 0.8), 0.0, 0.35)
+	var down := Ps1.mat(Color(0.7, 0.7, 0.68), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		# Hams, and a short leg under each on a small hoof
+		var leg := _pivot(self, Vector3(0.15 * chub * side, 0.22, -0.2))
+		_part(leg, _sphere(), fur, Vector3(0, 0.02, 0), Vector3(0.1, 0.14, 0.13))
+		_part(leg, _capsule(0.045, 0.2), fur, Vector3(0, -0.1, 0.0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.19, 0.015), Vector3(0.05, 0.035, 0.06))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	# A barrel of a body, deepest at the shoulder
+	_part(torso, _sphere(), fur, Vector3(0, 0.36, -0.04), Vector3(0.26 * chub, 0.24, 0.36))
+	_part(torso, _sphere(), fur, Vector3(0, 0.42, 0.12), Vector3(0.24 * chub, 0.22, 0.2))
+	_part(torso, _sphere(), pale, Vector3(0, 0.27, -0.02), Vector3(0.2 * chub, 0.16, 0.3))
+	# Bristles: a dark ridge from between its ears to its rump, standing up in tufts
+	_part(torso, _sphere(), bristle, Vector3(0, 0.575, -0.03), Vector3(0.05, 0.06 * crest, 0.33))
+	for i in 7:
+		var along := i / 6.0
+		_spike(torso, bristle, Vector3(0, 0.6 - along * along * 0.08, 0.24 - along * 0.52), Vector3(0, 1.0, -0.5), (0.13 - absf(along - 0.3) * 0.05) * crest, 0.045)
+	# A curl of a tail
+	tail = _pivot(torso, Vector3(0, 0.44, -0.37))
+	var curl_of := TorusMesh.new()
+	curl_of.inner_radius = 0.55
+	curl_of.outer_radius = 1.0
+	curl_of.rings = 8
+	curl_of.ring_segments = 4
+	_part(tail, curl_of, snout, Vector3(0, 0.04, -0.06), Vector3.ONE * 0.065, Vector3(0, 0, PI * 0.5))
+	_part(tail, _sphere(), bristle, Vector3(0, 0.1, -0.11), Vector3.ONE * 0.03)
+
+	for side: float in [-1.0, 1.0]:
+		_wing(torso, Vector3(0.13 * chub * side, 0.6, 0.06), side, 0.24 * lerpf(1.0, crest, 0.7), feather, down, false)
+		var a := _pivot(torso, Vector3(0.15 * chub * side, 0.26, 0.2))
+		_foreleg(a, side, 0.26, 0.045)
+		arms.append(a)
+
+	# A big head carried low, most of it snout
+	neck = _pivot(torso, Vector3(0, neck_y, 0.3))
+	_part(neck, _sphere(), fur, Vector3(0, 0.07, 0.03), Vector3(0.2, 0.19, 0.2))
+	_part(neck, _drum(0.6, 1.0, 1.0), fur, Vector3(0, 0.0, 0.25), Vector3(0.115, 0.22, 0.1), Vector3(PI * 0.5, 0, 0))
+	_part(neck, _drum(1.0, 1.0, 1.0), snout, Vector3(0, -0.01, 0.37), Vector3(0.082, 0.03, 0.072), Vector3(PI * 0.5, 0, 0))
+	for side: float in [-1.0, 1.0]:
+		_part(neck, _sphere(), black, Vector3(0.03 * side, -0.005, 0.387), Vector3(0.016, 0.022, 0.008))
+		# Tusks out of the lower jaw, up past its lip
+		var tusk := neck.get_child_count()
+		var root := Vector3(0.085 * side, -0.06, 0.27)
+		_spike(neck, bone, root, Vector3(0.5 * side, 1.0, 0.15), 0.16, 0.036)
+		_swell(neck, tusk, root, Vector3.ONE * lerpf(1.0, crest, 0.6) * _snapped(side))
+		var ear := _pivot(neck, Vector3(0.12 * side, 0.2, -0.02))
+		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.16, 0), Vector3(0.07, ear_len * 0.34, 0.03))
+		_part(ear, _cone(), snout, Vector3(0, ear_len * 0.14, 0.02), Vector3(0.04, ear_len * 0.24, 0.012))
+		ears.append(ear)
+		_eye(Vector3(0.115 * side, 0.12, 0.17), 0.042)
+	mouth_node = _pivot(neck, Vector3(0, -0.07, 0.27))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.06, 0.03, 0.09))
+
+
 # One of a hound's heads, on a pivot: collar, skull, muzzle, nose, fangs and eyes. Gives back
 # its two ears, for the rig to work or not.
 func _hound_head(on: Node3D, collar: Material) -> Array[Node3D]:
@@ -2266,6 +2564,7 @@ func _shape_up() -> void:
 	for a in arms:
 		a.scale.y = (a.position.y + stand) / a.position.y if fours else lerpf(1.0, limb, 0.6)
 	reach = arms[0].scale.y
+	hip = legs[0].position.y
 	gut *= minf(span(kind, "build", shape["build"]) + 0.06, 1.0)
 
 	var lip := mouth_node.position
@@ -2946,6 +3245,7 @@ func _process(delta: float) -> void:
 	_bristle(delta)
 	gaze = _default_gaze()
 	_think(delta)
+	_flit(delta)
 	_move(delta)
 	_animate(delta)
 
@@ -3018,6 +3318,14 @@ func _enter(s: int, length := 0.0) -> void:
 	for z in zzz:
 		z.visible = false
 	if s != State.HELD:
+		# (one that flies, caught up in the air by something else to do, comes down on its wings)
+		if likes.has("fly") and lift > 0.2 and not s in [State.DYING, State.SCANNED, State.SCUFFLE, State.LEAVE]:
+			jump_y = lift
+			jump_v = 0.0
+			airborne = true
+			flying = true
+		elif not airborne:
+			flying = false
 		lift = 0.0
 	match s:
 		State.IDLE:
@@ -3188,6 +3496,21 @@ func _sees(point: Vector3) -> bool:
 	if not likes.has("sight"):
 		return true
 	return Vector2(point.x - position.x, point.z - position.z).length() < float(likes["sight"])
+
+
+# One with wings it can use takes to the air now and then when it has somewhere to go: a short
+# hop on the wing, and down again
+func _flit(delta: float) -> void:
+	if not likes.has("fly") or airborne or lift > 0.0 or not state in FLITS or energy < 25.0 or health < POORLY:
+		return
+	if Vector2(velocity.x, velocity.z).length() > 0.5 and randf() < delta * float(likes["fly"]):
+		hop(flight.x)
+		flying = true
+
+
+# How high up one that flies would perch on a thing in the room (0: it would not, or cannot)
+func _roost(thing: Decor) -> float:
+	return float(ROOSTS.get(thing.kind, 0.0)) if likes.has("fly") else 0.0
 
 
 # Nothing pressing: pick something to do
@@ -3442,14 +3765,31 @@ func _think(delta: float) -> void:
 				return
 			var at := visiting.position
 			gaze = at + Vector3(0, 0.3, 0)
+			var roost := _roost(visiting)
 			if step == 0:
-				var near := 0.2 if visiting.hollow else visiting.radius + 0.28 * grow
+				var near := 0.2 if visiting.hollow and roost <= 0.0 else visiting.radius + 0.28 * grow
 				if _steer(at, WALK * 1.2, delta, near) or state_time > 7.0:
 					step = 1
 					state_time = 0.0
 					state_len = randf_range(4.0, 7.5)
 					if visiting.kind == Decor.Kind.ROCK:
 						hop(2.6)
+			elif roost > 0.0:
+				# Flies up and perches on top of it
+				_halt(delta)
+				var up := 1.0 - exp(-delta * 3.5)
+				position.x = lerpf(position.x, at.x, up)
+				position.z = lerpf(position.z, at.z, up)
+				lift = lerpf(lift, roost, up)
+				flying = roost - lift > 0.06
+				sit_goal = 1.0
+				gaze = world.camera.global_position
+				_face(gaze, delta)
+				if state_time > state_len:
+					fun = minf(fun + 1.5, 100.0)
+					if visiting.kind in like_decor:
+						love = minf(love + 0.3, 100.0)
+					_enter(State.IDLE, 1.0)
 			else:
 				_halt(delta)
 				match visiting.kind:
@@ -4382,7 +4722,7 @@ func _move(delta: float) -> void:
 				var room := thing.radius + 0.2 * grow
 				# Not the shelter it is tucked into, nor the rock it is sat on (and the pool is not
 				# a thing to walk round: see below)
-				if (thing.hollow and state in [State.SLEEP, State.GO_SLEEP, State.MOVE_NEST]) or (thing == visiting and state in [State.LURK, State.VISIT]) or thing.kind == Decor.Kind.POOL:
+				if (thing.hollow and state in [State.SLEEP, State.GO_SLEEP, State.MOVE_NEST]) or (thing == visiting and state in [State.LURK, State.VISIT]) or thing.kind == Decor.Kind.POOL or knack.through(thing):
 					continue
 				_keep_off(thing.position, room, delta)
 			# And round what has been left on the floor, unless it is busy adding to it
@@ -4401,11 +4741,12 @@ func _move(delta: float) -> void:
 		position.x = kept.x
 		position.z = kept.z
 	if airborne:
-		jump_v -= gravity * delta
+		jump_v -= gravity * (flight.y if flying else 1.0) * delta
 		jump_y += jump_v * delta
 		if jump_y <= 0.0:
 			jump_y = 0.0
 			airborne = false
+			flying = false
 			squash_v = 3.2
 	position.y = jump_y + lift + _sunk() - dive
 	rotation.y = yaw
@@ -4561,7 +4902,10 @@ func _animate(delta: float) -> void:
 	squash_v += (-squash * 140.0 - squash_v * 11.0) * delta
 	squash = clampf(squash + squash_v * delta, -0.3, 0.4)
 	var breath := sin(anim_t * (1.3 if curl > 0.5 else 2.6)) * (0.03 if curl > 0.5 else 0.012)
-	torso.position.y = stand * (1.0 - sit * 0.3 - curl * 0.7) + absf(sin(phase)) * 0.05 * gait - sit * 0.1 - curl * 0.15 + hover * (1.0 - curl) * (1.0 + sin(anim_t * 2.2) * 0.22)
+	# (one that is all legs does not fold up to sit, and comes right down to the floor to sleep)
+	var sat := sit * sits
+	var low := crouch * curl
+	torso.position.y = stand * (1.0 - sat * 0.3 - curl * 0.7) + absf(sin(phase)) * 0.05 * gait - sat * 0.1 - curl * 0.15 - low + hover * (1.0 - curl) * (1.0 + sin(anim_t * 2.2) * 0.22)
 	torso.rotation.x = gait * minf(speed, 3.5) * 0.07 + curl * 0.12 + stoop * gait
 	if glances:
 		# Now and then as it walks off it looks back over its shoulder, the one nearer whoever is
@@ -4581,9 +4925,12 @@ func _animate(delta: float) -> void:
 		torso.scale.z *= 1.0 + sin(phase * 2.0) * heave * gait
 		torso.rotation.x -= maxf(sin(phase * 2.0), 0.0) * heave * 1.6 * gait
 
-	var fold := sit * 1.3 + curl * 1.35
-	legs[0].rotation.x = swing * 0.9 - fold
-	legs[1].rotation.x = -swing * 0.9 - fold
+	var fold := sat * 1.3 + curl * 1.35
+	legs[0].rotation.x = swing * stride - fold
+	legs[1].rotation.x = -swing * stride - fold
+	if crouch > 0.0:
+		for leg in legs:
+			leg.position.y = hip - low - curl * 0.15
 	if lift > 0.05:
 		# Feet off the floor: they pedal
 		legs[0].rotation.x = sin(anim_t * 9.0) * 0.6
@@ -4668,7 +5015,8 @@ func _animate(delta: float) -> void:
 	# the neck round, a little behind it
 	for i in flaps.size():
 		var side := -1.0 if i == 0 else 1.0
-		flaps[i].rotation.y = side * (0.2 + sin(anim_t * flap_rate * (1.6 if airborne else 1.0)) * flap_reach)
+		var aloft := airborne or flying
+		flaps[i].rotation.y = side * (0.2 + sin(anim_t * flap_rate * (flap_air if aloft else 1.0)) * flap_reach * (flap_far if aloft else 1.0))
 	for i in heads.size():
 		var side := -1.0 if i == 0 else 1.0
 		var turn := Vector3(head_pitch * 0.8 + nod * 0.7 + hang, head_yaw * 0.6 + 0.6 * side, head_roll - 0.15 * side)
@@ -4780,7 +5128,8 @@ func _build_insides() -> void:
 	var bones := long_bones.duplicate()
 	if bones.is_empty():
 		for limb in (arms if decoy != null else legs + arms):
-			bones.append([limb, 0.16, Vector3(0, -0.09, 0), Vector3.ZERO])
+			var long := shin if limb in legs else 0.16
+			bones.append([limb, long, Vector3(0, -0.01 - long * 0.5, 0), Vector3.ZERO])
 	for b in bones:
 		insides.append(_part(b[0], _capsule(0.012, b[1]), white, b[2], Vector3.ONE, b[3]))
 

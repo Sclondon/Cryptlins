@@ -3,7 +3,7 @@ extends SceneTree
 ## the pool and the kinds that need one,
 ## the lamp, petting, calling, sleep, time passing while away, the scanner, the notebook and
 ## sending it off for a new egg.
-## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]
+## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..22]
 ## (touches are sent as window pixels, like a real finger)
 
 # The save this run uses: one for each kind, so that several can be run at once
@@ -1296,7 +1296,7 @@ func _run() -> void:
 	check(pet.legs.size() == 2 and pet.eyes.size() >= 1, "a cryptlin is built")
 	check(pet.nature != pet.nature2 and pet.nature_name().contains(", "), "with two natures (%s)" % pet.nature_name())
 	_looks(pet)
-	if pet.likes.has("dig"):
+	if pet.likes.has("sight"):
 		_digger(pet)
 	if pet.likes.has("print"):
 		await _tracker(pet)
