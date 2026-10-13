@@ -322,6 +322,10 @@ func _process(delta: float) -> void:
 		var away := Vector2(position.x - world.light_point.x, position.z - world.light_point.z).length()
 		if away < 1.8:
 			warmth += delta * 1.1 * world.lamp_warmth()
+		# One asleep beside it broods it, wherever the lamp is
+		for pet in world.pets():
+			if pet.state == Cryptlin.State.SLEEP and pet.position.distance_to(position) < 0.7:
+				warmth += delta * 0.8
 		warmth = minf(warmth, 100.0)
 		if warmth >= 100.0:
 			hatching = 0.0

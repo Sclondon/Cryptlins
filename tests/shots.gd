@@ -237,6 +237,32 @@ func _run_many() -> void:
 	await _wait(1.6)
 	await _snap("n4_after")
 	await _wait(2.5)
+	# Two that are fond of each other pairing off, caught at it, and the egg that turns up in the
+	# nest (they are made a happy pair for the picture, and the hours are skipped)
+	for pet: Cryptlin in [all[0], all[1]]:
+		pet.set_needs({"belly": 90.0, "energy": 90.0, "health": 100.0})
+		pet.comfort = 90.0
+		pet.fav_ground = main.floor_style
+		pet.fav_lamp = main.lamp_mode
+		pet.fight_cooldown = 999.0
+		pet._enter(Cryptlin.State.IDLE, 30.0)
+	main.warm(all[0], all[1], 100.0)
+	main.warm(all[1], all[0], 100.0)
+	all[0].position = Vector3(-0.6, 0, 0.8)
+	all[1].position = Vector3(0.5, 0, 0.8)
+	all[2].position = Vector3(1.5, 0, -0.8)
+	all[2]._enter(Cryptlin.State.STARE)
+	all[0].meet(Cryptlin.State.PAIR, all[1])
+	await _until(func() -> bool: return all[0].step == 1, 8.0)
+	await _wait(1.0)
+	await _snap("p1_pair")
+	all[0].caught()
+	await _wait(0.8)
+	await _snap("p2_caught")
+	await _until(func() -> bool: return all[0].state != Cryptlin.State.PAIR, 5.0)
+	main.paired(all[0], all[1], Den.EGG_HOURS * 3600.0)
+	await _wait(1.2)
+	await _snap("p3_egg")
 	# A poorly one, and the end of it: lying still, the ghost going up, and the marker it leaves
 	all[2].set_needs({"health": 25.0, "belly": 30.0})
 	all[2].flash_time = 0.0

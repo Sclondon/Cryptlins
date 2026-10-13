@@ -129,6 +129,27 @@ marker is a thing in the room like any other (drag it about, drag it down to the
 bring it back out; the others will go and sit by it) but it is never bought or sold: it is on the row only while one
 is put away. Its page stays in the notebook, after those of the living and marked as gone: what it was, how long it
 lived, and what was ever found out about it. One that died while the game was shut is found lying there when it is
+
+## Pairing off
+
+Two **grown** cryptlins that both think well of each other (70 or more, each of the other), both fed, well, rested
+and at home in the room, will now and then pair off. One goes over to the other, clambers up on it and gives it the
+same foolish full-body wiggle a nest gets, hearts and all; that is all there is to see, and they stop dead, mortified,
+if the keeper taps one, calls them, picks one up, scans one or changes the lamp, in which case nothing comes of it.
+Left to it, one of the two lays an egg in the nest six hours later by the clock (`EGG_HOURS`), if the room has space
+for one more by then; in a full room nothing is laid. One asleep beside an egg broods it. Neither pairs again for
+three days (`PAIR_REST_DAYS`); with the game shut, a pair that would takes eight hours or so on average to get round
+to it (`PAIR_AWAY_HOURS`). So a happy pair makes an egg about every three or four days, and what each thinks of the
+other and the room's four places are the brakes.
+
+`Den.would_pair()` is the one gate, and every way into the pairing goes through it (`Cryptlin._enter` turns away
+anything else): never a baby, in either place; never unless each thinks well of the other, so that one being willing
+is not enough; never close kin, which is a parent with its own young or two with a parent in common (each resident
+has a number, and those of its two parents).
+
+The egg is of the kind of one parent (there are no cross-bred bodies). What hatches wears the coat of the other
+parent and has the first of its two natures from one of them; the rest of its look and its tastes come from a seed
+mixed out of both of theirs. Its page in the notebook names its parents.
 next opened, and goes then. Nothing dies of old age.
 Phone-first: on an upright phone the room is narrow, deep and tall with the lamp near the top of the screen, the
 row of things is bigger, touch targets are generous, and nothing needs a keyboard or hover.
@@ -153,7 +174,11 @@ odd-sized eyes, its natures and its tastes.
   keeps of it), `pets()` the cryptlins among them, and `who()` the one in question when a single one is meant (the
   one last tapped or scanned, or else the eldest). `comfort_of()` is how well the room suits a cryptlin; `learned()`
   is told when one has shown one of its tastes. The save is version 3 (`residents` is a list); a version 2 save, of
-  one cryptlin or one egg, loads as a room with that one in it.
+  one cryptlin or one egg, loads as a room with that one in it. Each resident in the list holds `id`, `name`,
+  `kind`, `seed`, `hatched`, `born`, `warmth`, `at`, `needs` (health among them), `known`, `regard` (what it thinks
+  of each of the others, by their ids), `parents` and `parent_names`, `fur` and `nature` (what it has from them),
+  `paired` and `expecting` (when it last paired off, and the egg due as a result); `gone` holds the same for those
+  that have died, with `died` and `lived`, and `markers` the grave markers that are put away.
 - `scripts/shelf.gd`: the row of things along the bottom, its own little 3D picture with nothing behind it.
   `scripts/items.gd` lists what can be on it; inside a site that keeps a shop, only what comes free and what has been
   bought.
@@ -182,7 +207,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, how they get on and fall out, health and dying, old saves, eggs as stock
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, or of three sharing the room
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, or of three sharing the room (and falling out, pairing off, and one of them dying)
 godot --headless --path . --export-release Web build/index.html
 ```

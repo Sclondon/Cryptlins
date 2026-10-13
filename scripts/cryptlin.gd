@@ -9,7 +9,7 @@ enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
 	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED, INSPECT, SCANNED, VISIT, MOVE_NEST,
 	TOILET, FOND, SCRATCH, STRETCH, DIG, SPIN, GAZE,
-	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED, DYING,
+	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED, DYING, PAIR,
 }
 # The cryptids they are the young of
 enum Kind {
@@ -217,6 +217,8 @@ var world: Den
 var me: Resident
 var kind: int = Kind.GREMLIN
 var look_seed := 1
+# The colour of its coat (see colours(); one bred here has a parent's)
+var fur_colour := Color.WHITE
 
 # Set from KINDS and the body that was built
 var pace := 1.0
@@ -337,6 +339,8 @@ var food_cooldown := 0.0
 # and how long before it can come to blows again
 var partner: Cryptlin
 var fight_cooldown := 20.0
+# In a pairing, the one that was gone over to (it stands and waits for the other)
+var waiting := false
 var beg_cooldown := 6.0
 var pounce_cooldown := 0.0
 var last_stroke := -10.0
@@ -455,6 +459,17 @@ static func profile(k: int, s: int) -> Dictionary:
 	return me
 
 
+# The two natures of one of this kind and seed. One bred in the room has the first of them from
+# a parent (`given`), and keeps the second it would have had unless the two will not go together.
+static func natures(k: int, s: int, given := -1) -> Array[int]:
+	var drawn := profile(k, s)
+	var first: int = drawn["nature"] if given < 0 else given
+	var second: int = drawn["nature2"]
+	while second == first or [mini(second, first), maxi(second, first)] in OPPOSED:
+		second = (second + 1) % NATURES.size()
+	return [first, second]
+
+
 # The fur and eye colour a kind and seed give (the egg shows the eye before it hatches)
 static func colours(k: int, s: int) -> Array[Color]:
 	var rng := RandomNumberGenerator.new()
@@ -474,17 +489,19 @@ func _build() -> void:
 	spring = traits["spring"]
 	voice = traits["voice"]
 	likes = traits.duplicate()
-	var me := profile(kind, look_seed)
-	nature = me["nature"]
-	fav_food = me["food"]
-	yuck_food = me["yuck"]
-	fav_toy = me["toy"]
-	adult_size = me["size"]
-	nature2 = me["nature2"]
-	like_decor.assign(me["decor"])
-	hate_decor = me["hates"]
-	fav_ground = me["ground"]
-	fav_lamp = me["lamp"]
+	var drawn := profile(kind, look_seed)
+	nature = drawn["nature"]
+	fav_food = drawn["food"]
+	yuck_food = drawn["yuck"]
+	fav_toy = drawn["toy"]
+	adult_size = drawn["size"]
+	var both := natures(kind, look_seed, me.nature if me != null else -1)
+	nature = both[0]
+	nature2 = both[1]
+	like_decor.assign(drawn["decor"])
+	hate_decor = drawn["hates"]
+	fav_ground = drawn["ground"]
+	fav_lamp = drawn["lamp"]
 	for mine: Dictionary in [NATURES[nature], NATURES[nature2]]:
 		hunger *= float(mine.get("hunger", 1.0))
 		tire *= float(mine.get("tire", 1.0))
@@ -504,7 +521,10 @@ func _build() -> void:
 	var picked := colours(kind, look_seed)
 	rng.randi()
 	rng.randi()
-	var fur_colour := picked[0]
+	fur_colour = picked[0]
+	# One bred here wears the colour of one of its parents, and has a nature of one of them
+	if me != null and me.fur != "":
+		fur_colour = Color.html(me.fur)
 	var eye_colour := picked[1]
 	var ear_len := rng.randf_range(0.34, 0.52)
 	var chub := rng.randf_range(0.94, 1.14)
@@ -2026,19 +2046,30 @@ func _fancies() -> bool:
 	return world.left_alone() > 20.0
 
 
-# Come upon at it: it stops dead, and stares, and wishes the floor would open. True if it was.
+# Come upon at it (over-fond of its nest, or paired off with another, when the other is caught
+# too): it stops dead, and stares, and wishes the floor would open. True if it was.
 func caught() -> bool:
-	if state != State.FOND or step != 1:
+	if not state in [State.FOND, State.PAIR] or step == 0:
 		return false
+	# (caught already, and still wishing it)
+	if step == 2:
+		return true
+	if state == State.PAIR and _has_partner() and partner.state == State.PAIR and partner.step == 1:
+		partner._mortified()
+	_mortified()
+	return true
+
+
+func _mortified() -> void:
 	step = 2
 	state_time = 0.0
 	lift = 0.0
 	wiggle = 0.0
 	nod = 0.0
 	arm_goal = REST_ARM
+	hearts.emitting = false
 	feel(Feeling.SCARED, 3.5)
 	_cry("squeak", 1.2)
-	return true
 
 
 # What it leaves behind takes after it a little
@@ -2149,6 +2180,11 @@ func _enter(s: int, length := 0.0) -> void:
 	# (a baby has no such notions)
 	if s == State.FOND and is_baby():
 		s = State.IDLE
+	# Nor is one ever any part of a pairing, which is for two grown ones that are both willing
+	# and no kin (see Den.would_pair): there is no other way into it than this
+	if s == State.PAIR and (not _has_partner() or not world.would_pair(self, partner)):
+		s = State.IDLE
+	waiting = false
 	if state == State.PETTED and s != State.PETTED:
 		world.sfx.purr(false)
 	hearts.emitting = false
@@ -2271,6 +2307,10 @@ func _enter(s: int, length := 0.0) -> void:
 			wag = 0.0
 			velocity = Vector3.ZERO
 			_cry("whimper", 0.7, -6.0)
+		State.PAIR:
+			fond_cooldown = randf_range(300.0, 900.0)
+			kicks = 0
+			wag = 8.0
 		State.COWED:
 			droop_goal = 0.9
 			wag = 1.0
@@ -2359,6 +2399,9 @@ func _decide() -> void:
 			options[State.FOLLOW] = 5.0 * (1.6 if _is(4) or is_baby() else 1.0)
 		if world.regard(self, other) >= 45.0 and energy > 40.0 and other.energy > 30.0:
 			options[State.TAG] = 5.0 * float(likes["zoom"]) * (1.5 if _is(1) else 1.0)
+		# Now and then, two grown ones that are fond of each other and want for nothing
+		if fond_cooldown <= 0.0 and world.would_pair(self, other):
+			options[State.PAIR] = 4.0
 	var total := 0.0
 	for w: float in options.values():
 		total += w
@@ -2369,7 +2412,7 @@ func _decide() -> void:
 			if s == State.WANDER:
 				var a := randf() * TAU
 				target = Den.in_room(Vector3(randf_range(-9.0, 9.0), 0, randf_range(-9.0, 9.0)).limit_length(Den.half.length()), 0.4)
-			if s in [State.SNIFF, State.FOLLOW, State.TAG]:
+			if s in [State.SNIFF, State.FOLLOW, State.TAG, State.PAIR]:
 				meet(s, other)
 			else:
 				_enter(s)
@@ -2742,6 +2785,8 @@ func _think(delta: float) -> void:
 			velocity = Vector3.ZERO
 			if world.scuffle == null:
 				_enter(State.IDLE, 1.0)
+		State.PAIR:
+			_pair(delta)
 		State.COWED:
 			_cowed(delta)
 		State.SCRATCH:
@@ -3083,11 +3128,16 @@ func _someone() -> Cryptlin:
 	return free.pick_random() if not free.is_empty() else null
 
 
-# Takes up with another: to sniff at it, to follow it about, or to chase it (which sets the
+# Takes up with another: to sniff at it, to follow it about, to pair off with it (if they both
+# will: see _enter), or to chase it (which sets the
 # other running)
 func meet(s: int, other: Cryptlin) -> void:
 	partner = other
 	_enter(s)
+	if s == State.PAIR and state == State.PAIR:
+		other.partner = self
+		other._enter(State.PAIR)
+		other.waiting = true
 	if s == State.TAG:
 		other.partner = self
 		other._enter(State.FLEE)
@@ -3270,6 +3320,69 @@ func _cowed(delta: float) -> void:
 			_face(partner.position, delta)
 		if state_time > 3.0:
 			_enter(State.IDLE, 1.5)
+
+
+# Two grown ones that think well of each other pairing off, out in the open: the one that went
+# over clambers up on the other and gives it the same foolish wiggle a nest gets (see FOND),
+# hearts and all, and both are mortified if they are caught at it. That is all there is to see.
+func _pair(delta: float) -> void:
+	if not _has_partner() or partner.state != State.PAIR:
+		_enter(State.IDLE, 1.0)
+		return
+	if step == 2:
+		# Seen: stock still, staring at you, ears down
+		_halt(delta)
+		gaze = world.camera.global_position
+		_face(gaze, delta)
+		eye_goal = 1.25
+		droop_goal = 1.0
+		if state_time > 3.0:
+			_enter(State.IDLE, 1.0)
+		return
+	gaze = partner.global_position + Vector3(0, partner.tall() * 0.6, 0)
+	if step == 0:
+		if waiting:
+			# The one gone over to: it stays where it is and watches the other come
+			_halt(delta)
+			_face(partner.position, delta)
+			wag = 10.0
+		elif _steer(partner.position, WALK * 1.2, delta, 0.34 * (grow + partner.grow)) or state_time > 8.0:
+			for both: Cryptlin in [self, partner]:
+				both.step = 1
+				both.state_time = 0.0
+				both.state_len = randf_range(4.0, 6.0)
+				both.feel(Feeling.LOVING, 6.0)
+				both.hearts.emitting = true
+		return
+	_halt(delta)
+	eye_goal = 0.35
+	droop_goal = 0.6
+	wag = 14.0
+	if waiting:
+		wiggle = sin(anim_t * 19.0 + 1.0) * 0.05
+	else:
+		# Up on the other and giving it everything, eyes half shut
+		var near := 1.0 - exp(-delta * 8.0)
+		var behind := partner.position - Vector3(sin(partner.yaw), 0, cos(partner.yaw)) * 0.12 * partner.grow
+		position.x = lerpf(position.x, behind.x, near)
+		position.z = lerpf(position.z, behind.z, near)
+		yaw = rotate_toward(yaw, partner.yaw, delta * 6.0)
+		lift = lerpf(lift, partner.centre_y * partner.grow * 0.55, near)
+		arm_goal = BELLY_ARM
+		wiggle = sin(anim_t * 19.0) * 0.13
+		nod = 0.25 + sin(anim_t * 19.0) * 0.06
+		if int(state_time / 0.33) > kicks:
+			kicks = int(state_time / 0.33)
+			squash_v = 2.2
+			partner.squash_v = 1.2
+		if state_time > state_len:
+			var other := partner
+			world.paired(self, other)
+			for both: Cryptlin in [self, other]:
+				both.fun = minf(both.fun + 6.0, 100.0)
+				both._cry("coo", 0.9)
+				both._enter(State.IDLE, 1.5)
+				both.eye_goal = 0.5
 
 
 # ---------------------------------------------------------------- moving

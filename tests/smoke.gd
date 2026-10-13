@@ -126,6 +126,26 @@ func _settled(pet: Cryptlin) -> bool:
 	return pet.state in Cryptlin.INTERRUPTIBLE and not pet.airborne
 
 
+# Two cryptlins made grown, fed, well, at home and fond of each other: a pair that would pair off
+func _content(one: Cryptlin, mate: Cryptlin) -> void:
+	for p: Cryptlin in [one, mate]:
+		p.set_needs({"belly": 90.0, "energy": 90.0, "fun": 70.0, "health": 100.0, "age": Cryptlin.GROW_AGE, "bowel": 0.0, "bladder": 0.0})
+		p.grow = p.adult_size
+		p.fav_ground = main.floor_style
+		p.fav_lamp = main.lamp_mode
+		p.hate_decor = Decor.Kind.DISH
+		p.comfort = main.comfort_of(p)
+		p.fight_cooldown = 9999.0
+		p.fond_cooldown = 9999.0
+		p.me.paired = 0.0
+		p.me.expecting = {}
+		p._enter(Cryptlin.State.IDLE, 30.0)
+	one.position = Vector3(-0.7, 0, 0.6)
+	mate.position = Vector3(0.7, 0, 0.6)
+	main.warm(one, mate, 90.0 - main.regard(one, mate))
+	main.warm(mate, one, 90.0 - main.regard(mate, one))
+
+
 func _run() -> void:
 	# The egg
 	await _frames(5)
@@ -719,8 +739,8 @@ func _run() -> void:
 	for m in main.messes.duplicate():
 		main.clear_mess(m)
 	var thing_one: int = one.like_decor[0]
-	if main.decor_of(thing_one) != null:
-		main.remove_decor(main.decor_of(thing_one))
+	for d in main.decors.duplicate():
+		main.remove_decor(d)
 	var home_one := main.comfort_of(one)
 	var home_two := main.comfort_of(two)
 	main.place_decor(thing_one, Vector3(-1.4, 0, -1.0))
@@ -1010,6 +1030,164 @@ func _run() -> void:
 	await _restart()
 	one = main.residents[0].pet
 	check(main.departed.size() == 2 and main.departed[1].name == late and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.MARKER and d.whose > 0).size() == 2, "the markers and the pages are kept")
+
+	# Pairing off: two grown ones that think well of each other and want for nothing
+	main.new_egg().egg.warmth = 100.0
+	check(await _until(func() -> bool: return main.pets().size() == 2, 400), "another hatches, to keep the one that is left company")
+	await _frames(40)
+	var mate: Cryptlin = main.residents[1].pet
+	# (a room that suits them both: whatever each has is what it likes, and water for a water kind)
+	if (one.needs_water() or mate.needs_water()) and main.decor_of(Decor.Kind.POOL) == null:
+		main.place_decor(Decor.Kind.POOL, Vector3(1.6, 0, -1.4))
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	_content(one, mate)
+	check(one.comfort >= 55.0 and mate.comfort >= 55.0 and main.would_pair(one, mate) and main.would_pair(mate, one), "a happy grown pair would pair off")
+	# The hard limits. A baby is never any part of it, whichever of the two it is
+	mate.age = 0.0
+	check(not main.would_pair(one, mate) and not main.would_pair(mate, one), "never with a baby")
+	one.meet(Cryptlin.State.PAIR, mate)
+	check(one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  not if the grown one goes to it")
+	mate.meet(Cryptlin.State.PAIR, one)
+	check(one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  nor if it goes to the grown one")
+	mate.partner = one
+	mate._enter(Cryptlin.State.PAIR)
+	one.partner = mate
+	one._enter(Cryptlin.State.PAIR)
+	check(one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  nor by being put straight into it")
+	one.age = 0.0
+	one.meet(Cryptlin.State.PAIR, mate)
+	check(not main.would_pair(one, mate) and one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  nor two babies")
+	main.pass_time(40.0 * 3600.0)
+	check(one.me.expecting.is_empty() and mate.me.expecting.is_empty() and one.me.paired == 0.0, "  nor while nobody is looking")
+	# It takes both: one that is willing and one that is not do not pair
+	_content(one, mate)
+	main.warm(mate, one, -50.0)
+	check(main.regard(one, mate) >= Den.PAIR_REGARD and not main.would_pair(one, mate) and not main.would_pair(mate, one), "never unless each thinks well of the other: one willing is not enough")
+	one.meet(Cryptlin.State.PAIR, mate)
+	check(one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  the willing one cannot start it")
+	mate.meet(Cryptlin.State.PAIR, one)
+	check(one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  and the other does not")
+	main.pass_time(3600.0)
+	check(one.me.expecting.is_empty() and mate.me.expecting.is_empty(), "  nor while nobody is looking")
+	# Never close kin: a parent and its young, or two with a parent in common
+	_content(one, mate)
+	mate.me.parents = [one.me.id, 9001]
+	check(main.kin(one.me, mate.me) and not main.would_pair(one, mate) and not main.would_pair(mate, one), "never a parent with its own young")
+	one.meet(Cryptlin.State.PAIR, mate)
+	mate.meet(Cryptlin.State.PAIR, one)
+	check(one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  whichever goes to which")
+	mate.me.parents = [9001, 9002]
+	one.me.parents = [9003, 9001]
+	check(main.kin(one.me, mate.me) and not main.would_pair(one, mate), "nor two with a parent in common")
+	one.meet(Cryptlin.State.PAIR, mate)
+	check(one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, "  who do not")
+	main.pass_time(3600.0)
+	check(one.me.expecting.is_empty() and mate.me.expecting.is_empty(), "  nor while nobody is looking")
+	mate.me.parents = []
+	one.me.parents = []
+	# Nor one that is hungry or poorly
+	_content(one, mate)
+	mate.belly = 30.0
+	check(not main.would_pair(one, mate), "nor when one of them is hungry")
+	_content(one, mate)
+	one.health = 50.0
+	check(not main.would_pair(one, mate), "nor when one of them is poorly")
+	# A pair that would: out in the open, and mortified to be caught at it
+	_content(one, mate)
+	one.meet(Cryptlin.State.PAIR, mate)
+	check(one.state == Cryptlin.State.PAIR and mate.state == Cryptlin.State.PAIR and mate.waiting and not one.waiting, "a pair that would: one goes over to the other")
+	check(await _until(func() -> bool: return one.step == 1 and mate.step == 1 and one.lift > 0.1, 900) and one.feeling == Cryptlin.Feeling.LOVING, "and clambers up on it, all hearts")
+	await _tap(_screen(mate.body_centre()))
+	check(one.state == Cryptlin.State.PAIR and one.step == 2 and mate.step == 2 and one.feeling == Cryptlin.Feeling.SCARED and mate.feeling == Cryptlin.Feeling.SCARED and one.lift == 0.0, "a tap and they both stop dead, mortified")
+	check(await _until(func() -> bool: return one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, 400) and one.me.expecting.is_empty() and mate.me.expecting.is_empty() and one.me.paired == 0.0, "and nothing comes of it")
+	for way in 3:
+		_content(one, mate)
+		await _frames(2)
+		one.meet(Cryptlin.State.PAIR, mate)
+		await _until(func() -> bool: return one.step == 1, 900)
+		await _frames(20)
+		match way:
+			0: main.call_all(Vector3(0, 0, 1.2))
+			1: main.set_lamp(Den.Lamp.LOW if main.lamp_mode != Den.Lamp.LOW else Den.Lamp.BRIGHT)
+			2: main.start_scan(mate.me)
+		check(one.step == 2 and mate.step == 2 and one.state == Cryptlin.State.PAIR, "%s stops them too" % ["calling them", "changing the lamp", "the scanner"][way])
+		main.stop_scan()
+		await _until(func() -> bool: return _settled(one) and _settled(mate), 900)
+	# Left to it, an egg is on the way, and is laid in the nest some hours later
+	_content(one, mate)
+	await _frames(2)
+	one.meet(Cryptlin.State.PAIR, mate)
+	check(await _until(func() -> bool: return one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, 1500), "left to it, they are soon done")
+	var layer := one if not one.me.expecting.is_empty() else mate
+	check(one.me.expecting.is_empty() != mate.me.expecting.is_empty() and one.me.paired > 0.0 and mate.me.paired > 0.0, "and one of them has an egg on the way")
+	check(is_equal_approx(float(layer.me.expecting["due"]) - layer.me.paired, Den.EGG_HOURS * 3600.0) and main.residents.size() == 2, "due in %d hours, and not before" % int(Den.EGG_HOURS))
+	check(not main.would_pair(one, mate), "they do not pair again for days")
+	await _restart()
+	one = main.residents[0].pet
+	mate = main.residents[1].pet
+	layer = one if not one.me.expecting.is_empty() else mate
+	check(not layer.me.expecting.is_empty() and main.residents.size() == 2, "the egg on the way is kept in the save")
+	# (the clock is put back for the test by moving what the save holds: the egg is due by the
+	# clock on the wall, so that is moved too)
+	layer.me.expecting["due"] = float(layer.me.expecting["due"]) - Den.EGG_HOURS * 3600.0 - 60.0
+	await _come_back_after(Den.EGG_HOURS * 3600.0 + 60.0)
+	one = main.residents[0].pet
+	mate = main.residents[1].pet
+	check(main.residents.size() == 3 and main.residents[2].egg != null and one.me.expecting.is_empty() and mate.me.expecting.is_empty(), "when the hours have gone by there is an egg")
+	var young := main.residents[2]
+	check(young.egg.position.distance_to(main.nest_pos) < 0.4, "in the nest")
+	check(young.kind in [one.kind, mate.kind] and young.parents == [one.me.id, mate.me.id] and young.id != one.me.id and young.id != mate.me.id, "of the kind of one of its parents, with both of them written down")
+	main.chosen = young
+	main.notebook.open()
+	check(main.notebook.body.text.contains(one.me.name) and main.notebook.body.text.contains(mate.me.name), "and named on its page in the notebook")
+	main.notebook.close()
+	# One asleep by an egg keeps it warm
+	var brooded := young.egg.warmth
+	main.set_lamp(Den.Lamp.OFF)
+	one.position = main.nest_pos + Vector3(0.3, 0, 0)
+	one._enter(Cryptlin.State.SLEEP)
+	await _frames(120)
+	check(young.egg.warmth > brooded + 1.0, "one asleep beside the egg broods it, lamp or no lamp")
+	main.set_lamp(Den.Lamp.BRIGHT)
+	young.egg.warmth = 100.0
+	check(await _until(func() -> bool: return young.pet != null, 400), "it hatches")
+	var child := young.pet
+	check(child.kind in [one.kind, mate.kind] and child.is_baby(), "into a baby of a parent's kind (%s)" % child.kind_name())
+	check(child.fur_colour.to_html(false) in [one.fur_colour.to_html(false), mate.fur_colour.to_html(false)], "in the coat of one of them")
+	check(child.nature in [one.nature, mate.nature] and child.nature != child.nature2, "with a nature from one of them (%s)" % child.nature_name())
+	check(main.notebook._notes(child).contains("Its parents are %s and %s" % [one.me.name, mate.me.name]), "and its page records its parents")
+	# Grown, it is still their young, and the room has its limit
+	child.set_needs({"belly": 90.0, "energy": 90.0, "health": 100.0, "age": Cryptlin.GROW_AGE})
+	child.fav_ground = main.floor_style
+	child.fav_lamp = main.lamp_mode
+	child.hate_decor = Decor.Kind.DISH
+	child.comfort = 90.0
+	_content(one, mate)
+	main.warm(child, one, 95.0 - main.regard(child, one))
+	main.warm(one, child, 95.0 - main.regard(one, child))
+	check(not child.is_baby() and main.regard(one, child) >= Den.PAIR_REGARD and not main.would_pair(one, child) and not main.would_pair(child, mate), "grown up and fond of them, it is still their young: never")
+	child.meet(Cryptlin.State.PAIR, one)
+	check(child.state != Cryptlin.State.PAIR and one.state != Cryptlin.State.PAIR, "  whoever starts it")
+	# With nobody looking, a happy pair gets round to it in a day or so; a full room has no egg
+	main.new_egg()
+	check(main.residents.size() == Den.MAX_RESIDENTS, "the room is full")
+	one.me.paired = 0.0
+	mate.me.paired = 0.0
+	for day in 6:
+		if one.me.paired > 0.0:
+			break
+		_content(one, mate)
+		main.pass_time(24.0 * 3600.0)
+	# (if the egg is still on the way, its time comes)
+	for r in main.residents:
+		if not r.expecting.is_empty():
+			r.expecting["due"] = 0.0
+	main._lay_due()
+	check(one.me.expecting.is_empty() and mate.me.expecting.is_empty() and one.me.paired > 0.0 and main.residents.size() == Den.MAX_RESIDENTS, "with nobody looking a happy pair gets round to it, but a full room gets no egg")
+	check(child.me.paired == 0.0 and child.me.expecting.is_empty(), "and their young had no part in it")
+	await _restart()
+	check(main.residents[2].parents.size() == 2 and main.residents[2].fur != "" and main.residents[2].nature >= 0 and main.residents[0].paired > 0.0, "parentage and what was inherited are kept in the save")
 
 	# A save from when there was only ever one
 	main.queue_free()

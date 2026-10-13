@@ -27,6 +27,16 @@ var leaving := false
 # Once it has died: when (unix time), and how long it lived, in seconds
 var died := 0.0
 var lived := 0.0
+# One bred in the room: the numbers and names of its two parents, the colour of coat it has from
+# one of them (as html; "" for its own) and the nature it has from one of them (-1 for its own)
+var parents: Array[int] = []
+var parent_names: Array[String] = []
+var fur := ""
+var nature := -1
+# When it last paired off (unix time), and the egg it is to lay as a result: {"due": when,
+# "egg": what the save would hold of that egg}
+var paired := 0.0
+var expecting := {}
 
 
 # The thing itself in the room, egg or cryptlin
@@ -52,6 +62,12 @@ func to_save() -> Dictionary:
 		"regard": regard,
 		"died": died,
 		"lived": lived,
+		"parents": parents,
+		"parent_names": parent_names,
+		"fur": fur,
+		"nature": nature,
+		"paired": paired,
+		"expecting": expecting,
 		"at": [spot.x, spot.z] if spot != Vector3.INF else [],
 	}
 
@@ -71,6 +87,17 @@ static func from_save(d: Dictionary) -> Resident:
 		r.known = d["known"]
 	r.died = float(d.get("died", 0.0))
 	r.lived = float(d.get("lived", 0.0))
+	if d.get("parents") is Array:
+		for id: Variant in d["parents"]:
+			r.parents.append(int(id))
+	if d.get("parent_names") is Array:
+		for parent: Variant in d["parent_names"]:
+			r.parent_names.append(str(parent))
+	r.fur = str(d.get("fur", ""))
+	r.nature = int(d.get("nature", -1))
+	r.paired = float(d.get("paired", 0.0))
+	if d.get("expecting") is Dictionary:
+		r.expecting = d["expecting"]
 	if d.get("regard") is Dictionary:
 		r.regard = d["regard"]
 	if d.get("at") is Array and d["at"].size() == 2:

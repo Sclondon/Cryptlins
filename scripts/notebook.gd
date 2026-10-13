@@ -22,6 +22,8 @@ They leave droppings. Tap one to clear it up: they spoil the place. Puddles dry 
 
 They do not all get on. Two that have fallen out may fight: a tap on the scuffle breaks it up.
 
+Two grown ones that are fond of each other, fed and at home may pair off, and some hours later there is an egg in the nest, if the room has space for it.
+
 One left hungry for days sickens, and in the end dies.
 
 The scanner on the shelf shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, how well it is, and whether it likes its home. Drag it up onto the one you mean."
@@ -176,9 +178,9 @@ func refresh() -> void:
 		body.text = _notes(pet)
 	elif r != null and r.egg != null:
 		heading.text = "An egg"
-		body.text = "%s.
+		body.text = "%s.%s
 
-Who knows what is inside? Keep it warm and it will hatch." % r.egg.title()
+Who knows what is inside? Keep it warm and it will hatch." % [r.egg.title(), _parents(r, "\nLaid in the nest. Its parents are %s and %s.")]
 	elif r != null:
 		heading.text = "%s, gone" % r.name
 		body.text = _remembrance(r)
@@ -187,10 +189,16 @@ Who knows what is inside? Keep it warm and it will hatch." % r.egg.title()
 		body.text = [CARE, SHELF, HANDS, ODDS][rest]
 
 
+# A line about the parents of one that was bred in the room, or nothing for one that was not
+func _parents(r: Resident, line: String) -> String:
+	return line % r.parent_names if r.parent_names.size() == 2 else ""
+
+
 # The page kept for one that has died: what it was, how long it lived, and as much of its tastes
 # as was ever found out
 func _remembrance(r: Resident) -> String:
 	var was := Cryptlin.profile(r.kind, r.look_seed)
+	var both := Cryptlin.natures(r.kind, r.look_seed, r.nature)
 	var known := r.known
 	var likes: Array[String] = []
 	for kind: int in was["decor"]:
@@ -198,7 +206,7 @@ func _remembrance(r: Resident) -> String:
 			likes.append("the " + Decor.PLAIN[kind])
 	var hated: int = was["hates"]
 	var water := "yes, a pool to wade in" if Cryptlin.KINDS[r.kind].get("water", false) else "no more than a drink"
-	return "A %s, %s %s.
+	return "A %s, %s %s.%s
 It lived %s, and is gone. Its marker stands where it lay.
 
 Loved to eat: %s
@@ -209,7 +217,8 @@ Liked the lamp: %s
 Liked having about: %s
 Couldn't stand: %s
 Needed water: %s" % [
-		Cryptlin.NATURES[was["nature"]]["title"], Cryptlin.NATURES[was["nature2"]]["title"], Cryptlin.KINDS[r.kind]["title"], _span(r.lived),
+		Cryptlin.NATURES[both[0]]["title"], Cryptlin.NATURES[both[1]]["title"], Cryptlin.KINDS[r.kind]["title"], _parents(r, "
+Its parents were %s and %s."), _span(r.lived),
 		Snack.PLURALS[was["food"]] if known.get("food", false) else "?",
 		Snack.PLURALS[was["yuck"]] if known.get("yuck", false) else "?",
 		"the " + Ball.PLAIN[was["toy"]] if known.get("toy", false) else "?",
@@ -235,7 +244,7 @@ func _notes(pet: Cryptlin) -> String:
 	var grown := "Hatched %s ago, and all grown up." % _span(Time.get_unix_time_from_system() - pet.me.born)
 	if pet.is_baby():
 		grown = "Hatched %s ago. Grown in about %s." % [_span(Time.get_unix_time_from_system() - pet.me.born), _span(pet.growing_left())]
-	return "A %s %s%s.
+	return "A %s %s%s.%s
 %s
 Just now it is feeling %s.
 
@@ -249,7 +258,8 @@ Can't stand: %s
 Needs water: %s
 
 What it shows you gets written down here." % [
-		pet.nature_name(), "baby " if pet.is_baby() else "", pet.kind_name(), grown, pet.feeling_name(),
+		pet.nature_name(), "baby " if pet.is_baby() else "", pet.kind_name(), _parents(pet.me, "
+Hatched from an egg laid here. Its parents are %s and %s."), grown, pet.feeling_name(),
 		Snack.PLURALS[pet.fav_food] if open or known.get("food", false) else "?",
 		Snack.PLURALS[pet.yuck_food] if open or known.get("yuck", false) else "?",
 		"the " + Ball.PLAIN[pet.fav_toy] if open or known.get("toy", false) else "?",

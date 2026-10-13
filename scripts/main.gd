@@ -27,6 +27,13 @@ const FIGHT_SOURS := 12.0
 const DUST := Color(0.6, 0.56, 0.5)
 # How many of those that have died the notebook keeps a page for
 const MAX_DEPARTED := 12
+# Pairing off: what each must think of the other, how many days before either will again, how
+# many hours after it the egg is laid, and (with nobody watching) how many hours a pair that
+# would takes to get round to it
+const PAIR_REGARD := 70.0
+const PAIR_REST_DAYS := 3.0
+const EGG_HOURS := 6.0
+const PAIR_AWAY_HOURS := 8.0
 const NAME_HEADS: Array[String] = ["Grub", "Mog", "Snag", "Fizz", "Bork", "Nib", "Skrit", "Womp", "Gloom", "Pim", "Zog", "Murk"]
 const NAME_TAILS: Array[String] = ["nik", "let", "wort", "bo", "gle", "kin", "zle", "by", "mort", "ix"]
 const EGG_SPOT := Vector3(0, 0, 0.3)
@@ -261,6 +268,12 @@ func room_for_more() -> bool:
 # in): each of them lives through it, and is found asleep in the nest if that is how it ended
 func pass_time(seconds: float) -> void:
 	end_fight(true)
+	# A pair that would pair off may well have done, with nobody there to see
+	var all := pets()
+	for i in all.size():
+		for j in range(i + 1, all.size()):
+			if would_pair(all[i], all[j]) and randf() < 1.0 - exp(-seconds / (PAIR_AWAY_HOURS * Cryptlin.HOUR)):
+				paired(all[i], all[j], seconds * randf_range(0.2, 0.8))
 	for pet in pets():
 		if pet.pass_time(seconds, not light_on):
 			pet.position = nest_pos + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.2))
@@ -272,6 +285,7 @@ func pass_time(seconds: float) -> void:
 		for b in pets():
 			if a != b and a.state == Cryptlin.State.SLEEP and b.state == Cryptlin.State.SLEEP and regard(a, b) >= 35.0:
 				warm(a, b, minf(seconds / Cryptlin.HOUR * Cryptlin.SLEEP_WARMS, 4.0))
+	_lay_due()
 	_sync()
 
 
@@ -377,6 +391,86 @@ func end_fight(broken: bool) -> void:
 		winner.feel(Cryptlin.Feeling.GRUMPY, 5.0)
 		loser.beaten(winner)
 	save_game()
+
+
+# ---------------------------------------------------------------- pairing off
+
+# Close kin: one is the other's parent, or they have a parent in common
+func kin(a: Resident, b: Resident) -> bool:
+	if a.id in b.parents or b.id in a.parents:
+		return true
+	for parent in a.parents:
+		if parent in b.parents:
+			return true
+	return false
+
+
+# Whether two cryptlins would pair off, which is the only way an egg is ever come by between
+# them. Both must be grown. Each must think well of the other: one willing is not enough. They
+# must not be close kin. And both must want for nothing: fed, well, rested, at home in the room,
+# and not lately paired nor with an egg on the way.
+func would_pair(a: Cryptlin, b: Cryptlin) -> bool:
+	if a == b or a.is_baby() or b.is_baby():
+		return false
+	if regard(a, b) < PAIR_REGARD or regard(b, a) < PAIR_REGARD:
+		return false
+	if kin(a.me, b.me):
+		return false
+	var now := Time.get_unix_time_from_system()
+	for pet: Cryptlin in [a, b]:
+		if pet.belly < 50.0 or pet.health < 70.0 or pet.energy < 35.0 or pet.comfort < 55.0:
+			return false
+		if not pet.me.expecting.is_empty() or now - pet.me.paired < PAIR_REST_DAYS * 86400.0:
+			return false
+	return true
+
+
+# Two of them have paired off (see Cryptlin._pair), `ago` seconds since: one or other of them
+# will lay an egg some hours on. What will be in it is settled now: the kind of one parent, the
+# coat of the other, a nature from one of them, and a look and tastes of its own from a seed
+# mixed out of both of theirs.
+func paired(a: Cryptlin, b: Cryptlin, ago := 0.0) -> void:
+	var when := Time.get_unix_time_from_system() - ago
+	a.me.paired = when
+	b.me.paired = when
+	warm(a, b, 2.0)
+	warm(b, a, 2.0)
+	var pair: Array[Cryptlin] = [a, b]
+	pair.shuffle()
+	var egg := Resident.new()
+	egg.kind = pair[0].kind
+	egg.fur = pair[1].fur_colour.to_html(false)
+	egg.nature = pair.pick_random().nature
+	egg.look_seed = (a.look_seed * 31 + b.look_seed * 17 + next_id * 7919) % 1000000 + 1
+	egg.parents = [a.me.id, b.me.id]
+	egg.parent_names = [a.me.name, b.me.name]
+	pair.pick_random().me.expecting = {"due": when + EGG_HOURS * Cryptlin.HOUR, "egg": egg.to_save()}
+	save_game()
+
+
+# Any egg that is due is laid: in the nest, if the room has space for one more (and not at all
+# if it has not)
+func _lay_due() -> void:
+	var now := Time.get_unix_time_from_system()
+	for r in residents.duplicate():
+		if r.expecting.is_empty() or now < float(r.expecting.get("due", 0.0)):
+			continue
+		var laid: Variant = r.expecting.get("egg")
+		r.expecting = {}
+		if laid is Dictionary and room_for_more():
+			var egg := Resident.from_save(laid)
+			egg.id = next_id
+			next_id += 1
+			egg.hatched = false
+			egg.at = nest_pos + Vector3(randf_range(-0.12, 0.12), 0, randf_range(-0.12, 0.12))
+			residents.append(egg)
+			_lay_egg(egg, false)
+			crumbs(egg.egg.centre(), Egg.SHELLS[egg.kind])
+			sfx.play("knock", 0.8, -4.0)
+			# (whoever laid it comes to have a look at it, if it is up)
+			if r.pet != null and not r.leaving:
+				r.pet.look_over(nest_pos + Vector3(0, 0, 0.5), 1, "")
+		save_game()
 
 
 # ---------------------------------------------------------------- dying
@@ -1925,6 +2019,7 @@ func _process(delta: float) -> void:
 		scanner.position = scanner.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
 		scanner.rotation = Vector3.ZERO
 
+	_lay_due()
 	if scuffle != null:
 		_tick_fight(delta)
 
