@@ -168,6 +168,32 @@ func _tracker(pet: Cryptlin) -> void:
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 
 
+# The cockatrice is the snake, and the rooster in front of it a dummy: the eyes, the mouth and
+# the insides are the snake's, the dummy lags behind what the snake does, and the snake sleeps
+# coiled round it
+func _serpent(pet: Cryptlin) -> void:
+	var alive := pet.decoy != null and not pet.decoy.is_ancestor_of(pet.mouth_node) and not pet.decoy.is_ancestor_of(pet.neck)
+	for eye in pet.eyes:
+		alive = alive and pet.neck.is_ancestor_of(eye)
+	check(alive and pet.eyes.size() == 2, "its eyes and mouth are the snake's, and the rooster is a dummy")
+	var behind := pet.to_local(pet.inside_at("stomach")).z < pet.to_local(pet.decoy.global_position).z - 0.1
+	var boned := 0
+	for leg in pet.legs:
+		boned += leg.get_children().filter(func(part: Node) -> bool: return part in pet.insides).size()
+	check(behind and boned == 0 and pet.inside_at("brain").y > pet.decoy.global_position.y, "its insides are in the snake, and there is nothing in the dummy")
+	pet._enter(Cryptlin.State.SLEEP)
+	await _frames(120)
+	check(pet.coil.visible and absf(pet.decoy.rotation.z) > 0.8, "asleep, it is coiled round the dummy, which has tipped over")
+	pet._enter(Cryptlin.State.IDLE, 3.0)
+	await _frames(120)
+	check(not pet.coil.visible and absf(pet.decoy.rotation.z) < 0.3, "and awake it rears up behind it again")
+	pet.wiggle = 0.3
+	pet._animate(0.016)
+	var lagging := absf(pet.decoy.rotation.z)
+	check(lagging > 0.0 and lagging < 0.2, "the dummy flops after it, a beat behind")
+	pet.wiggle = 0.0
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -567,6 +593,8 @@ func _run() -> void:
 		_digger(pet)
 	if pet.likes.has("print"):
 		await _tracker(pet)
+	if pet.decoy != null:
+		await _serpent(pet)
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name
