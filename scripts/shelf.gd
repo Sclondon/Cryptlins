@@ -1,8 +1,9 @@
 class_name Shelf
 extends Control
-## The shelf under the tank: every item the keeper has, stood in a row as the things themselves.
-## It slides sideways under a finger. Den reads the touches and asks this which item is where.
-## The row is its own little 3D scene, drawn small and blown up like the room.
+## Everything the keeper has, as the things themselves, floating in a row along the bottom of
+## the screen with the room showing between them. The row slides sideways under a finger. Den
+## reads the touches and asks this which item is where. It is its own little 3D scene with
+## nothing behind it, drawn small and blown up like the room.
 
 const GAP := 0.4
 const TALL := 1.15
@@ -31,12 +32,12 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	view = SubViewport.new()
 	view.own_world_3d = true
+	view.transparent_bg = true
 	view.size = Vector2i(64, 32)
 	view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(view)
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.035, 0.03, 0.03)
+	env.background_mode = Environment.BG_CLEAR_COLOR
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.7, 0.72, 0.85)
 	env.ambient_light_energy = 0.45
@@ -54,12 +55,9 @@ func _ready() -> void:
 	sun.look_at_from_position(Vector3(-2, 4, 5), Vector3.ZERO)
 	row = Node3D.new()
 	view.add_child(row)
-	# The board they stand on, and the dark behind
-	Ps1.part(row, Ps1.box(), Ps1.mat(Color(0.2, 0.14, 0.09)), Vector3(0, -0.06, 0), Vector3(400, 0.1, 1.3))
-	Ps1.part(row, Ps1.box(), Ps1.mat(Color(0.09, 0.07, 0.06)), Vector3(0, 0.6, -0.7), Vector3(400, 1.6, 0.05))
 
 	var post := ShaderMaterial.new()
-	post.shader = load("res://shaders/ps1_screen.gdshader")
+	post.shader = load("res://shaders/ps1_float.gdshader")
 	var picture := TextureRect.new()
 	picture.texture = view.get_texture()
 	picture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -190,17 +188,17 @@ func _process(delta: float) -> void:
 		_limit()
 	camera.position = Vector3(scroll + _span() * 0.5, 1.25, 3.0)
 	camera.rotation = Vector3(-0.3, 0, 0)
-	# Each thing rocks a little on its spot, to show its shape
+	# Each thing turns a little and bobs where it hangs, to show its shape
 	for i in holders.size():
 		holders[i].rotation.y = 0.35 + sin(t * 0.9 + i * 1.7) * 0.4
+		holders[i].position.y = 0.06 + sin(t * 1.3 + i * 2.3) * 0.03
 	overlay.queue_redraw()
 
 
-# What is drawn sharp over the picture: the shelf's top edge, the marks, and a hint of more either side
+# What is drawn sharp over the picture: the marks, and a hint of more either side
 func _paint() -> void:
 	var w := overlay.size.x
 	var h := overlay.size.y
-	overlay.draw_line(Vector2(0, 0.5), Vector2(w, 0.5), Color(Icons.BONE, 0.22), 1.0)
 	var font := get_theme_default_font()
 	var unit := _unit()
 	for i in ids.size():
