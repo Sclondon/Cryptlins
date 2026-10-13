@@ -174,7 +174,7 @@ const FURS: Array[Array] = [
 	[Color(0.33, 0.27, 0.21), Color(0.26, 0.22, 0.18), Color(0.4, 0.34, 0.26), Color(0.29, 0.27, 0.25), Color(0.36, 0.26, 0.19)],
 	[Color(0.5, 0.46, 0.38), Color(0.42, 0.26, 0.16), Color(0.3, 0.3, 0.34), Color(0.46, 0.38, 0.2)],
 	[Color(0.24, 0.24, 0.29), Color(0.3, 0.26, 0.24), Color(0.34, 0.34, 0.37), Color(0.26, 0.21, 0.31)],
-	[Color(0.3, 0.36, 0.3), Color(0.36, 0.31, 0.33), Color(0.27, 0.32, 0.37), Color(0.38, 0.35, 0.27)],
+	[Color(0.34, 0.4, 0.48), Color(0.44, 0.47, 0.5), Color(0.27, 0.32, 0.4), Color(0.44, 0.46, 0.38)],
 	[Color(0.24, 0.42, 0.2), Color(0.36, 0.42, 0.18), Color(0.2, 0.38, 0.32), Color(0.4, 0.36, 0.2)],
 	[Color(0.2, 0.34, 0.4), Color(0.24, 0.38, 0.3), Color(0.27, 0.3, 0.44), Color(0.32, 0.33, 0.34)],
 	[Color(0.34, 0.34, 0.37), Color(0.38, 0.34, 0.3), Color(0.3, 0.34, 0.4), Color(0.4, 0.38, 0.33)],
@@ -195,7 +195,7 @@ const EYES: Array[Array] = [
 	[Color(1.0, 0.8, 0.3), Color(0.7, 1.0, 0.5), Color(1.0, 0.45, 0.25), Color(0.6, 0.9, 1.0)],
 	[Color(1.0, 0.3, 0.2), Color(1.0, 0.6, 0.15), Color(1.0, 0.9, 0.3), Color(0.6, 1.0, 0.4)],
 	[Color(1.0, 0.15, 0.1), Color(1.0, 0.3, 0.1), Color(1.0, 0.1, 0.3)],
-	[Color(1.0, 0.2, 0.15), Color(1.0, 0.5, 0.1), Color(0.8, 1.0, 0.2)],
+	[Color(1.0, 0.2, 0.15), Color(1.0, 0.5, 0.1), Color(1.0, 0.34, 0.05)],
 	[Color(1.0, 0.8, 0.2), Color(1.0, 0.5, 0.15), Color(0.9, 1.0, 0.4)],
 	[Color(1.0, 0.9, 0.4), Color(0.5, 1.0, 0.9), Color(1.0, 0.6, 0.3)],
 	[Color(1.0, 0.85, 0.3), Color(0.6, 0.9, 1.0), Color(1.0, 0.5, 0.3)],
@@ -219,7 +219,7 @@ const FURS_MORE: Array[Array] = [
 	[Color(0.44, 0.3, 0.2), Color(0.42, 0.4, 0.36)],
 	[Color(0.56, 0.3, 0.2), Color(0.24, 0.3, 0.26)],
 	[Color(0.36, 0.28, 0.22), Color(0.2, 0.26, 0.3)],
-	[Color(0.3, 0.34, 0.4), Color(0.4, 0.4, 0.34)],
+	[Color(0.4, 0.37, 0.44), Color(0.5, 0.5, 0.44)],
 	[Color(0.3, 0.46, 0.4), Color(0.46, 0.4, 0.14)],
 	[Color(0.18, 0.28, 0.3), Color(0.34, 0.4, 0.36)],
 	[Color(0.44, 0.4, 0.42), Color(0.28, 0.3, 0.3)],
@@ -237,7 +237,7 @@ const FURS_MORE: Array[Array] = [
 ]
 const EYES_MORE: Array[Array] = [
 	[Color(0.8, 0.6, 1.0)], [Color(1.0, 0.95, 0.6)], [Color(1.0, 0.45, 0.6)], [Color(1.0, 0.4, 0.0)],
-	[Color(1.0, 0.35, 0.05)], [Color(0.6, 1.0, 0.6)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.7, 0.5)],
+	[Color(1.0, 0.12, 0.22)], [Color(0.6, 1.0, 0.6)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.7, 0.5)],
 	[Color(0.9, 0.7, 1.0)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.5, 0.7)], [Color(0.9, 0.6, 1.0)],
 	[Color(1.0, 0.6, 0.4)], [Color(0.8, 1.0, 0.7)], [Color(1.0, 0.7, 0.5)], [Color(0.8, 1.0, 0.5)],
 	[Color(1.0, 0.8, 0.4)], [Color(0.7, 1.0, 0.8)], [Color(1.0, 0.2, 0.3)],
@@ -252,7 +252,7 @@ const SHAPE := {
 }
 # Where a kind's body will not take as much as that
 const SHAPES: Array[Dictionary] = [
-	{}, {"head": [0.88, 1.2], "limb": [0.75, 1.5]}, {}, {}, {}, {"limb": [0.85, 1.3]},
+	{}, {"head": [0.88, 1.2], "limb": [0.75, 1.5]}, {}, {}, {"limb": [0.85, 1.25], "crest": [0.7, 1.5]}, {"limb": [0.85, 1.3]},
 	{"limb": [0.9, 1.15], "crest": [0.66, 1.4]}, {"head": [0.88, 1.16], "limb": [0.8, 1.6]},
 	{"head": [0.85, 1.22], "limb": [0.84, 1.2]}, {"limb": [0.8, 1.22]}, {}, {"head": [0.85, 1.2]},
 	{"crest": [0.6, 1.4]}, {"head": [0.85, 1.25]}, {"crest": [0.75, 1.3]}, {}, {"head": [0.86, 1.2], "crest": [0.85, 1.25]},
@@ -1059,47 +1059,77 @@ func _build_mothman(chub: float, ear_len: float) -> void:
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.04, 0.04))
 
 
-# Lean and hunched, with spines down its back, fangs, and an eye on anything that bleeds
+# The goat-sucker of the legend: gaunt, hairless and dog-like, down on all fours with its back
+# humped and its ribs showing, a row of long spines from its skull to its tail, big haunches, a
+# whip of a tail, and a long narrow muzzle with the fangs out in front
 func _build_chupacabra(chub: float, ear_len: float) -> void:
-	neck_y = 0.52
-	centre_y = 0.45
-	top_y = 1.02
-	ear_splay = 0.9
-	var spine := Ps1.mat(Color(0.42, 0.13, 0.1), 0.0, 0.35)
+	neck_y = 0.42
+	head_y = 0.13
+	centre_y = 0.4
+	top_y = 0.9
+	ear_splay = 1.75
+	gut = 0.7
+	back_y = 0.52
+	fours = true
+	brain_at = Vector3(0, 0.16, 0.0)
+	chub *= 1.15
+	var spine := Ps1.mat(Color(0.62, 0.24, 0.12), 0.0, 0.35)
 	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(self, Vector3(0.11 * side, 0.22, -0.03))
-		_part(leg, _capsule(0.05, 0.22), fur, Vector3(0, -0.08, 0))
-		_part(leg, _sphere(), dark, Vector3(0, -0.185, 0.07), Vector3(0.07, 0.035, 0.16))
+		# Haunches made for springing: a big thigh, a thin shank and a long clawed foot
+		var leg := _pivot(self, Vector3(0.13 * chub * side, 0.34, -0.22))
+		_part(leg, _sphere(), fur, Vector3(0.01 * side, -0.03, 0.01), Vector3(0.07, 0.15, 0.125), Vector3(0.45, 0, 0))
+		_part(leg, _capsule(0.028, 0.22), fur, Vector3(0, -0.21, -0.03), Vector3.ONE, Vector3(-0.3, 0, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.315, 0.04), Vector3(0.045, 0.028, 0.11))
+		for claw: float in [-1.0, 1.0]:
+			_part(leg, _cone(), bone, Vector3(0.022 * claw, -0.32, 0.15), Vector3(0.012, 0.05, 0.012), Vector3(PI * 0.5, 0, 0))
 		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
-	_part(torso, _sphere(), fur, Vector3(0, 0.39, -0.03), Vector3(0.21 * chub, 0.25, 0.27 * chub), Vector3(0.35, 0, 0))
-	_part(torso, _sphere(), pale, Vector3(0, 0.36, 0.1 * chub), Vector3(0.15 * chub, 0.17, 0.12))
-	for i in 4:
-		_part(torso, _cone(), spine, Vector3(0, 0.63 - i * 0.085, -0.13 - i * 0.055), Vector3(0.03, 0.15 - i * 0.015, 0.045), Vector3(-0.7 - i * 0.3, 0, 0))
-	tail = _pivot(torso, Vector3(0, 0.26, -0.27 * chub))
-	_part(tail, _capsule(0.022, 0.4), fur, Vector3(0, 0.04, -0.17), Vector3.ONE, Vector3(-1.3, 0, 0))
+	# A deep chest, a waist drawn in under a humped back, and a pale hollow belly
+	_part(torso, _sphere(), fur, Vector3(0, 0.38, 0.16), Vector3(0.135 * chub, 0.15, 0.17))
+	_part(torso, _sphere(), fur, Vector3(0, 0.47, -0.02), Vector3(0.115 * chub, 0.13, 0.27), Vector3(-0.12, 0, 0))
+	_part(torso, _sphere(), fur, Vector3(0, 0.4, -0.22), Vector3(0.12 * chub, 0.12, 0.14))
+	_part(torso, _sphere(), pale, Vector3(0, 0.37, -0.04), Vector3(0.075 * chub, 0.075, 0.2))
+	for side: float in [-1.0, 1.0]:
+		for i in 4:
+			_part(torso, _sphere(), pale, Vector3((0.128 - i * 0.008) * chub * side, 0.4 + i * 0.008, 0.14 - i * 0.065), Vector3(0.014, 0.085 - i * 0.008, 0.016), Vector3(0.35, 0, 0.12 * side))
+	# The spines: longest over the hump, and the first thing anyone sees of it
+	for i in 7:
+		var along := i / 6.0
+		var base := Vector3(0, 0.5 + sin(along * PI) * 0.09, 0.2 - along * 0.5)
+		_spike(torso, spine, base, Vector3(0, 1.0, -0.25 - along * 0.6), (0.17 + sin(along * PI) * 0.12) * crest, 0.03)
+	tail = _pivot(torso, Vector3(0, 0.44, -0.34))
+	_part(tail, _capsule(0.016, 0.5), fur, Vector3(0, -0.105, -0.23), Vector3.ONE, Vector3(-2.0, 0, 0))
+	_part(tail, _capsule(0.012, 0.2), fur, Vector3(0, -0.17, -0.55), Vector3.ONE, Vector3(-1.2, 0, 0))
 
 	for side: float in [-1.0, 1.0]:
-		var a := _pivot(torso, Vector3(0.2 * chub * side, 0.52, 0.06))
-		_part(a, _capsule(0.035, 0.3), fur, Vector3(0, -0.12, 0))
-		for claw: float in [-1.0, 0.0, 1.0]:
-			_part(a, _cone(), bone, Vector3(0.025 * claw, -0.31, 0.01), Vector3(0.013, 0.08, 0.013), Vector3(PI, 0, 0))
+		var a := _pivot(torso, Vector3(0.11 * chub * side, 0.3, 0.2))
+		var fore := _foreleg(a, side, 0.3, 0.028)
+		_part(fore, _sphere(), fur, Vector3(0, -0.02, -0.01), Vector3(0.045, 0.07, 0.055))
 		arms.append(a)
 
-	neck = _pivot(torso, Vector3(0, neck_y, 0.11))
-	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.25, 0.21, 0.25))
-	_part(neck, _sphere(), fur, Vector3(0, 0.13, 0.2), Vector3(0.12, 0.09, 0.12))
-	for i in 2:
-		_part(neck, _cone(), spine, Vector3(0, 0.43 - i * 0.07, -0.02 - i * 0.12), Vector3(0.03, 0.14, 0.045), Vector3(-0.25 - i * 0.6, 0, 0))
+	# Its head is carried low and out in front
+	neck = _pivot(torso, Vector3(0, neck_y, 0.3))
+	_part(neck, _sphere(), fur, Vector3(0, 0.03, -0.07), Vector3(0.075, 0.08, 0.12), Vector3(-0.5, 0, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.1, 0.0), Vector3(0.115, 0.1, 0.125))
+	_part(neck, _sphere(), fur, Vector3(0, 0.075, 0.17), Vector3(0.055, 0.05, 0.15))
+	_part(neck, _sphere(), dark, Vector3(0, 0.09, 0.315), Vector3(0.025, 0.02, 0.02))
+	for i in 3:
+		_spike(neck, spine, Vector3(0, 0.18 - i * 0.03, 0.02 - i * 0.07), Vector3(0, 1.0, -0.3 - i * 0.45), (0.13 + i * 0.03) * crest, 0.026)
 	for side: float in [-1.0, 1.0]:
-		var ear := _pivot(neck, Vector3(0.2 * side, 0.3, -0.03))
-		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.25, 0), Vector3(0.06, ear_len * 0.5, 0.03))
+		# Small ears, laid back along its skull
+		var ear := _pivot(neck, Vector3(0.085 * side, 0.15, -0.06))
+		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.14, -0.03), Vector3(0.04, ear_len * 0.3, 0.02), Vector3(-0.9, 0, 0))
 		ears.append(ear)
-		_eye(Vector3(0.125 * side, 0.25, 0.165), 0.095)
-		_part(neck, _cone(), bone, Vector3(0.05 * side, 0.045, 0.285), Vector3(0.02, 0.1, 0.02), Vector3(PI, 0, 0))
-	mouth_node = _pivot(neck, Vector3(0, 0.08, 0.28))
-	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.1, 0.05, 0.05))
+		_part(neck, _sphere(), fur, Vector3(0.07 * side, 0.16, 0.085), Vector3(0.05, 0.022, 0.05), Vector3(0.2, 0, 0.5 * side))
+		_eye(Vector3(0.075 * side, 0.125, 0.09), 0.05)
+		# Two long fangs past the end of its muzzle, and two short ones behind them
+		_part(neck, _cone(), bone, Vector3(0.028 * side, 0.01, 0.29), Vector3(0.016, 0.11, 0.016), Vector3(PI, 0, 0))
+		_part(neck, _cone(), bone, Vector3(0.036 * side, 0.03, 0.21), Vector3(0.012, 0.05, 0.012), Vector3(PI, 0, 0))
+	mouth_node = _pivot(neck, Vector3(0, 0.04, 0.2))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.04, 0.03, 0.11))
+	# A big head for so thin a body
+	_swell(neck, 0, Vector3.ZERO, Vector3.ONE * 1.3)
 
 
 # A frog that stands up: wide mouth, eyes on top of its head, and legs made for jumping

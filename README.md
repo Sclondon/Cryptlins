@@ -17,7 +17,7 @@ eggs are all plain eggs, a little rounder or taller by their kind; what is paint
 | Streaky | **squatchling** | A young sasquatch: a shaggy mound of hair with two tall eyes, on big feet and no arms yet. Slow, heavy, deep-voiced, hungry and shy. |
 | Speckled | **cockatrice** | A rooster with a serpent's tail. Struts, flaps, crows high, and stares more than anything else does. |
 | Silk-wound | **mothman** | Dark and furry with great red eyes, feathered feelers and eyed wings. Fast, squeaky, gets the zoomies, tires quickly. |
-| Thorn-patterned | **chupacabra** | Lean and hunched, spines down its back, fangs. Quick, very hungry, lurks. |
+| Thorn-patterned | **chupacabra** | The goat-sucker: gaunt, hairless and dog-like, on all fours with its ribs showing, long spines from skull to tail, a whip tail, and a narrow muzzle with the fangs out front. Grey-blue or sickly grey-green, with red eyes. Quick, very hungry, lurks. |
 | Slimy | **Loveland frogman** | A frog that stands up. Jumps highest of all, croaks, loves to dance. *Water.* |
 | Rippled | **Loch Ness monster** | A hump, four flippers and a long neck. Slow on land, shy, rarely tired. *Water.* |
 | Stone | **slide-rock bolter** | A whale of the high slopes: mostly mouth, with a hooked tail. Lumbering and always starving, until it gets the zoomies. |
