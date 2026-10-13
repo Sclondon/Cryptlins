@@ -1455,7 +1455,7 @@ func _decide() -> void:
 		if roll <= 0.0:
 			if s == State.WANDER:
 				var a := randf() * TAU
-				target = Den.in_room(Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * 2.3, 0.4)
+				target = Den.in_room(Vector3(randf_range(-9.0, 9.0), 0, randf_range(-9.0, 9.0)).limit_length(Den.half.length()), 0.4)
 			_enter(s)
 			return
 	_enter(State.IDLE)
@@ -1550,7 +1550,7 @@ func _think(delta: float) -> void:
 					_enter(State.IDLE)
 		State.ZOOMIES:
 			var a := state_len + step * 1.9
-			var point := Den.in_room(Vector3(cos(a), 0, sin(a)) * 1.6, 0.4)
+			var point := Den.in_room(Vector3(cos(a) * Den.half.x, 0, sin(a) * Den.half.y) * 0.75, 0.4)
 			gaze = point + Vector3(0, 0.3, 0)
 			mouth_goal = 0.7
 			if _steer(point, RUN * 1.45, delta, 0.55):

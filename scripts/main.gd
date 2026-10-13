@@ -29,9 +29,9 @@ const SCAN_SECONDS := 9.0
 # Half the room's width and depth: walls left, right and behind, and you in front. The room is
 # cut to the screen (see _fit): wide and low on a wide one, narrow, deep and tall on an upright
 # phone, so that the lamp hangs near the top of the screen and the floor runs down to the shelf.
-static var half := Vector2(2.4, 2.1)
+static var half := Vector2(2.9, 2.5)
 # Where the lamp's cord is fixed
-static var lamp_at := Vector3(0, 2.85, 0.1)
+static var lamp_at := Vector3(0, 3.4, 0.1)
 
 var save_path := "user://cryptlin.json"
 # Set before it is added to the tree to choose what a new game's egg holds (tests); -1 for any
@@ -44,8 +44,8 @@ var view: SubViewport
 var shell: Node3D
 var cord: MeshInstance3D
 var tall_room := false
-var eye := Vector3(0, 3.4, 7.0)
-var eye_on := Vector3(0, 0.9, 0)
+var eye := Vector3(0, 4.0, 8.4)
+var eye_on := Vector3(0, 1.0, 0)
 var screen: TextureRect
 var camera: Camera3D
 var spot: SpotLight3D
@@ -681,7 +681,7 @@ func settle_nest() -> void:
 # Where a cryptlin would sooner have its nest: in the cave if there is one, by something it
 # likes, or tucked into a back corner
 func nest_spot(who: Cryptlin) -> Vector3:
-	var spots: Array[Vector3] = [Vector3(-1.7, 0, -1.4), Vector3(1.7, 0, -1.4)]
+	var spots: Array[Vector3] = [Vector3(-9.0, 0, -9.0), Vector3(9.0, 0, -9.0)]
 	for d in decors:
 		if d.hollow:
 			spots.append(d.position)
@@ -710,7 +710,7 @@ func hiding_place(who: Cryptlin) -> Vector3:
 	for d in decors:
 		if d.kind in who.like_decor:
 			return in_room(d.position + Vector3(0, 0, -d.radius - 0.4), 0.35)
-	return Vector3(1.8 if randf() < 0.5 else -1.8, 0, -1.6)
+	return in_room(Vector3(9.0 if randf() < 0.5 else -9.0, 0, -9.0), 0.5)
 
 
 # A thing in the room for a cryptlin to go and make use of (never the one it hates), or null
@@ -1077,7 +1077,7 @@ func _build_lamp() -> void:
 	spot = SpotLight3D.new()
 	spot.position = Vector3(0, -LAMP_DROP, 0)
 	spot.rotation.x = -PI * 0.5
-	spot.spot_range = 9.0
+	spot.spot_range = 14.0
 	spot.spot_angle = 48.0
 	spot.spot_angle_attenuation = 0.6
 	spot.spot_attenuation = 0.5
@@ -1089,7 +1089,7 @@ func _build_lamp() -> void:
 	spot.shadow_normal_bias = 2.0
 	lamp_head.add_child(spot)
 
-	var reach := 6.2
+	var reach := 7.6
 	beam = ShaderMaterial.new()
 	beam.shader = load("res://shaders/beam.gdshader")
 	beam.set_shader_parameter("reach", reach)
@@ -1111,7 +1111,7 @@ func _build_lamp() -> void:
 	# Light thrown back off the floor, so what stands in the beam is not black underneath
 	bounce = OmniLight3D.new()
 	bounce.light_color = Color(1.0, 0.86, 0.66)
-	bounce.omni_range = 5.0
+	bounce.omni_range = 7.5
 	bounce.light_specular = 0.0
 	bounce.light_cull_mask = 1
 	add_child(bounce)
@@ -1153,20 +1153,20 @@ func _fit() -> void:
 	view.size = Vector2i((size * Ps1.LINES / minf(size.x, size.y)).round())
 	var tall := size.x < size.y
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
-	var room := Vector2(2.4, 2.1)
-	var lamp := Vector3(0, 2.85, 0.1)
+	var room := Vector2(2.9, 2.5)
+	var lamp := Vector3(0, 3.4, 0.1)
 	if tall:
 		# Upright: a narrow, deep, tall room, as wide as the screen shows of its near end, with
 		# the lamp up by the top of the screen and the floor running down to the shelf
 		camera.fov = 62.0
-		eye = Vector3(0, 3.6, 6.4)
-		eye_on = Vector3(0, 1.28, 0)
-		room = Vector2(clampf(3.1 * size.x / size.y, 1.3, 2.4), 2.4)
-		lamp = Vector3(0, 4.9, 0.1)
+		eye = Vector3(0, 4.7, 8.3)
+		eye_on = Vector3(0, 1.66, 0)
+		room = Vector2(clampf(4.0 * size.x / size.y, 1.7, 2.9), 3.1)
+		lamp = Vector3(0, 6.3, 0.1)
 	else:
 		camera.fov = 44.0
-		eye = Vector3(0, 3.4, 7.0)
-		eye_on = Vector3(0, 0.9, 0)
+		eye = Vector3(0, 4.0, 8.4)
+		eye_on = Vector3(0, 1.0, 0)
 	tall_room = tall
 	if not room.is_equal_approx(half) or lamp != lamp_at or shell == null:
 		_reshape(room, lamp)
@@ -1399,7 +1399,7 @@ func _process(delta: float) -> void:
 	if light_on:
 		spot.light_color = spot.light_color.lerp(mode["colour"], ease_in)
 		# Hung higher in a tall room, it burns harder and narrower to throw the same pool of light
-		lamp_energy = lerpf(lamp_energy, float(mode["energy"]) * (1.9 if tall_room else 1.0), ease_in)
+		lamp_energy = lerpf(lamp_energy, float(mode["energy"]) * (2.6 if tall_room else 1.2), ease_in)
 		lamp_angle = lerpf(lamp_angle, float(mode["angle"]) * (0.6 if tall_room else 1.0), ease_in)
 	spot.light_energy = lamp_energy * light_level * (1.0 + sin(clock * 13.0) * sin(clock * 3.1) * 0.025)
 	spot.spot_angle = lamp_angle
