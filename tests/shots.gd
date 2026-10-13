@@ -1,12 +1,12 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark]]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --faces:
 ## each of the faces that go up over its head. With --many: three of different kinds sharing the room.
 ## With --variety: one sheet of twelve of the kind, each of another seed, stood in rows facing
 ## the front under an even light (or side on, as babies, in the dark, or as the scanner shows
-## them; with --with=K every
+## them; fewer to a row with --per, for the wide ones; turned any way with --turn; with --with=K every
 ## other one is of kind K, to see two kinds side by side).
 
 # The save this run uses: one for each kind and shape of screen, so that several can be run at once
@@ -27,6 +27,8 @@ var beside := -1
 var side_on := false
 var dark := false
 var bare := false
+var per_row := 4
+var turned := 0.0
 
 
 func _initialize() -> void:
@@ -53,6 +55,10 @@ func _initialize() -> void:
 			beside = int(arg.trim_prefix("--with="))
 		if arg == "--side":
 			side_on = true
+		if arg.begins_with("--per="):
+			per_row = clampi(int(arg.trim_prefix("--per=")), 1, 4)
+		if arg.begins_with("--turn="):
+			turned = deg_to_rad(float(arg.trim_prefix("--turn=")))
 		if arg == "--xray":
 			bare = true
 		if arg == "--dark":
@@ -330,8 +336,8 @@ func _run_variety() -> void:
 	var sheet := Image.create(strip.size.x, strip.size.y * 3, false, Image.FORMAT_RGB8)
 	for row in 3:
 		var four: Array = []
-		for i in 4:
-			var n := row * 4 + i
+		for i in per_row:
+			var n := row * per_row + i
 			var k := beside if beside >= 0 and n % 2 == 1 else kind
 			var s := look + n / 2 + 1 + (Cryptlin.OLD_SEEDS if n % 2 == 1 and beside < 0 else 0)
 			four.append({"id": i + 1, "name": "Seed %d" % s, "kind": Cryptlin.KINDS[k]["title"], "seed": s, "hatched": true, "born": Time.get_unix_time_from_system() - 200000.0, "needs": {"belly": 80.0, "fun": 80.0, "energy": 90.0, "love": 50.0}})
@@ -357,8 +363,8 @@ func _run_variety() -> void:
 				if baby:
 					pet.age = 0.0
 					pet.grow = pet.size_goal()
-				pet.position = Vector3(-1.5 + i * 1.0, 0, 1.9)
-				pet.yaw = PI * 0.5 if side_on else 0.0
+				pet.position = Vector3((i - (per_row - 1) * 0.5) * 4.0 / per_row, 0, 1.9)
+				pet.yaw = PI * 0.5 if side_on else turned
 				pet.velocity = Vector3.ZERO
 				pet.fight_cooldown = 99.0
 				pet.emote_again = 99.0
@@ -374,7 +380,7 @@ func _run_variety() -> void:
 		sheet.blit_rect(shot, strip, Vector2i(0, strip.size.y * row))
 		main.queue_free()
 		await _wait(0.2)
-	var tag := "%s%s%s%s%s" % ["_with%d" % beside if beside >= 0 else "", "_side" if side_on else "", "_baby" if baby else "", "_dark" if dark else "", "_xray" if bare else ""]
+	var tag := "%s%s%s%s%s%s" % ["_with%d" % beside if beside >= 0 else "", "_side" if side_on else "", "_turn%d" % roundi(rad_to_deg(turned)) if turned != 0.0 else "", "_baby" if baby else "", "_dark" if dark else "", "_xray" if bare else ""]
 	sheet.resize(sheet.get_width() * 2, sheet.get_height() * 2, Image.INTERPOLATE_NEAREST)
 	sheet.save_png("%s/k%d_variety%s.png" % [out, kind, tag])
 	quit()
@@ -450,6 +456,16 @@ func _run() -> void:
 	pet._enter(Cryptlin.State.WANDER)
 	await _wait(1.0)
 	await _snap("2_walk")
+	if pet.likes.has("print"):
+		# The trail a heavy one leaves, on flagstones and then on sand
+		for style: int in [0, 5]:
+			main.set_ground(style)
+			pet.position = Vector3(-1.2, 0, 0.3)
+			pet.target = Vector3(1.4, 0, 1.3)
+			pet._enter(Cryptlin.State.WANDER)
+			await _until(func() -> bool: return pet.state != Cryptlin.State.WANDER, 6.0)
+			await _snap("2_prints%d" % style)
+		main.set_ground(0)
 	pet.belly = 30.0
 	main.feed()
 	await _until(func() -> bool: return pet.state == Cryptlin.State.EAT, 8.0)

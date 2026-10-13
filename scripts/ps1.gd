@@ -6,6 +6,7 @@ const LIT: Shader = preload("res://shaders/ps1.gdshader")
 const FLAT: Shader = preload("res://shaders/ps1_flat.gdshader")
 const XRAY: Shader = preload("res://shaders/xray.gdshader")
 const ORGAN: Shader = preload("res://shaders/organ.gdshader")
+const FUR: Shader = preload("res://shaders/fur.gdshader")
 # The room is drawn this many pixels high (or wide, on an upright phone) and blown up
 const LINES := 240.0
 
@@ -26,6 +27,33 @@ static func flat(c: Color) -> ShaderMaterial:
 	m.shader = FLAT
 	m.set_shader_parameter("tint", c)
 	return m
+
+
+# A coat of long hair (see fur.gdshader): the skin, and over it `shells` layers of hanging locks,
+# each the next pass of the one under it, the outermost `hair` off the skin in the mesh's own
+# measure. `values` are any more of the shader's settings, for every layer.
+static func fur(c: Color, shells: int, hair: float, values := {}) -> ShaderMaterial:
+	var skin := ShaderMaterial.new()
+	var under := skin
+	for i in shells + 1:
+		var layer := skin if i == 0 else ShaderMaterial.new()
+		layer.shader = FUR
+		layer.set_shader_parameter("shell", float(i) / shells)
+		if i > 0:
+			under.next_pass = layer
+			under = layer
+	comb(skin, {"tint": c, "rim": 0.35, "hair": hair})
+	comb(skin, values)
+	return skin
+
+
+# Sets some of a coat's settings on its skin and on every shell over it
+static func comb(coat: ShaderMaterial, values: Dictionary) -> void:
+	var layer := coat
+	while layer != null:
+		for setting: String in values:
+			layer.set_shader_parameter(setting, values[setting])
+		layer = layer.next_pass as ShaderMaterial
 
 
 # A ball of radius 1 with few enough faces to see them

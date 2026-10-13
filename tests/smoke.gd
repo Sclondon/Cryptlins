@@ -119,6 +119,55 @@ func _digger(pet: Cryptlin) -> void:
 	check(pet._sees(pet.position + Vector3(0.5, 0, 0)) and not pet._sees(pet.position + Vector3(2.0, 0, 0)), "and it does not see far")
 
 
+# One that is mostly hair and heavy on its feet: its coat is the hair shader with its shells over
+# it, which the scanner takes off and puts back, and it leaves a trail of prints that fade, are
+# never too many, last longer on a soft floor, and are nothing to do with how the room suits it
+func _tracker(pet: Cryptlin) -> void:
+	var shells := 0
+	var layer := pet.fur.next_pass as ShaderMaterial
+	while layer != null:
+		shells += 1
+		layer = layer.next_pass as ShaderMaterial
+	check(pet.fur.shader == Ps1.FUR and shells >= 2, "its coat is long hair, in %d layers" % shells)
+	pet.xray(true)
+	var bare := true
+	for mi: MeshInstance3D in pet.skin:
+		bare = bare and mi.material_override == pet.scan_skin
+	pet.xray(false)
+	var coated := 0
+	for mi in pet.find_children("*", "MeshInstance3D", true, false):
+		if mi.material_override == pet.fur:
+			coated += 1
+	check(bare and coated >= 1, "the scanner takes its hair off and puts it back")
+	var was := main.floor_style
+	var comfort := main.comfort_of(pet)
+	var lasts := [0.0, 0.0]
+	var trail := 0
+	for soft in 2:
+		main.set_ground(5 if soft == 1 else 0)
+		pet.position = Vector3(-1.2, 0, 0.3)
+		pet.target = Vector3(1.4, 0, 1.2)
+		pet._enter(Cryptlin.State.WANDER)
+		await _until(func() -> bool: return pet.state != Cryptlin.State.WANDER, 500)
+		trail = main.tracks.size()
+		if trail > 0:
+			lasts[soft] = main.tracks[0].lasts * main.tracks[0].depth
+	check(trail >= 3 and lasts[1] > lasts[0] and lasts[0] > 0.0, "it leaves footprints as it walks (%d), deeper and longer lasting on sand than on flagstones" % trail)
+	main.set_ground(was)
+	for i in Den.MAX_TRACKS + 12:
+		main.leave_print("sasquatch", Vector3(randf_range(-1.0, 1.0), 0, 0.5), 0.0, 1.0, 1.0)
+	check(main.tracks.size() == Den.MAX_TRACKS, "there are never more than %d of them" % Den.MAX_TRACKS)
+	check(main.messes.is_empty() and is_equal_approx(main.comfort_of(pet), comfort), "they are no mess, and make the room no worse for it")
+	main.save_game()
+	check(not FileAccess.get_file_as_string(save).contains("track"), "they are not kept in the save")
+	for print in main.tracks:
+		print.age = print.lasts - 0.01
+	await _frames(4)
+	main.leave_print("sasquatch", Vector3(0, 0, 0.5), 0.0, 1.0, 1.0)
+	check(main.tracks.size() == 1, "and they fade away")
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -262,6 +311,8 @@ func _run() -> void:
 	_looks(pet)
 	if pet.likes.has("dig"):
 		_digger(pet)
+	if pet.likes.has("print"):
+		await _tracker(pet)
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name

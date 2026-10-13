@@ -14,7 +14,7 @@ eggs are all plain eggs, a little rounder or taller by their kind; what is paint
 | Egg | Hatches a | Which is |
 | --- | --- | --- |
 | Mossy | **gremlin** | The all-rounder: big ears, a tail, fangs. |
-| Streaky | **squatchling** | A young sasquatch: a shaggy mound of hair with two tall eyes, on big feet and no arms yet. Slow, heavy, deep-voiced, hungry and shy. |
+| Streaky | **squatchling** | A young sasquatch: a mound of long shaggy hair, ragged at the hem, with two tall eyes, on big bare feet with five fat toes each and no arms yet. Slow, heavy, deep-voiced, hungry and shy. It leaves **footprints** where it walks: deep ones that last a minute and a half on moss, dirt, sand and gravel, faint ones that are gone sooner on flagstones, boards and tiles, none in water. They are only to look at. |
 | Speckled | **cockatrice** | A rooster with a serpent's tail. Struts, flaps, crows high, and stares more than anything else does. |
 | Silk-wound | **mothman** | Dark and furry with great red eyes, feathered feelers and eyed wings. Fast, squeaky, gets the zoomies, tires quickly. |
 | Thorn-patterned | **chupacabra** | The goat-sucker: gaunt, hairless and dog-like, on all fours with its ribs showing, long spines from skull to tail, a whip tail, and a narrow muzzle with the fangs out front. Grey-blue or sickly grey-green, with red eyes. Quick, very hungry, lurks. |
@@ -198,7 +198,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `scripts/items.gd` lists what can be on it; inside a site that keeps a shop, only what comes free and what has been
   bought.
 - `scripts/decor.gd`: the things that stand in the room (shelters and the pool among them) and the nests.
-  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
+  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
   `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes.
 - The PlayStation look: the room is drawn into a SubViewport 240 pixels on its short side and blown up with hard
@@ -208,6 +208,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   drawn one dot to one dot of that picture. Because the room is drawn smaller than the screen, touches go through
   `Den._in_view()` before any camera ray, and `Den.screen_of()` goes the other way.
 - The eyes are emissive and the room has almost no ambient light, so outside the beam the eyes are all that shows.
+- `shaders/fur.gdshader` (through `Ps1.fur`): long hair, for the kinds that are mostly hair. The coat is streaked down the lie of the hair and drawn again a few times over, each layer pushed further off the skin, left to hang and with more of it cut away, so that what is left stands off the body in ragged locks; nothing in it is see-through. The scanner takes the layers off with the coat and puts them back.
 - `shaders/beam.gdshader`: the haze in the beam. `shaders/floor.gdshader`: the grounds, from world position.
   `shaders/brick.gdshader`: the walls. No art or audio files anywhere: `scripts/sfx.gd` synthesises every sound at
   start-up.
@@ -223,7 +224,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), or one sheet of twelve of the kind, each of another seed
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 ```

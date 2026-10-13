@@ -41,6 +41,9 @@ const GROUNDS: Array[String] = ["Flagstones", "Floorboards", "Moss", "Checkers",
 # As in "it is happiest on ..."
 const GROUND_PLAIN: Array[String] = ["flagstones", "floorboards", "moss", "checkered tiles", "dirt", "sand", "gravel"]
 const SCAN_SECONDS := 9.0
+# The grounds a foot sinks into (moss, dirt, sand, gravel), and the most footprints there are at once
+const SOFT_GROUNDS: Array[int] = [2, 4, 5, 6]
+const MAX_TRACKS := 28
 # The colour of each ground, for what gets dug out of it
 const GROUND_TINTS: Array[Color] = [
 	Color(0.4, 0.4, 0.42), Color(0.4, 0.28, 0.16), Color(0.2, 0.34, 0.14), Color(0.5, 0.5, 0.5),
@@ -98,6 +101,8 @@ var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
 # What the cryptlins have left on the floor (see Mess)
 var messes: Array[Mess] = []
+# Footprints on the floor just now (see leave_print)
+var tracks: Array[Track] = []
 var nest: Node3D
 var nest_pos := Vector3(-1.6, 0, -1.2)
 
@@ -1084,6 +1089,10 @@ func _clear_spot(centre: Vector3, reach: float) -> Vector3:
 func set_ground(style: int) -> void:
 	floor_style = clampi(style, 0, GROUNDS.size() - 1)
 	floor_mat.set_shader_parameter("style", floor_style)
+	# A new floor has nobody's prints in it
+	for old in tracks:
+		old.queue_free()
+	tracks.clear()
 	sfx.play("thud", 0.7, -8.0)
 	for pet in pets():
 		var right := floor_style == pet.fav_ground
@@ -1968,6 +1977,23 @@ func crumbs(at: Vector3, colour: Color) -> void:
 	crumb_puff.position = at
 	crumb_puff.color = colour
 	crumb_puff.restart()
+
+
+# A footprint left by one of the heavy kinds (see Track): where its foot came down, facing the
+# way it was going, deeper and longer lasting on a soft floor. There are never more than
+# MAX_TRACKS of them; the oldest goes to make room. Water takes no print.
+func leave_print(shape: String, at: Vector3, facing: float, side: float, big: float) -> void:
+	var pool := decor_of(Decor.Kind.POOL)
+	if pool != null and Vector2(at.x - pool.position.x, at.z - pool.position.z).length() < pool.radius:
+		return
+	while tracks.size() >= MAX_TRACKS:
+		tracks.pop_front().queue_free()
+	var print := Track.new(shape, side, big, floor_style in SOFT_GROUNDS)
+	print.tree_exiting.connect(tracks.erase.bind(print))
+	add_child(print)
+	print.position = Vector3(at.x, 0, at.z)
+	print.rotation.y = facing
+	tracks.append(print)
 
 
 # Water thrown up by something wading in the pool

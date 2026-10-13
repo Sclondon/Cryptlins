@@ -22,10 +22,11 @@ enum Kind {
 # The ones marked "water" live in it, and are not at home without a pool to wade in. "dig" is how
 # much more than the rest one digs (and it will dig any floor); "dim" is one from underground,
 # as happy with the lamp off as low and unhappy under the bright one; "sight" is how far one that
-# is short-sighted can see a toy or the moving light.
+# is short-sighted can see a toy or the moving light; "print" is the footprint a heavy one leaves
+# (see Track).
 const KINDS: Array[Dictionary] = [
 	{"title": "gremlin", "pace": 1.0, "hunger": 1.0, "tire": 1.0, "spring": 1.0, "voice": 1.0, "lurk": 1.0, "zoom": 1.0, "dance": 1.0, "stare": 1.0},
-	{"title": "squatchling", "pace": 0.85, "hunger": 1.25, "tire": 1.1, "spring": 0.7, "voice": 0.55, "lurk": 2.2, "zoom": 0.5, "dance": 1.1, "stare": 1.4},
+	{"title": "squatchling", "pace": 0.85, "hunger": 1.25, "tire": 1.1, "spring": 0.7, "voice": 0.55, "lurk": 2.2, "zoom": 0.5, "dance": 1.1, "stare": 1.4, "print": "sasquatch"},
 	{"title": "cockatrice", "pace": 1.1, "hunger": 1.0, "tire": 1.0, "spring": 1.2, "voice": 1.45, "lurk": 0.5, "zoom": 1.2, "dance": 1.5, "stare": 2.4},
 	{"title": "mothman", "pace": 1.2, "hunger": 0.8, "tire": 1.2, "spring": 1.4, "voice": 1.6, "lurk": 1.2, "zoom": 2.2, "dance": 1.0, "stare": 1.5},
 	{"title": "chupacabra", "pace": 1.25, "hunger": 1.6, "tire": 1.0, "spring": 1.2, "voice": 0.85, "lurk": 1.8, "zoom": 1.6, "dance": 0.6, "stare": 1.0},
@@ -257,9 +258,10 @@ const SHAPE := {
 	"head": [0.82, 1.3], "eye": [0.72, 1.42], "gap": [0.86, 1.18], "build": [0.84, 1.22],
 	"limb": [0.78, 1.36], "ear": [0.6, 1.55], "crest": [0.55, 1.55], "tail": [0.55, 1.75],
 }
-# Where a kind's body will not take as much as that
+# Where a kind's body will not take as much as that; "marks" is for a kind whose coat takes
+# only some of the markings
 const SHAPES: Array[Dictionary] = [
-	{}, {"head": [0.88, 1.2], "limb": [0.75, 1.5]}, {}, {}, {"limb": [0.85, 1.25], "crest": [0.7, 1.5]}, {"limb": [0.85, 1.3]},
+	{}, {"head": [0.88, 1.2], "limb": [0.8, 1.2], "marks": [Mark.SPOTS, Mark.PATCHES, Mark.STRIPES, Mark.SOCKS, Mark.FRECKLES, Mark.POINTS]}, {}, {}, {"limb": [0.85, 1.25], "crest": [0.7, 1.5]}, {"limb": [0.85, 1.3]},
 	{"limb": [0.9, 1.15], "crest": [0.66, 1.4]}, {"head": [0.88, 1.16], "limb": [0.8, 1.6]},
 	{"head": [0.85, 1.22], "limb": [0.84, 1.2]}, {"limb": [0.8, 1.22]}, {}, {"head": [0.85, 1.2]},
 	{"crest": [0.6, 1.4]}, {"head": [0.85, 1.25]}, {"crest": [0.75, 1.3]}, {}, {"head": [0.86, 1.2], "crest": [0.85, 1.25]},
@@ -444,6 +446,8 @@ var glance_point := Vector3.ZERO
 var anim_t := 0.0
 var phase := 0.0
 var gait := 0.0
+# Which footfall it is on, counted from the swing of its legs
+var footfall := 0
 var sit := 0.0
 var sit_goal := 0.0
 var curl := 0.0
@@ -614,6 +618,10 @@ static func looks(k: int, s: int) -> Dictionary:
 			first = i
 			break
 	var over := rng.randi_range(Mark.BELLY, Mark.POINTS) if rng.randf() < 0.35 else int(Mark.PLAIN)
+	var takes: Array = SHAPES[k].get("marks", [])
+	if not takes.is_empty():
+		first = first if first in takes else int(Mark.PLAIN)
+		over = over if over in takes else int(Mark.PLAIN)
 	me["marks"] = [first, rng.randi() % 100000, over if over != first else int(Mark.PLAIN)]
 	var odd: Array[String] = []
 	for extra: String in CHANCES:
@@ -928,13 +936,18 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 	gravity = 15.0
 	brain_at = Vector3(0, 0.4, 0.04)
 	crown = Vector3(0, 0.52, 0)
+	_shaggy(3, 0.15, {"hang": 0.9, "face": 0.2, "face_from": 0.42})
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.18 * side, 0.24, 0.02))
 		_part(leg, _capsule(0.07, 0.24), dark, Vector3(0, -0.1, 0))
-		# Big flat feet, toes out
+		# Big flat feet, toes out, and five fat toes on each, the big one on the inside
 		var foot := _pivot(leg, Vector3(0, -0.185, 0))
 		foot.rotation.y = 1.0 * side
-		_part(foot, _sphere(), dark, Vector3(0, 0, 0.14), Vector3(0.13, 0.065, 0.27))
+		_part(foot, _sphere(), dark, Vector3(0, 0, 0.17), Vector3(0.19, 0.065, 0.3))
+		for toe in 5:
+			var across := (toe - 2.0) * 0.088 * side
+			var size := 0.085 - toe * 0.009
+			_part(foot, _sphere(), pale, Vector3(across, 0.01, 0.49 - toe * 0.03), Vector3(size * 0.8, size * 0.8, size * 1.3))
 		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
@@ -946,33 +959,25 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
 	var body := _pivot(neck, Vector3.ZERO)
 	body.scale = Vector3(chub, 1.0, 0.8 * chub)
-	# One smooth mound, wider than it is tall, flaring out to the hem
+	# One smooth mound, wider than it is tall, flaring out to the hem, under its hair
 	var shape: Array[Vector2] = [
-		Vector2(0.5, 0.0), Vector2(0.58, 0.03), Vector2(0.56, 0.1), Vector2(0.47, 0.19), Vector2(0.4, 0.28),
+		Vector2(0.48, 0.0), Vector2(0.55, 0.04), Vector2(0.54, 0.11), Vector2(0.47, 0.19), Vector2(0.4, 0.28),
 		Vector2(0.35, 0.37), Vector2(0.28, 0.45), Vector2(0.17, 0.51), Vector2(0.0, 0.53),
 	]
-	_part(body, _lathe(shape, 10), fur, Vector3.ZERO)
-	var shag := Ps1.mat(fur.get_shader_parameter("tint") * 0.62, 0.0, 0.35)
-	# Hair hangs off the hem in a row of round hanks, light and dark
-	for i in 12:
-		var around := TAU * (i + 0.5) / 12.0
+	_part(body, _lathe(shape, 14), fur, Vector3.ZERO)
+	var shag := Ps1.mat(fur_colour * 0.76 * 0.62, 0.0, 0.35)
+	# The hem is ragged: pointed tufts of every length hang off it and splay, light and dark,
+	# and the odd one sticks straight out
+	for i in 17:
+		var around := TAU * (i + rng.randf_range(0.2, 0.8)) / 17.0
 		var out := Vector3(sin(around), 0, cos(around))
-		var hank := rng.randf_range(0.08, 0.13)
-		_part(body, _sphere(), pale if i % 2 == 0 else shag, out * 0.52 + Vector3(0, 0.0, 0), Vector3(0.14, hank, 0.09), Vector3(0, around, 0))
-	# And lies in long locks down the rest of it
-	for i in 22:
-		var around := TAU * i / 22.0 + rng.randf_range(-0.12, 0.12)
-		if absf(wrapf(around, -PI, PI)) < 0.5:
-			continue
-		var up := rng.randf_range(0.12, 0.44)
-		var wide := lerpf(0.53, 0.3, (up - 0.1) / 0.34)
-		var out := Vector3(sin(around), 0, cos(around))
-		var lock := _part(body, _cone(), shag if i % 2 == 0 else pale, out * wide + Vector3(0, up, 0))
-		lock.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, 2.35) * Basis.from_scale(Vector3(0.035, rng.randf_range(0.14, 0.22), 0.02))
+		var long := rng.randf_range(0.13, 0.3)
+		var splay := rng.randf_range(0.25, 0.75) if i % 6 != 3 else 1.25
+		_spike(body, [pale, shag, fur][i % 3], out * 0.5 + Vector3(0, 0.1, 0), out * splay + Vector3.DOWN, long, 0.06)
 
 	# Two tall dark eyes, wide at the bottom and drawn up to a point, with a light in each
 	for side: float in [-1.0, 1.0]:
-		var eye := _pivot(neck, Vector3(0.12 * chub * side, 0.2, 0.385 * chub))
+		var eye := _pivot(neck, Vector3(0.12 * chub * side, 0.2, 0.4 * chub))
 		eye.rotation.x = -0.62
 		_part(eye, _sphere(), black, Vector3.ZERO, Vector3(0.068, 0.078, 0.03))
 		_part(eye, _cone(), black, Vector3(0, 0.16, 0), Vector3(0.06, 0.28, 0.026))
@@ -982,6 +987,14 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 	# Its mouth is somewhere under the hair, and only shows when it opens
 	mouth_node = _pivot(neck, Vector3(0, 0.07, 0.47 * chub))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.11, 0.06, 0.04))
+
+
+# Turns its coat to long hair that hangs off it in locks (see Ps1.fur), keeping what is painted
+# on it: `shells` layers of it, the longest `hair` off the skin in the measure of what wears it
+func _shaggy(shells: int, hair: float, values := {}) -> void:
+	var coat := Ps1.fur(fur_colour * 0.76, shells, hair, values)
+	Ps1.comb(coat, {"tex": fur.get_shader_parameter("tex"), "gain": fur.get_shader_parameter("gain")})
+	fur = coat
 
 
 # A rooster hatched wrong: feathers in front, a serpent's tail behind, and a stare it is proud of
@@ -3964,6 +3977,13 @@ func _animate(delta: float) -> void:
 	gait = move_toward(gait, clampf(speed / 0.7, 0.0, 1.0), delta * 5.0)
 	phase += delta * (3.0 + speed * 5.5)
 	var swing := sin(phase) * gait
+	# One with a foot heavy enough to mark the floor leaves a print each time one comes down
+	var landed := floori((phase - PI * 0.5) / PI)
+	if landed != footfall:
+		footfall = landed
+		if likes.has("print") and gait > 0.35 and lift < 0.02 and not airborne and jump_y < 0.02:
+			var side := 1.0 if landed % 2 == 0 else -1.0
+			world.leave_print(str(likes["print"]), global_transform * Vector3(absf(legs[0].position.x) * side, 0, 0.16), yaw + 0.6 * side, side, grow)
 	sit = lerpf(sit, sit_goal, ease_slow)
 	curl = lerpf(curl, curl_goal, ease_slow)
 
