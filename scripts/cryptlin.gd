@@ -325,15 +325,16 @@ var flap_rate := 0.0
 var flap_reach := 0.0
 # More heads than the one on its neck: they follow it round, a little behind
 var heads: Array[Node3D] = []
-# A dummy it carries about in front of it (the cockatrice's stuffed rooster): the dummy, its two
-# wings and its head, how far it is leaning and its wings trailing just now (see _flop); and of
-# the snake behind it, the part that rears up and the coils it sleeps in
+# A dummy it wears in front of it (the cockatrice's stuffed rooster): the dummy, its two wings
+# and its head, how far it is leaning and its wings trailing just now (see _flop); and of the
+# snake that comes out of the back of it, each joint from the dummy to the head, and where each
+# is when it is up and then when it is asleep
 var decoy: Node3D
 var decoy_parts: Array[Node3D] = []
 var flop := Vector3.ZERO
 var trail := 0.0
-var rise: Node3D
-var coil: Node3D
+var serpent: Array[Node3D] = []
+var serpent_at: Array[Vector3] = []
 # How big its insides are next to the usual (a slight body has less room), and how high its
 # backbone runs when its head is not straight above it (0 for up to the neck)
 var gut := 1.0
@@ -1032,18 +1033,23 @@ func _shaggy(colour: Color, shells: int, hair: float, values := {}) -> ShaderMat
 	return coat
 
 
-# The cockatrice is the serpent. It rises from behind a stuffed rooster that it carries in front
-# of it and walks about like a puppet: the rig's neck, eyes and mouth are the snake's, and the
-# rooster is a dummy (see `decoy`) with buttons for eyes, a beak that is sewn shut and limp
-# wings, which flops along a beat behind whatever the snake does.
+# The cockatrice is the serpent, and the serpent is what its rooster has for a tail: it comes up
+# out of the back end of a stuffed rooster, curving up and over with its head held high, and
+# wears the rooster in front of it like a costume. The rig's neck, eyes and mouth are the snake's,
+# and the rooster is a dummy (see `decoy`) with buttons for eyes, a beak that is sewn shut and limp
+# wings, hung from the snake at the place where the two join, which flops along a beat behind
+# whatever the snake does.
 func _build_cockatrice(chub: float) -> void:
-	neck_y = 0.7
+	neck_y = 0.85
 	head_y = 0.13
 	centre_y = 0.3
-	top_y = 1.0
+	top_y = 1.15
 	gravity = 9.0
-	gut = 0.62
-	gut_at = Vector3(0.04, 0, -0.2)
+	# Its insides are up in the snake, behind the dummy, which it leans to one side of or the other
+	var bend := 1.0 if int(shape["side"]) == 1 else -1.0
+	gut = 0.56
+	back_y = 0.5
+	gut_at = Vector3(0.06 * bend, 0.31, -0.33)
 	brain_at = Vector3(0, 0.14, 0.05)
 	var yellow := Ps1.mat(Color(0.62, 0.46, 0.12), 0.0, 0.35)
 	var red := Ps1.mat(Color(0.6, 0.1, 0.08), 0.0, 0.35)
@@ -1051,7 +1057,8 @@ func _build_cockatrice(chub: float) -> void:
 	var stuffed := Ps1.mat(fur_colour.lerp(Color(0.5, 0.44, 0.34), 0.5) * 0.7, 0.0, 0.2)
 	var sacking := Ps1.mat(Color(0.52, 0.46, 0.34), 0.0, 0.2)
 	var thread := Ps1.mat(Color(0.1, 0.08, 0.07))
-	# Its legs are the dummy's: they dangle, and swing as it is walked along
+	# Its legs are the dummy's: they dangle, and swing as it is walked along (see _flop, which
+	# keeps them on the dummy)
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.09 * side, 0.2, 0.14))
 		_part(leg, _capsule(0.022, 0.2), yellow, Vector3(0, -0.08, 0))
@@ -1059,37 +1066,31 @@ func _build_cockatrice(chub: float) -> void:
 		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
-	# The serpent: an S of it lies on the floor behind, and the rest rears up over the dummy
-	var lying: Array[Vector3] = [Vector3(0.02, 0.05, -0.5), Vector3(-0.2, 0.06, -0.36), Vector3(-0.08, 0.07, -0.2), Vector3(0.1, 0.07, -0.2)]
-	_rope(torso, fur, lying, 0.05 * chub, 0.075 * chub)
-	rise = _pivot(torso, Vector3(0.1, 0, -0.2))
-	var reared: Array[Vector3] = [Vector3(0, 0.07, 0), Vector3(0.03, 0.26, -0.03), Vector3(-0.05, 0.5, 0.02), Vector3(-0.1, 0.72, 0.1)]
-	_rope(rise, fur, reared, 0.075 * chub, 0.06 * chub)
-	# Paler down its front, with dark saddles down its back
-	var throat: Array[Vector3] = []
-	for at in reared:
-		throat.append(at + Vector3(0, -0.01, 0.035))
-	_rope(rise, pale, throat, 0.055 * chub, 0.045 * chub)
-	for at: Vector3 in [lying[1], lying[2]]:
-		_part(torso, _sphere(), dark, at + Vector3(0, 0.03, 0), Vector3(0.06, 0.05, 0.06) * chub)
-	for at: Vector3 in [reared[1], reared[2]]:
-		_part(rise, _sphere(), dark, at + Vector3(0, 0, -0.04), Vector3(0.06, 0.06, 0.05) * chub)
-	tail = _pivot(torso, lying[0])
-	_rope(tail, fur, [Vector3.ZERO, Vector3(0.12, -0.01, -0.14), Vector3(0.02, -0.02, -0.3)], 0.05 * chub, 0.02)
-	_part(tail, _cone(), dark, Vector3(-0.03, -0.02, -0.36), Vector3(0.02, 0.12, 0.02), Vector3(-PI * 0.5, 0, 0.5))
-	# Coils that it throws round the dummy when it sleeps
-	coil = _pivot(torso, Vector3(0, 0, 0.12))
-	var round: Array[Vector3] = []
-	for i in 9:
-		var around := TAU * i / 8.0
-		round.append(Vector3(sin(around) * 0.3, 0.06, cos(around) * 0.3))
-	_rope(coil, fur, round, 0.07 * chub, 0.07 * chub)
-	coil.visible = false
+	# The serpent, joint by joint from where it comes out of the dummy to its head: where each is
+	# when it is up and about, and then where each is when it has laid itself round the dummy to
+	# sleep. Paler down its front, with dark saddles down its back.
+	serpent_at = [
+		Vector3(0, 0.42, -0.04), Vector3(0.02 * bend, 0.46, -0.24), Vector3(0.06 * bend, 0.58, -0.37), Vector3(0.06 * bend, 0.71, -0.35), Vector3(0.02 * bend, 0.81, -0.25), Vector3(-0.02 * bend, 0.85, -0.12),
+		Vector3(0, 0.42, -0.04), Vector3(-0.17, 0.5, -0.15), Vector3(-0.32, 0.46, 0.0), Vector3(-0.34, 0.42, 0.17), Vector3(-0.25, 0.4, 0.32), Vector3(-0.1, 0.34, 0.38),
+	]
+	var joints := serpent_at.size() / 2
+	for i in joints:
+		var thick := lerpf(0.085, 0.06, float(i) / (joints - 1)) * chub
+		var link := _pivot(torso, serpent_at[i])
+		if i < joints - 1:
+			var taper := lerpf(0.085, 0.06, float(i + 1) / (joints - 1)) * chub / thick
+			var length := _pivot(link, Vector3.ZERO)
+			_part(length, _drum(taper, 1.0, 1.0), fur, Vector3(0, 0.5, 0), Vector3(thick, 1.0, thick))
+			_part(length, _drum(taper, 1.0, 1.0), pale, Vector3(0, 0.5, thick * 0.4), Vector3(thick * 0.72, 1.0, thick * 0.72))
+			if i > 0:
+				_part(length, _sphere(), dark, Vector3(0, 0.5, -thick * 0.5), Vector3(thick * 0.8, 0.36, thick * 0.7))
+		_part(link, _sphere(), fur, Vector3.ZERO, Vector3.ONE * thick)
+		serpent.append(link)
 	for side: float in [-1.0, 1.0]:
-		arms.append(_pivot(torso, Vector3(0.1 + 0.03 * side, 0.2, -0.2)))
+		arms.append(_pivot(serpent[2], Vector3(0.02 * side, 0.12, 0)))
 
 	# Its head: flat and blunt, with a low red crest down the middle of it, fangs and a forked tongue
-	neck = _pivot(rise, Vector3(-0.1, neck_y, 0.1))
+	neck = _pivot(torso, serpent_at[joints - 1])
 	_part(neck, _sphere(), fur, Vector3(0, 0.12, 0.04), Vector3(0.12, 0.08, 0.15))
 	_part(neck, _sphere(), fur, Vector3(0, 0.105, 0.16), Vector3(0.085, 0.055, 0.1))
 	_part(neck, _sphere(), pale, Vector3(0, 0.075, 0.08), Vector3(0.095, 0.045, 0.13))
@@ -1109,20 +1110,21 @@ func _build_cockatrice(chub: float) -> void:
 	for side: float in [-1.0, 1.0]:
 		_part(mouth_node, Ps1.box(), red, Vector3(0.014 * side, -0.02, 0.135), Vector3(0.01, 0.01, 0.045), Vector3(0, 0.5 * side, 0))
 
-	# The dummy, hung from where its legs join it so that it can flop about them
-	decoy = _pivot(torso, Vector3(0, 0.2, 0.14))
-	_part(decoy, _sphere(), stuffed, Vector3(0, 0.14, -0.02), Vector3(0.2 * chub, 0.19, 0.23 * chub))
-	_part(decoy, _sphere(), sacking, Vector3(0, 0.12, 0.1 * chub), Vector3(0.15 * chub, 0.15, 0.12))
+	# The dummy, hung from the snake at the first joint of it, inside its own back end, so that
+	# however it flops the two stay joined there
+	decoy = _pivot(torso, serpent_at[0])
+	_part(decoy, _sphere(), stuffed, Vector3(0, -0.08, 0.16), Vector3(0.2 * chub, 0.19, 0.23 * chub))
+	_part(decoy, _sphere(), sacking, Vector3(0, -0.1, 0.18 + 0.1 * chub), Vector3(0.15 * chub, 0.15, 0.12))
 	# (a seam down its front, and a patch)
 	for i in 4:
-		_part(decoy, Ps1.box(), thread, Vector3(0, 0.03 + i * 0.055, 0.2 * chub - absf(i - 1.5) * 0.012), Vector3(0.05, 0.01, 0.012))
-	_part(decoy, Ps1.box(), red, Vector3(0.13 * chub, 0.16, 0.1), Vector3(0.01, 0.07, 0.07), Vector3(0, 0.5, 0.2))
+		_part(decoy, Ps1.box(), thread, Vector3(0, -0.19 + i * 0.055, 0.18 + 0.2 * chub - absf(i - 1.5) * 0.012), Vector3(0.05, 0.01, 0.012))
+	_part(decoy, Ps1.box(), red, Vector3(0.13 * chub, -0.06, 0.28), Vector3(0.01, 0.07, 0.07), Vector3(0, 0.5, 0.2))
 	for side: float in [-1.0, 1.0]:
-		var wing := _pivot(decoy, Vector3(0.18 * chub * side, 0.26, -0.02))
+		var wing := _pivot(decoy, Vector3(0.18 * chub * side, 0.04, 0.16))
 		_part(wing, _sphere(), stuffed, Vector3(0, -0.12, -0.02), Vector3(0.035, 0.15, 0.12))
 		_part(wing, _cone(), sacking, Vector3(0, -0.27, -0.05), Vector3(0.028, 0.13, 0.08), Vector3(PI, 0, 0))
 		decoy_parts.append(wing)
-	var lolling := _pivot(decoy, Vector3(0, 0.3, 0.07))
+	var lolling := _pivot(decoy, Vector3(0, 0.08, 0.25))
 	_part(lolling, _sphere(), stuffed, Vector3(0, 0.1, 0), Vector3(0.14, 0.14, 0.14))
 	_part(lolling, _cone(), yellow, Vector3(0, 0.08, 0.17), Vector3(0.05, 0.13, 0.04), Vector3(PI * 0.5 + 0.25, 0, 0))
 	for i in 3:
@@ -1135,36 +1137,62 @@ func _build_cockatrice(chub: float) -> void:
 		_part(button, _drum(1.0, 1.0, 1.0), bone, Vector3.ZERO, Vector3(0.042, 0.012, 0.042), Vector3(PI * 0.5, 0, 0))
 		_part(button, _drum(1.0, 1.0, 1.0), thread, Vector3(0, 0, 0.006), Vector3(0.03, 0.012, 0.03), Vector3(PI * 0.5, 0, 0))
 	decoy_parts.append(lolling)
-
-
-# A length of body through these points, from so thick at the first to so thick at the last
-func _rope(parent: Node3D, mat: Material, points: Array[Vector3], from: float, to: float) -> void:
-	for i in points.size():
-		var thick := lerpf(from, to, float(i) / (points.size() - 1))
-		_part(parent, _sphere(), mat, points[i], Vector3.ONE * thick)
-		if i > 0:
-			var along := points[i] - points[i - 1]
-			_spike(parent, mat, points[i - 1], along, along.length(), (thick + lerpf(from, to, float(i - 1) / (points.size() - 1))) * 0.5, _drum(1.0, 1.0, 1.0))
+	# What is left of the rooster's own tail: a few limp feathers round the place the snake comes
+	# out of
+	tail = _pivot(decoy, Vector3(0, 0.02, -0.03))
+	for i in 3:
+		_part(tail, _cone(), sacking if i == 1 else stuffed, Vector3((i - 1) * 0.07, -0.05 - absf(i - 1.0) * 0.03, -0.1), Vector3(0.04, 0.2, 0.014), Vector3(-PI * 0.5 - 0.5 - absf(i - 1.0) * 0.3, (1 - i) * 0.5, 0))
 
 
 # What the cockatrice's dummy does, which is whatever the snake has just done, a beat late and
-# with nothing holding it up: it leans and swings about its legs, its head lolls, its wings hang
-# and trail, and when the snake curls up to sleep it tips over and is coiled round
+# with nothing holding it up: it leans and swings from where the snake comes out of it, its head
+# lolls, its wings hang and trail, its legs dangle under it, and when the snake goes to sleep it
+# tips over and the snake lays its length round it
 func _flop(delta: float) -> void:
 	var late := 1.0 - exp(-delta * 3.5)
 	var speed := Vector2(velocity.x, velocity.z).length()
-	flop = flop.lerp(Vector3(-minf(speed, 3.0) * 0.16 - squash * 1.6 + sit * 0.25, head_yaw * 0.3, sin(phase - 1.3) * 0.3 * gait - wiggle * 2.5 - head_roll * 0.6 + curl * 1.35), late)
+	var hung := airborne or lift > 0.05
+	flop = flop.lerp(Vector3((0.5 if hung else 0.0) - minf(speed, 3.0) * 0.07 - squash * 1.6 + sit * 0.2, head_yaw * 0.25, sin(phase - 1.3) * 0.3 * gait - wiggle * 2.5 - head_roll * 0.6 + curl * 1.35), late)
+	# The snake: each joint of it eases between where it is held up and where it lies asleep, it
+	# sways as it goes, most at the head, and when it puts its head down to something it reaches
+	# out round the side of the dummy to do it
+	var joints := serpent.size()
+	var at: Array[Vector3] = []
+	var lean := Vector3(0.5 * signf(serpent_at[2].x), -0.6, 0.8) * nod
+	for i in joints:
+		var up := float(i) / (joints - 1)
+		var sway := sin(anim_t * 1.7 - i * 0.9) * 0.012 + sin(phase - i * 0.8) * 0.03 * gait
+		at.append(serpent_at[i].lerp(serpent_at[joints + i], curl) + Vector3(sway * up, 0, -minf(speed, 3.0) * 0.03 * up * up) * (1.0 - curl) + lean * up * up * (1.0 - curl))
+	var belly := Vector3(0, -1.0, 0.6).lerp(Vector3(0.3, -1.0, 0.0), curl).normalized()
+	for i in joints:
+		serpent[i].position = at[i]
+		if i < joints - 1:
+			var along := at[i + 1] - at[i]
+			var up := along.normalized()
+			var across := up.cross(belly)
+			if across.length() < 0.05:
+				across = up.cross(Vector3.RIGHT)
+			across = across.normalized()
+			serpent[i].basis = Basis(across, up, across.cross(up))
+			(serpent[i].get_child(0) as Node3D).scale.y = along.length()
+	neck.position = at[joints - 1]
+	# (and under the scanner its insides go with the part of it they are in)
+	if not insides.is_empty():
+		insides[0].position = (at[2] + at[3] - serpent_at[2] - serpent_at[3]) * 0.5
+	decoy.position = at[0]
 	decoy.rotation = flop
-	decoy.position.y = 0.2 - curl * 0.06
 	var lolling := decoy_parts[2]
 	lolling.rotation = Vector3(0.35 + flop.x * 1.6 + absf(sin(phase - 2.0)) * 0.25 * gait, flop.y, 0.3 + flop.z * 0.8)
-	trail = lerpf(trail, 2.2 if airborne or lift > 0.05 else absf(sin(phase - 1.8)) * 0.4 * gait, late * 2.0)
+	trail = lerpf(trail, 2.2 if hung else absf(sin(phase - 1.8)) * 0.4 * gait, late * 2.0)
 	for i in 2:
 		var side := -1.0 if i == 0 else 1.0
 		decoy_parts[i].rotation.z = side * (0.12 + trail)
-	rise.rotation.x = curl * 0.95
-	coil.visible = curl > 0.05
-	coil.scale = Vector3.ONE * maxf(curl, 0.05)
+		# Its legs hang from the dummy wherever that has got to, and off the floor they only dangle
+		legs[i].position = torso.transform * (decoy.transform * Vector3(0.09 * side, -0.22, 0.18))
+		legs[i].rotation.z = flop.z
+		if lift > 0.05:
+			legs[i].rotation.x = 0.3 + sin(anim_t * 2.5 + i * 1.7) * 0.15
+	tail.rotation = Vector3(trail * 0.25, flop.y, flop.z * 0.3)
 
 
 # Small, dark and furry, with great red eyes, feathered feelers and wings it is still growing into

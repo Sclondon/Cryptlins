@@ -44,6 +44,8 @@ var book := false
 var from_step := 1
 var first_wait := 0.8
 var second_wait := 1.8
+var poses := false
+var strides := false
 
 
 func _initialize() -> void:
@@ -98,6 +100,10 @@ func _initialize() -> void:
 			dark = true
 		if arg == "--wheel":
 			wheel = true
+		if arg == "--poses":
+			poses = true
+		if arg == "--strides":
+			strides = true
 		if arg == "--portrait":
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
@@ -125,7 +131,9 @@ func _initialize() -> void:
 	main.first_kind = kind
 	main.ask_names = false
 	root.add_child(main)
-	if tidy:
+	if poses or strides:
+		_run_close.call_deferred()
+	elif tidy:
 		_run_tidy.call_deferred()
 	elif book:
 		_run_book.call_deferred()
@@ -655,6 +663,102 @@ func _run_variety() -> void:
 	quit()
 
 
+# One of the kind close to, on one sheet. With --poses: stood facing you and turned three ways,
+# walking, eating, held up, and asleep from three sides. With --strides: so many moments one
+# after another of it going across the room at a walk and then at a run, and of the jump it gives
+# when it is startled. A baby with --baby.
+func _run_close() -> void:
+	await _wait(0.8)
+	var sun := DirectionalLight3D.new()
+	sun.light_energy = 0.45
+	main.add_child(sun)
+	sun.look_at_from_position(Vector3(0.5, 2.0, 4.0), Vector3(0, 0.4, 0))
+	var pet := main.who().pet
+	pet.set_needs({"belly": 80.0, "fun": 80.0, "energy": 90.0, "love": 50.0})
+	if baby:
+		pet.age = 0.0
+		pet.grow = pet.size_goal()
+	var tiles: Array[Image] = []
+	var spot := Vector3(0, 0, 1.7)
+	if strides:
+		for pace in 3:
+			pet.position = Vector3(-1.5, 0, 1.7) if pace < 2 else spot
+			pet.yaw = PI * 0.5
+			pet._enter(Cryptlin.State.IDLE, 60.0)
+			await _wait(0.5)
+			match pace:
+				0:
+					pet.target = Vector3(1.7, 0, 1.7)
+					pet._enter(Cryptlin.State.WANDER)
+					await _wait(0.5)
+				1:
+					pet.call_to(Vector3(1.7, 0, 1.7))
+					await _wait(0.35)
+				2:
+					pet.boop()
+			for i in 8:
+				tiles.append(await _tile(pet))
+				for frame in (3 if pace < 2 else 5):
+					await process_frame
+	else:
+		for turn: float in [0.0, 70.0, 180.0, 250.0]:
+			pet.position = spot
+			pet._enter(Cryptlin.State.IDLE, 60.0)
+			for frame in 40:
+				pet.yaw = deg_to_rad(turn)
+				await process_frame
+			tiles.append(await _tile(pet))
+		pet.position = Vector3(-1.2, 0, 1.7)
+		pet.target = Vector3(1.7, 0, 1.7)
+		pet._enter(Cryptlin.State.WANDER)
+		await _wait(0.9)
+		tiles.append(await _tile(pet))
+		pet.belly = 30.0
+		main.feed()
+		await _until(func() -> bool: return pet.state == Cryptlin.State.EAT, 8.0)
+		await _wait(0.6)
+		tiles.append(await _tile(pet))
+		await _until(func() -> bool: return main.snacks.is_empty(), 5.0)
+		pet.position = spot
+		pet.pick_up()
+		pet.carry(spot + Vector3(0, 0.7, 0))
+		await _wait(1.0)
+		tiles.append(await _tile(pet))
+		pet.put_down()
+		await _until(func() -> bool: return pet.state != Cryptlin.State.HELD, 3.0)
+		pet.position = spot
+		pet._enter(Cryptlin.State.SLEEP)
+		for turn: float in [0.0, 110.0, 200.0]:
+			for frame in 130:
+				pet.position = spot
+				pet.yaw = deg_to_rad(turn)
+				await process_frame
+			tiles.append(await _tile(pet))
+	var across := 4 if strides else 5
+	var size := tiles[0].get_size()
+	var sheet := Image.create(size.x * across, size.y * ceili(float(tiles.size()) / across), false, Image.FORMAT_RGB8)
+	for i in tiles.size():
+		sheet.blit_rect(tiles[i], Rect2i(Vector2i.ZERO, size), Vector2i((i % across) * size.x, (i / across) * size.y))
+	sheet.resize(sheet.get_width() * 2, sheet.get_height() * 2, Image.INTERPOLATE_NEAREST)
+	sheet.save_png("%s/k%d_%s%s.png" % [out, kind, "strides" if strides else "poses", "_baby" if baby else ""])
+	quit()
+
+
+# The piece of the picture that one of them is in
+func _tile(pet: Cryptlin) -> Image:
+	pet.emote.visible = false
+	pet.emote_again = 99.0
+	await RenderingServer.frame_post_draw
+	var shot := root.get_texture().get_image()
+	shot.convert(Image.FORMAT_RGB8)
+	var scale := Vector2(shot.get_size()) / main.get_viewport().get_visible_rect().size
+	var size := Vector2i(250, 220)
+	var mid := Vector2i(main.screen_of(Vector3(pet.position.x, 0.62 + pet.lift, pet.position.z)) * scale)
+	var piece := Image.create(size.x, size.y, false, Image.FORMAT_RGB8)
+	piece.blit_rect(shot, Rect2i(mid - size / 2, size).intersection(Rect2i(Vector2i.ZERO, shot.get_size())), Vector2i.ZERO)
+	return piece
+
+
 # Its knack: one of the kind with another beside it and what it needs to hand, taking its turn
 # at it. One picture of two moments, the middle of the room cut out of each and set side by side.
 func _run_knack() -> void:
@@ -875,6 +979,13 @@ func _run() -> void:
 		pet.stroke()
 		await process_frame
 	await _snap("6_petted")
+	pet.pick_up()
+	pet.carry(pet.position + Vector3(0.2, 0.8, 0))
+	await _wait(1.0)
+	await _snap("6a_held")
+	pet.put_down()
+	await _until(func() -> bool: return pet.state != Cryptlin.State.HELD, 3.0)
+	await _wait(0.8)
 	pet._enter(Cryptlin.State.LURK)
 	await _until(func() -> bool: return pet.step == 1, 9.0)
 	await _wait(1.0)

@@ -78,7 +78,7 @@ const QUIET := "The noise they make can be shut off below. The trains you will h
 const KIND_NOTES: Array[String] = [
 	"Ears, a tail and teeth. The plainest of them and the least trouble, which is not saying much.",
 	"A young sasquatch. Slow, heavy and shy, and it eats like a platelayer.",
-	"The snake is the animal. The rooster it carries in front is stuffed. Do not let on that you know.",
+	"The snake is the animal. The rooster on the front of it is stuffed, and the snake is its tail. Do not let on that you know.",
 	"All eyes and wings. Quick and squeaky, and worn out sooner than you would think.",
 	"Thin as a rail and always hungry. It lurks.",
 	"A frog that stands up. It jumps higher than is decent, and likes a dance.",

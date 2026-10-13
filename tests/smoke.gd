@@ -187,15 +187,47 @@ func _serpent(pet: Cryptlin) -> void:
 	check(behind and boned == 0 and pet.inside_at("brain").y > pet.decoy.global_position.y, "its insides are in the snake, and there is nothing in the dummy")
 	pet._enter(Cryptlin.State.SLEEP)
 	await _frames(120)
-	check(pet.coil.visible and absf(pet.decoy.rotation.z) > 0.8, "asleep, it is coiled round the dummy, which has tipped over")
+	var laid := pet.neck.position.y < pet.neck_y * 0.6 and Vector2(pet.neck.position.x, pet.neck.position.z).distance_to(Vector2(pet.decoy.position.x, pet.decoy.position.z + 0.16)) < 0.45
+	check(laid and absf(pet.decoy.rotation.z) > 0.8 and _joined(pet), "asleep, it is coiled round the dummy, which has tipped over")
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	await _frames(120)
-	check(not pet.coil.visible and absf(pet.decoy.rotation.z) < 0.3, "and awake it rears up behind it again")
+	check(pet.neck.position.y > pet.neck_y - 0.05 and absf(pet.decoy.rotation.z) < 0.3, "and awake it rears up behind it again")
+	# The snake is the rooster's tail: it comes out of the back end of the dummy, goes up from
+	# there to a head held higher than the dummy's, and the two stay joined however it is thrown about
+	var body: Node3D = pet.decoy.get_child(0)
+	var rear := pet.to_local(pet.serpent[0].global_position)
+	var tailed := rear.z < pet.to_local(body.global_position).z - 0.1 and pet.to_local(pet.serpent[2].global_position).z < rear.z and pet.to_local(pet.neck.global_position).y > pet.to_local(pet.decoy_parts[2].global_position).y + 0.2
+	var held := _joined(pet)
+	pet.position = Vector3(-1.0, 0, 0.6)
+	pet.target = Vector3(1.2, 0, 1.0)
+	pet._enter(Cryptlin.State.WANDER)
+	for i in 50:
+		await process_frame
+		held = held and _joined(pet)
+	pet.pick_up()
+	pet.carry(pet.position + Vector3(0.3, 0.8, 0))
+	for i in 50:
+		await process_frame
+		held = held and _joined(pet)
+	var hung := pet.decoy.rotation.x > 0.2
+	pet.put_down()
+	await _until(func() -> bool: return pet.state != Cryptlin.State.HELD, 200)
+	pet._enter(Cryptlin.State.IDLE, 3.0)
+	await _frames(90)
+	check(tailed and held and hung, "the snake comes out of the dummy's back end like a tail, and stays joined to it walking and picked up, when the dummy hangs from it")
 	pet.wiggle = 0.3
 	pet._animate(0.016)
 	var lagging := absf(pet.decoy.rotation.z)
 	check(lagging > 0.0 and lagging < 0.2, "the dummy flops after it, a beat behind")
 	pet.wiggle = 0.0
+
+
+# Whether the cockatrice's snake and its dummy are joined: the first joint of the snake is where
+# the dummy hangs from, and that is inside the dummy's body
+func _joined(pet: Cryptlin) -> bool:
+	var body: Node3D = pet.decoy.get_child(0)
+	var inside := (body.global_transform.affine_inverse() * pet.serpent[0].global_position).length() < 1.0
+	return inside and pet.serpent[0].global_position.distance_to(pet.decoy.global_position) < 0.01
 
 
 # The slide-rock bolter is a whale to look at, long along the ground from its mouth to its
