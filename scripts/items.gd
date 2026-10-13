@@ -7,6 +7,7 @@ extends RefCounted
 const LIST: Array[Dictionary] = [
 	{"id": "notebook", "group": "tool", "n": 0, "name": "Notebook"},
 	{"id": "scanner", "group": "tool", "n": 1, "name": "Scanner"},
+	{"id": "broom", "group": "tool", "n": 2, "name": "Broom"},
 	{"id": "egg", "group": "egg", "n": 0, "name": "Egg"},
 	{"id": "bone", "group": "food", "n": 0, "name": "Bone"},
 	{"id": "toadstool", "group": "food", "n": 1, "name": "Toadstool"},
@@ -49,12 +50,12 @@ const LIST: Array[Dictionary] = [
 # What every keeper has without buying it. The rest come from the shop when the game is played
 # inside a site that keeps one (see Den.stock), eggs among them: a room there is never given an
 # egg for nothing. Played by itself, everything is on the shelf.
-const FREE: Array[String] = ["notebook", "scanner", "bone", "ball", "rags", "dirt"]
+const FREE: Array[String] = ["notebook", "scanner", "broom", "bone", "ball", "rags", "dirt"]
 # Used up when used: each one fed, or each egg laid, is one fewer on the shelf
 const SPENT: Array[String] = ["food", "egg"]
 # The order things ride in round the wheel, by id or by group: the scanner first and the notebook
 # last, whatever order LIST is in (which saves and the shop go by, and is not to be renumbered)
-const ROW: Array[String] = ["scanner", "food", "toy", "egg", "decor", "nest", "ground", "notebook"]
+const ROW: Array[String] = ["scanner", "broom", "food", "toy", "egg", "decor", "nest", "ground", "notebook"]
 # Never bought or sold: on the shelf only while the keeper has one put away
 const KEPT: Array[String] = ["marker"]
 # On the scanner (see scanner()): how far up its barrel runs, the middle of the mouth of its cone
@@ -64,6 +65,8 @@ const MUZZLE := Vector3(0, BORE, -0.54)
 const MOUTH := 0.22
 const READOUT := Vector3(0, BORE + 0.01, 0.35)
 const READOUT_SIZE := Vector2(0.19, 0.14)
+# How far the broom leans when nobody is sweeping with it (see broom())
+const BROOM_LEAN := -0.3
 
 
 static func find(id: String) -> Dictionary:
@@ -124,6 +127,11 @@ static func model(id: String) -> Node3D:
 		_:
 			if id == "notebook":
 				holder.add_child(notebook())
+			elif id == "broom":
+				var b := broom()
+				b.scale = Vector3.ONE * 0.86
+				b.position = Vector3(0.02, 0.02, 0)
+				holder.add_child(b)
 			else:
 				# Side on, its cone to the left and a little of its back showing
 				var s := scanner()
@@ -151,6 +159,43 @@ static func notebook() -> Node3D:
 	Ps1.part(leaf, Ps1.drum(5), Ps1.mat(Color(0.85, 0.65, 0.15)), Vector3(0.25, 0.0, 0.03), Vector3(0.018, 0.4, 0.018))
 	Ps1.part(leaf, Ps1.drum(5, 0.0), Ps1.mat(Color(0.2, 0.18, 0.16)), Vector3(0.25, -0.225, 0.03), Vector3(0.018, 0.05, 0.018), Vector3(PI, 0, 0))
 	return book
+
+
+# A short hearth broom and a tin dustpan, for what gets left on the floor. The broom stands on
+# its bristles, leaning, with the pan lying beside it; the two are children of their own ("brush"
+# and "pan") so that the room can work the one against the other (see Den._tick_broom). Both give
+# off a very little light, so that they can be found in the dark.
+static func broom() -> Node3D:
+	var set_of := Node3D.new()
+	var brush := Node3D.new()
+	brush.name = "brush"
+	brush.position = Vector3(-0.1, 0, 0)
+	brush.rotation.z = BROOM_LEAN
+	set_of.add_child(brush)
+	var wood := Ps1.mat(Color(0.5, 0.33, 0.17), 0.12)
+	var straw := Ps1.mat(Color(0.8, 0.64, 0.28), 0.15)
+	Ps1.part(brush, Ps1.drum(6), wood, Vector3(0, 0.5, 0), Vector3(0.022, 0.56, 0.022))
+	Ps1.part(brush, Ps1.ball(), wood, Vector3(0, 0.79, 0), Vector3(0.032, 0.026, 0.032))
+	Ps1.part(brush, Ps1.box(), Ps1.mat(Color(0.56, 0.14, 0.1), 0.12), Vector3(0, 0.2, 0), Vector3(0.24, 0.06, 0.075))
+	Ps1.part(brush, Ps1.box(), straw, Vector3(0, 0.115, 0), Vector3(0.25, 0.13, 0.06))
+	Ps1.part(brush, Ps1.box(), Ps1.mat(Color(0.25, 0.2, 0.14), 0.1), Vector3(0, 0.14, 0), Vector3(0.26, 0.018, 0.068))
+	# (the ends of the bristles, splayed and uneven)
+	for i in 5:
+		Ps1.part(brush, Ps1.box(), Ps1.mat(Color(0.7, 0.54, 0.22).lerp(Color(0.86, 0.72, 0.36), (i % 2) * 0.8), 0.15), Vector3(-0.12 + i * 0.06, 0.03 + 0.008 * (i % 3), 0), Vector3(0.062, 0.06 + 0.016 * (i % 3), 0.07), Vector3(0, 0, (i - 2) * -0.09))
+	var pan := Node3D.new()
+	pan.name = "pan"
+	pan.position = Vector3(0.17, 0, 0.02)
+	pan.rotation.y = -0.5
+	set_of.add_child(pan)
+	var tin := Ps1.mat(Color(0.24, 0.42, 0.38), 0.12)
+	var edge := Ps1.mat(Color(0.62, 0.64, 0.62), 0.12)
+	Ps1.part(pan, Ps1.box(), tin, Vector3(0, 0.012, 0), Vector3(0.28, 0.014, 0.24), Vector3(0.06, 0, 0))
+	Ps1.part(pan, Ps1.box(), tin, Vector3(0, 0.05, -0.12), Vector3(0.28, 0.085, 0.02))
+	for side: float in [-1.0, 1.0]:
+		Ps1.part(pan, Ps1.box(), tin, Vector3(0.14 * side, 0.04, -0.01), Vector3(0.016, 0.06, 0.22), Vector3(0.14, 0, 0))
+	Ps1.part(pan, Ps1.box(), edge, Vector3(0, 0.008, 0.122), Vector3(0.28, 0.01, 0.014))
+	Ps1.part(pan, Ps1.drum(5), Ps1.mat(Color(0.5, 0.33, 0.17), 0.12), Vector3(0, 0.085, -0.2), Vector3(0.022, 0.17, 0.022), Vector3(-1.25, 0, 0))
+	return set_of
 
 
 # The scanner: a radar gun of the kind the police point at cars. A pistol grip with a trigger, a

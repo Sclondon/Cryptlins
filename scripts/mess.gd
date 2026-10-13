@@ -1,12 +1,14 @@
 class_name Mess
 extends Node3D
-## What a cryptlin leaves on the floor: a dropping, which stays until the keeper taps it away; a
-## puddle, which dries up by itself; or the heap of earth from a dig, which settles in a while.
+## What gets left on the floor: a dropping, which stays until the keeper sweeps it up; a puddle,
+## which dries up by itself; the heap of earth from a dig, which settles in a while; or the bits of
+## a toy that has been played with until it broke, which stay until they are swept up too.
 
-enum Kind { DROPPING, PUDDLE, HEAP }
+enum Kind { DROPPING, PUDDLE, HEAP, BITS }
 
-# How long a puddle and a heap last, in seconds of the clock on the wall (a dropping: for ever)
-const LASTS: Array[float] = [0.0, 3600.0, 600.0]
+# How long a puddle and a heap last, in seconds of the clock on the wall (a dropping and the bits
+# of a toy: for ever)
+const LASTS: Array[float] = [0.0, 3600.0, 600.0, 0.0]
 
 var kind: int = Kind.DROPPING
 # When it was left (unix time), its colour, and how big next to the usual
@@ -37,9 +39,19 @@ func _init(which: int, when: float, colour: Color, big := 1.0) -> void:
 			var mat := Ps1.mat(tint)
 			Ps1.part(body, Ps1.ball(), mat, Vector3(0, 0.03, 0), Vector3(0.16, 0.07, 0.14))
 			Ps1.part(body, Ps1.ball(), mat, Vector3(0.1, 0.02, 0.06), Vector3(0.09, 0.04, 0.08))
+		Kind.BITS:
+			# A split half of it lying open, and shards and scraps round about, in its own colour,
+			# a darker one and the pale of its insides
+			var shades: Array[ShaderMaterial] = [Ps1.mat(tint), Ps1.mat(tint.darkened(0.45)), Ps1.mat(tint.lerp(Color(0.85, 0.8, 0.7), 0.6))]
+			Ps1.part(body, Ps1.ball(), shades[0], Vector3(-0.03, 0.012, 0.02), Vector3(0.12, 0.05, 0.1), Vector3(0.2, 0.4, 0.15))
+			Ps1.part(body, Ps1.ball(), shades[1], Vector3(-0.03, 0.03, 0.02), Vector3(0.09, 0.034, 0.075), Vector3(0.2, 0.4, 0.15))
+			for i in 7:
+				var a := i * 0.9 + 0.4
+				var far := 0.13 + 0.035 * (i % 3)
+				Ps1.part(body, Ps1.box(), shades[i % 3], Vector3(cos(a) * far, 0.012, sin(a) * far), Vector3(0.07 - 0.012 * (i % 3), 0.02, 0.035 + 0.01 * (i % 2)), Vector3(0.3 * (i % 2), a * 1.7, 0.25))
 
 
-# How far through its time it is, 0 to 1 (a dropping is always 0)
+# How far through its time it is, 0 to 1 (0 always, for what stays until it is swept up)
 func gone() -> float:
 	if LASTS[kind] <= 0.0:
 		return 0.0

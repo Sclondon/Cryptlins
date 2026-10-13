@@ -99,6 +99,11 @@ const NATURES: Array[Dictionary] = [
 	{"title": "grumpy", "cuddle": 0.7, "dance": 0.5, "lurk": 1.3, "carry": Feeling.GRUMPY, "push": Feeling.GRUMPY},
 	{"title": "restless", "zoom": 2.0, "tire": 1.2, "pace": 1.15, "bore": 1.2, "carry": Feeling.GRUMPY, "push": Feeling.EXCITED},
 ]
+# How hard each nature is on a toy (the playful, the bold, the grumpy and the restless are rough
+# with one, and pleased with themselves when it breaks; the rest are startled), and each kind:
+# the heavy and the fierce wear one out fast, and the slight ones slowly
+const NATURE_ROUGH: Array[float] = [1.0, 1.15, 0.8, 0.85, 0.8, 1.25, 1.3, 1.2]
+const ROUGH: Array[float] = [1.0, 1.3, 1.0, 0.8, 1.4, 0.9, 1.1, 1.6, 1.4, 1.2, 0.9, 1.1, 0.8, 0.6, 0.7, 1.0, 0.8, 1.4, 1.6, 1.1]
 # The two foods and two toys each kind leans towards (Snack.Kind, Ball.Kind); one of each is its favourite
 const FOOD_LIKES: Array[Array] = [
 	[Snack.Kind.CANDY, Snack.Kind.BONE], [Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.BEETLE, Snack.Kind.BERRIES],
@@ -3847,6 +3852,34 @@ func _kick(b: Ball) -> void:
 	else:
 		step = 1
 		state_time = 0.0
+	# (every kick wears it a little, and the last one breaks it: see toy_broke)
+	world.wear_toy(b, self)
+
+
+# How hard it is on a toy, next to an ordinary grown one: by its kind, its two natures, and less
+# for a baby
+func rough() -> float:
+	return ROUGH[kind] * NATURE_ROUGH[nature] * NATURE_ROUGH[nature2] * (0.6 if is_baby() else 1.0)
+
+
+# The toy has come apart, in front of it or under its own foot. A rough or lively one is delighted
+# with itself; any other jumps out of its skin.
+func toy_broke(at: Vector3) -> void:
+	if state in [State.SLEEP, State.LEAVE, State.HELD, State.DYING, State.SCUFFLE, State.SCANNED, State.SPELL, State.TRICK]:
+		return
+	gaze = at
+	ball_cooldown = 4.0
+	if NATURE_ROUGH[nature] > 1.0:
+		_enter(State.IDLE, 2.2)
+		hop(3.2)
+		arm_goal = UP_ARM
+		wag = 14.0
+		_cry("coo", 1.2)
+		feel(Feeling.EXCITED, 4.0)
+	else:
+		_cry("squeak", 1.2)
+		_enter(State.STARTLED, 1.6)
+		feel(Feeling.SCARED, 4.0)
 
 
 # ---------------------------------------------------------------- one another

@@ -305,6 +305,291 @@ func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
 		p._enter(Cryptlin.State.IDLE, 1.0)
 
 
+# How many things there are to have on the wheel just now: all of them, but for the grave marker
+# (which is only there when one is put away) and whatever is out in the room
+func _all_but_in_use() -> int:
+	return Items.LIST.filter(func(item: Dictionary) -> bool: return not item["id"] in Items.KEPT and not main.in_room_now(item["id"])).size()
+
+
+# What is out in the room is not on the wheel: a thing stood in the room leaves it and the rest
+# close up, and put away it is back in its place; so with the nest and the ground in use, and
+# the toy on the floor; the tools never leave it; inside a page with a shop, what has run out
+# leaves it and comes back when there is more; a toy bought is the room's own once it has been
+# out; and the wheel still works with next to nothing on it
+func _in_and_out(pet: Cryptlin) -> void:
+	var shelf := main.shelf
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	pet.position = Vector3(-2.0, 0, -1.4)
+	pet.ball_cooldown = 9999.0
+	await _frames(2)
+	var before: Array[String] = shelf.ids.duplicate()
+	var at := before.find("skull")
+	var from := _on_shelf("skull")
+	await _slide(from, _screen(Vector3(0.6, 0, 0.6)), 16, from - Vector2(0, 190))
+	var skull := main.decor_of(Decor.Kind.SKULL)
+	check(skull != null and not shelf.ids.has("skull") and shelf.ids.size() == before.size() - 1, "a thing dragged up into the room is no longer on the wheel")
+	check(shelf.ids[at - 1] == before[at - 1] and shelf.ids[at] == before[at + 1] and is_equal_approx(shelf.spots[at] - shelf.spots[at - 1], 1.0), "and its neighbours close up where it was")
+	check(await _until(func() -> bool: return shelf.going.is_empty() and shelf.slips.all(func(slip: float) -> bool: return is_zero_approx(slip)), 200) and shelf.rim.get_child_count() == shelf.ids.size(), "its model is gone from the wheel, and the rest have slid round")
+	await _slide(_screen(skull.position + Vector3(0, 0.2, 0)), _on_shelf("bone"))
+	check(main.decor_of(Decor.Kind.SKULL) == null and shelf.ids == before, "dragged back down, it is on the wheel again, in its place")
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	# The nest and the ground
+	var bed := main.nest_style
+	var other_bed := (bed + 1) % Decor.NESTS.size()
+	check(not shelf.ids.has(Items.id_of("nest", bed)) and shelf.ids.has(Items.id_of("nest", other_bed)), "the nest that is in use is not on the wheel")
+	await _tap(_on_shelf(Items.id_of("nest", other_bed)))
+	check(main.nest_style == other_bed and shelf.ids.has(Items.id_of("nest", bed)) and not shelf.ids.has(Items.id_of("nest", other_bed)), "another put down in its place, the old one is back on it")
+	main.set_nest(bed)
+	var ground := main.floor_style
+	var other_ground := (ground + 1) % Den.GROUNDS.size()
+	check(not shelf.ids.has(Items.id_of("ground", ground)), "nor is the ground that is laid")
+	await _tap(_on_shelf(Items.id_of("ground", other_ground)))
+	check(main.floor_style == other_ground and shelf.ids.has(Items.id_of("ground", ground)) and not shelf.ids.has(Items.id_of("ground", other_ground)), "until another is")
+	main.set_ground(ground)
+	check(shelf.ids == before, "and with everything as it was, so is the wheel")
+	# The toy
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	pet.position = Vector3(-2.0, 0, -1.4)
+	await _tap(_on_shelf("bell"))
+	check(main.ball != null and main.ball.kind == Ball.Kind.BELL and not shelf.ids.has("bell"), "a toy thrown in is off the wheel while it is on the floor")
+	pet.ball_cooldown = 9999.0
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	main.ball.vel = Vector3.ZERO
+	main.ball.position = Vector3(0.6, Ball.R, 0.9)
+	await _frames(3)
+	await _slide(_screen(main.ball.global_position), _on_shelf("bone"))
+	check(main.ball == null and shelf.ids == before, "picked up and carried down to the wheel, it is put away and back in its place")
+	# The tools
+	main.start_scan()
+	check(shelf.ids.has("scanner") and shelf.out.get("scanner", false) and shelf.ids.has("broom") and shelf.ids.has("notebook"), "the tools stay on it whatever they are doing")
+	main.stop_scan()
+	# With a shop
+	main.embedded = true
+	main.stock = {}
+	main._sync()
+	var free := Items.FREE.filter(func(id: String) -> bool: return not main.in_room_now(id))
+	check(shelf.ids.size() == free.size() and shelf.ids[0] == "scanner" and shelf.ids[1] == "broom" and shelf.ids.back() == "notebook", "with a shop and nothing bought, the wheel holds the tools and what comes free and is not in use (%s)" % ", ".join(shelf.ids))
+	main.stock = {"fish": 1, "stone": 1}
+	main._sync()
+	var stocked: Array[String] = shelf.ids.duplicate()
+	check(stocked.has("fish") and shelf.counts.get("fish") == 1 and stocked.has("stone") and shelf.counts.get("stone") == 1, "what is bought is on it, with how many")
+	pet.belly = 100.0
+	main.feed(Snack.Kind.FISH)
+	check(main.left_of("fish") == 0 and not shelf.ids.has("fish") and shelf.ids.size() == stocked.size() - 1, "the last of a thing used, it leaves the wheel")
+	main.stock["fish"] = 2
+	main._sync()
+	check(shelf.ids == stocked and shelf.counts.get("fish") == 2, "and more of it from the page puts it back in its place")
+	main.play_ball(Ball.Kind.STONE)
+	check(main.ball != null and main.ball.bought and main.left_of("stone") == 0 and not shelf.ids.has("stone"), "a toy bought and brought out is taken from stock, and is the room's from then on")
+	main._clear_toys()
+	check(main.toybox.get("stone", []).size() == 1 and shelf.ids.has("stone") and shelf.counts.get("stone") == 1, "put away, it is on the wheel again, though there are none in stock")
+	main.stock = {}
+	main._sync()
+	check(shelf.ids.has("stone") and main.owns("stone") and not main.owns("bell"), "and stays there whatever the page says is left")
+	main.dev.visible = true
+	main._sync()
+	check(shelf.ids.size() == _all_but_in_use(), "the test panel puts everything on it that is not out in the room")
+	main.play_ball(Ball.Kind.GLOW)
+	check(not main.ball.bought and not shelf.ids.has("glow"), "and what it lends is not the room's to keep")
+	main._clear_toys()
+	main.dev.visible = false
+	main._sync()
+	check(not main.owns("glow") and main.toybox.get("glow", []).is_empty(), "nor is it on the wheel once the panel is shut")
+	# Next to nothing on it, and nothing at all
+	var few: Array[String] = ["scanner", "broom", "notebook"]
+	shelf.stock(few)
+	var reached := 0
+	for id in few:
+		shelf.show_item(id)
+		await _frames(2)
+		if shelf.has_point(shelf.where(id)) and shelf.item_at(shelf.where(id)) == id:
+			reached += 1
+	await _tap(_on_shelf("notebook"))
+	check(reached == 3 and main.notebook.visible, "with only the tools on it, each comes to the top and answers")
+	main.notebook.close()
+	var none: Array[String] = []
+	shelf.stock(none)
+	await _frames(30)
+	check(shelf.ids.is_empty() and shelf.item_at(shelf.global_position + shelf.size * 0.5) == "" and not shelf.can_scroll(1.0) and shelf.rim.get_child_count() == 0, "and with nothing on it at all it comes to no harm")
+	main.embedded = false
+	main.toybox.clear()
+	main._sync()
+	await _frames(30)
+	check(shelf.ids == before, "played by itself again, everything is back")
+
+
+# Toys wear out with being played with: so much a kick, more from a rough kind or nature and
+# less from a gentle one or a baby; it shows, scuffed and then far gone; it is kept with the
+# room, on the floor or put away; and at the last it breaks, in front of a cryptlin that is
+# startled or pleased as its nature has it, leaves its bits to be swept up, and is not on the
+# wheel afterwards: for some hours if it is one there is no end of, for good if it was bought
+func _toys() -> void:
+	var pet := main.who().pet
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	pet.ball_cooldown = 9999.0
+	main.scuffs.clear()
+	main.play_ball(Ball.Kind.BALL)
+	var toy := main.ball
+	var kicks := Ball.WORN_OUT / Ball.WEARS[Ball.Kind.BALL]
+	check(toy.wear == 0.0 and toy.stage() == 0 and kicks >= 150.0 and Ball.WEARS[Ball.Kind.STONE] < Ball.WEARS[Ball.Kind.BALL] and Ball.WEARS[Ball.Kind.GLOW] > Ball.WEARS[Ball.Kind.BALL], "a new ball takes %d kicks from an ordinary one, a stone more and the orb fewer" % kicks)
+	var natures := [pet.nature, pet.nature2]
+	var age := pet.age
+	pet.nature = 6
+	pet.nature2 = 5
+	var hard := pet.rough()
+	pet.nature = 2
+	pet.nature2 = 4
+	var soft := pet.rough()
+	pet.age = 0.0
+	var young := pet.rough()
+	pet.age = age
+	pet.nature = natures[0]
+	pet.nature2 = natures[1]
+	check(hard > soft * 2.0 and young < soft and Cryptlin.ROUGH[Cryptlin.Kind.BOLTER] > Cryptlin.ROUGH[Cryptlin.Kind.FAE] * 2.0 and Cryptlin.ROUGH.size() == Cryptlin.KINDS.size(), "a grumpy, bold one is far harder on a toy than a shy, cuddly one, a baby gentler still, and a bolter than a fae")
+	main.wear_toy(toy, pet)
+	check(is_equal_approx(toy.wear, Ball.WEARS[Ball.Kind.BALL] * pet.rough()), "each kick wears it a little (%.2f)" % toy.wear)
+	var new_look: Image = toy.mesh.material_override.get_shader_parameter("tex").get_image()
+	var tall := toy.mesh.basis.get_scale().y
+	toy.wear = Ball.SCUFFED
+	toy.show_wear()
+	var scuffed: Image = toy.mesh.material_override.get_shader_parameter("tex").get_image()
+	check(toy.stage() == 1 and scuffed.get_data() != new_look.get_data(), "a third of the way gone it is scuffed")
+	toy.wear = Ball.FAR_GONE
+	toy.show_wear()
+	var patched: Image = toy.mesh.material_override.get_shader_parameter("tex").get_image()
+	check(toy.stage() == 2 and patched.get_data() != scuffed.get_data() and toy.mesh.basis.get_scale().y < tall * 0.85 and toy.bounce < toy.spring, "and far gone it is patched, sagging and has lost its bounce")
+	# Kept with the room
+	toy.wear = 80.0
+	toy.vel = Vector3.ZERO
+	toy.position = Vector3(0.7, Ball.R, 0.5)
+	await _restart()
+	pet = main.who().pet
+	pet.ball_cooldown = 9999.0
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	check(main.ball != null and main.ball.kind == Ball.Kind.BALL and is_equal_approx(main.ball.wear, 80.0) and main.ball.stage() == 2 and main.ball.position.distance_to(Vector3(0.7, Ball.R, 0.5)) < 0.3 and not main.shelf.ids.has("ball"), "the toy on the floor is kept with the room, as worn as it was")
+	main._clear_toys()
+	check(is_equal_approx(main.scuffs.get("ball", 0.0), 80.0) and main.shelf.ids.has("ball"), "put away, it is as worn as it was")
+	await _restart()
+	pet = main.who().pet
+	pet.ball_cooldown = 9999.0
+	main.play_ball(Ball.Kind.BALL)
+	check(is_equal_approx(main.ball.wear, 80.0) and main.ball.stage() == 2, "and comes out again no better, the next day or any other")
+	# The end of it
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	pet.position = Vector3(0.2, 0, 0.6)
+	pet.flash_time = 0.0
+	main.ball.vel = Vector3.ZERO
+	main.ball.position = Vector3(0.5, Ball.R, 0.7)
+	main.ball.wear = Ball.WORN_OUT - 0.01
+	var clean := main.comfort_of(pet)
+	var loose := main.get_child_count()
+	main.wear_toy(main.ball, pet)
+	check(main.ball == null and main.messes.size() == 1 and main.messes[0].kind == Mess.Kind.BITS and main.messes[0].position.distance_to(Vector3(0.5, 0, 0.7)) < 0.2, "one kick more and it comes apart, and its bits lie where it was")
+	check(main.get_child_count() >= loose + 6, "with the pieces of it flying")
+	var pleased := Cryptlin.NATURE_ROUGH[pet.nature] > 1.0
+	check(pet.feeling == (Cryptlin.Feeling.EXCITED if pleased else Cryptlin.Feeling.SCARED) and (pleased or pet.state == Cryptlin.State.STARTLED), "the %s one is %s" % [Cryptlin.NATURES[pet.nature]["title"], "pleased with itself" if pleased else "startled"])
+	check(main.toast.modulate.a == 0.0 or main.toast.text.findn("ball") < 0, "nothing is written on the screen about it")
+	check(not main.shelf.ids.has("ball") and not main.owns("ball") and main.scuffs.is_empty() and main.comfort_of(pet) < clean, "it is not on the wheel, and the bits spoil the place a little")
+	await _frames(60)
+	check(main.get_child_count() <= loose, "the pieces come down and are gone")
+	main.sweep_one()
+	check(await _until(func() -> bool: return main.messes.is_empty(), 200), "the broom sweeps up what is left")
+	await _restart()
+	pet = main.who().pet
+	check(main.ball == null and not main.shelf.ids.has("ball"), "and it is still gone the next time")
+	main.dev.visible = true
+	main._sync()
+	check(main.shelf.ids.has("ball"), "(the test panel has one all the same)")
+	main.dev.visible = false
+	main.broken["ball"] = Time.get_unix_time_from_system() - 1.0
+	main._sync()
+	main.play_ball(Ball.Kind.BALL)
+	check(main.ball != null and main.ball.wear == 0.0 and not main.ball.bought, "of a kind there is no end of, there is a new one some hours on")
+	main._clear_toys()
+	# One that was bought
+	main.embedded = true
+	main.stock = {"glow": 1}
+	main._sync()
+	main.play_ball(Ball.Kind.GLOW)
+	main.ball.wear = Ball.WORN_OUT
+	main.wear_toy(main.ball, pet)
+	main.stock = {"glow": 0}
+	main._sync()
+	check(main.ball == null and not main.owns("glow") and main.toybox.get("glow", []).is_empty() and not main.broken.has("glow") and not main.shelf.ids.has("glow"), "one that was bought is gone for good when it breaks")
+	main.embedded = false
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	main._sync()
+	pet.ball_cooldown = 0.0
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
+# The broom: always on the wheel and nobody's to buy; a tap on a mess does nothing to it; the
+# broom dragged up off the wheel and over it sweeps it up, with a few strokes and some dust; a
+# tap on the broom sends it to sweep one up by itself; and it sweeps up a puddle and a heap too
+func _broom(pet: Cryptlin, dropping: Mess, clean: float) -> void:
+	check(main.shelf.ids.has("broom") and main.shelf.ids[1] == "broom" and "broom" in Items.FREE and main.left_of("broom") == -1, "the broom rides the wheel next to the scanner, and is nobody's to buy")
+	await _tap(_screen(dropping.position + Vector3(0, 0.06, 0)))
+	await _frames(10)
+	check(main.droppings() == 1 and dropping in main.messes, "a tap on a dropping does not clear it up")
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet._enter(Cryptlin.State.IDLE, 20.0)
+	pet.position = Den.in_room(dropping.position + Vector3(-1.6 if dropping.position.x > 0.0 else 1.6, 0, 0), 0.4)
+	# Up off the wheel on a finger, and across the floor to it
+	var from := _on_shelf("broom")
+	var over := _screen(dropping.position)
+	_touch(from, true)
+	await _frames(2)
+	for i in 12:
+		_drag(from.lerp(from - Vector2(0, 200), (i + 1) / 12.0), Vector2(0, -200) / 12.0)
+		await _frames(1)
+	check(main.grab == Den.Grab.BROOM and main.broom.visible and main.shelf.ids.has("broom"), "dragged up off the wheel, the broom is on the finger (and still on the wheel: it is a tool)")
+	var above := from - Vector2(0, 200)
+	for i in 12:
+		_drag(above.lerp(over, (i + 1) / 12.0), (over - above) / 12.0)
+		await _frames(1)
+	check(await _until(func() -> bool: return main.sweeping == dropping, 60), "brought over the dropping, it sets about it")
+	var brush: Node3D = main.broom.get_node("brush")
+	var least := 9.0
+	var most := -9.0
+	var puffs := 0
+	main.crumb_puff.emitting = false
+	for i in 300:
+		if not dropping in main.messes:
+			break
+		least = minf(least, brush.position.x)
+		most = maxf(most, brush.position.x)
+		# (each puff is counted and put out, so that the next shows as a new one)
+		if main.crumb_puff.emitting:
+			puffs += 1
+			main.crumb_puff.emitting = false
+		await _frames(1)
+	check(most - least > 0.15 and puffs >= 2, "the brush goes back and forth, and the dust flies (%d times)" % puffs)
+	check(main.droppings() == 0 and not dropping in main.messes and main.comfort_of(pet) > clean - 0.1, "and the dropping is swept up, and the cryptlin at home again")
+	check(main.broom.visible and main.grab == Den.Grab.BROOM, "the broom stays on the finger")
+	_touch(over, false)
+	await _frames(3)
+	check(not main.broom.visible and main.grab == Den.Grab.NONE, "let go, it goes back to the wheel")
+	# A tap on it sends it to a mess by itself
+	var puddle := main.leave_mess(Mess.Kind.PUDDLE, Vector3(0.6, 0, 0.9), pet)
+	var heap := main.leave_mess(Mess.Kind.HEAP, Vector3(-0.6, 0, 0.9), pet)
+	await _tap(_on_shelf("broom"))
+	check(main.broom.visible and main.sweeping == puddle, "a tap on the broom sends it to sweep up what spoils the place first (the puddle before the heap)")
+	check(await _until(func() -> bool: return main.messes.size() == 1, 200) and main.messes[0] == heap, "which it does")
+	await _frames(30)
+	check(not main.broom.visible, "and puts itself away")
+	await _tap(_on_shelf("broom"))
+	check(await _until(func() -> bool: return main.messes.is_empty(), 200), "a heap of earth can be swept up as well")
+	await _frames(30)
+	await _tap(_on_shelf("broom"))
+	await _frames(5)
+	check(not main.broom.visible and main.sweeping == null, "with nothing on the floor there is nothing for it to do")
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -456,11 +741,11 @@ func _wheel(pet: Cryptlin, shape: String) -> void:
 	var down := (shelf.where(left).y - top.y) / shelf._unit()
 	await _tap(_px(shelf.where(left)))
 	check(Items.find(left)["group"] == "food" and main.snacks.size() == 1 and main.snacks[0].kind == Items.find(left)["n"], "%s: a tap on the last one showing on the left (the %s, %.2f of a thing lower than the top) drops it in" % [shape, left, down])
-	shelf.show_item("scanner")
+	shelf.show_item("broom")
 	var right := _outermost(1.0)
 	var from := _px(shelf.where(right))
 	await _slide(from, _screen(Vector3(0.4, 0.8, 0.3)), 16, from - Vector2(0, 190))
-	check(Items.find(right)["group"] == "food" and main.snacks.size() == 2 and main.snacks[1].kind == Items.find(right)["n"] and is_zero_approx(shelf.turn), "%s: the last one showing on the right (the %s) comes up off the wheel on a finger, and the wheel has not turned" % [shape, right])
+	check(Items.find(right)["group"] == "food" and main.snacks.size() == 2 and main.snacks[1].kind == Items.find(right)["n"] and is_equal_approx(shelf.turn, shelf.spots[1]), "%s: the last one showing on the right (the %s) comes up off the wheel on a finger, and the wheel has not turned" % [shape, right])
 	main._clear_toys()
 	pet._enter(Cryptlin.State.IDLE, 0.2)
 	await _frames(2)
@@ -551,8 +836,9 @@ func _pool(pet: Cryptlin) -> void:
 	pool = main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
 	check(Den.shore == Den.Shore.BACK and Den.wade(main.nest_pos) <= -0.699 and Den.wade(skull.position) < 0.0 and Den.wade(left.position) < 0.0, "laid where things stand, it moves them out onto the dry")
 	main.clear_mess(left)
-	await _tap(_on_shelf("pool"))
-	check(main.decor_of(Decor.Kind.POOL) == null and Den.shore == Den.Shore.NONE, "a tap on its item puts it away too")
+	check(not main.shelf.ids.has("pool"), "while it is laid it is not on the wheel")
+	main.remove_decor(pool)
+	check(main.decor_of(Decor.Kind.POOL) == null and Den.shore == Den.Shore.NONE and main.shelf.ids.has("pool"), "and put away it is back there")
 	# The room changing shape round it
 	pool = main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.LEFT))
 	var wide := Den.half
@@ -656,7 +942,7 @@ func _run() -> void:
 	# The egg
 	await _frames(5)
 	check(main.who().egg != null and main.who().pet == null, "a new game starts with an egg (%s)" % main.who().egg.title())
-	check(main.shelf.ids.has("bone") and main.shelf.ids.has("notebook") and main.shelf.ids.size() == Items.LIST.size() - Items.KEPT.size() and main.shelf.ids.has("egg"), "everything is on the shelf (%d things)" % main.shelf.ids.size())
+	check(main.shelf.ids.has("bone") and main.shelf.ids.has("notebook") and main.shelf.ids.size() == _all_but_in_use() and main.shelf.ids.has("egg"), "everything is on the wheel but the nest and the ground that are in use (%d things)" % main.shelf.ids.size())
 	main.use("bone")
 	check(main.snacks.is_empty(), "but there is nothing to feed yet")
 	check(await _until(func() -> bool: return main.who().egg.landed, 300), "the egg drops into the light")
@@ -1067,8 +1353,7 @@ func _run() -> void:
 	pet._enter(Cryptlin.State.IDLE, 6.0)
 	pet.position = Den.in_room(dropping.position + Vector3(-1.6 if dropping.position.x > 0.0 else 1.6, 0, 0), 0.4)
 	await _frames(2)
-	await _tap(_screen(dropping.position + Vector3(0, 0.06, 0)))
-	check(main.droppings() == 0 and main.comfort_of(pet) > clean - 0.1, "a tap clears it up, and it is at home again")
+	await _broom(pet, dropping, clean)
 	pet._enter(Cryptlin.State.IDLE, 0.5)
 	pet.bladder = 100.0
 	check(await _until(func() -> bool: return main.messes.size() == 1 and main.messes[0].kind == Mess.Kind.PUDDLE, 1500), "it pees too, and leaves a puddle")
@@ -1169,6 +1454,11 @@ func _run() -> void:
 		await _frames(8)
 	check(pet.feeling == Cryptlin.Feeling.GRUMPY, "poked four times, it is grumpy")
 
+	# What is out in the room is off the wheel, and toys wear out
+	await _in_and_out(pet)
+	await _toys()
+	pet = main.who().pet
+
 	# The notebook
 	await _tap(_on_shelf("notebook"))
 	check(main.notebook.visible and main.notebook.heading.text == "Smoke", "a tap on the notebook opens it at the cryptlin's page")
@@ -1204,7 +1494,7 @@ func _run() -> void:
 	check(main.snacks.size() == 1, "and what was not bought cannot be used")
 	main.dev.visible = true
 	main._sync()
-	check(main.shelf.ids.size() == Items.LIST.size() - Items.KEPT.size() and main.owns("berries") and main.left_of("fish") == -1, "with the test panel open everything is on the row without end, shop or no shop")
+	check(main.shelf.ids.size() == _all_but_in_use() and main.owns("berries") and main.left_of("fish") == -1, "with the test panel open everything is on the row without end, shop or no shop")
 	main.feed(Snack.Kind.FISH)
 	main.dev.visible = false
 	main._sync()
@@ -1784,6 +2074,9 @@ func _run() -> void:
 	await _frames(5)
 	check(main.residents.size() == 1 and main.who().name == "Old" and main.who().pet != null and main.who().pet.kind == kind and main.who().look_seed == 7, "a save from when there was only one loads as a room with that one in it")
 	check(absf(main.who().pet.belly - 52.0) < 1.0 and main.who().known.get("toy", false) and main.who().pet.is_baby() and main.floor_style == 2, "as it was")
+	main.play_ball(Ball.Kind.BALL)
+	check(main.toybox.is_empty() and main.scuffs.is_empty() and main.broken.is_empty() and main.ball != null and main.ball.wear == 0.0 and main.ball.stage() == 0, "a save from before toys wore out loads with none out, and the one that comes out is as good as new")
+	main._clear_toys()
 	await _restart()
 	check(main.residents.size() == 1 and main.who().name == "Old" and main.who().id > 0, "and is saved again as one of a list")
 	main.queue_free()

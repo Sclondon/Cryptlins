@@ -31,8 +31,15 @@ var ids: Array[String] = []
 # How far round the rim each thing rides, counted in neighbours from the first
 var spots: Array[float] = []
 var stands: Array[Node3D] = []
+# How far each is from its place just now, sliding round to it after the things on the wheel have
+# changed, and how much of its size a thing new to the wheel has grown to (0 to 1)
+var slips: Array[float] = []
+var fresh: Array[float] = []
+# What has left the wheel and is shrinking away where it rode: its stand, where that is on the
+# rim, and how much of its size is left
+var going: Array[Dictionary] = []
 # By item id: "heart" or "cross" for what is known of the cryptlin's tastes, how many are left of
-# things that get used up, and which are out in the tank just now
+# things that get used up, and which are in use just now (the scanner, while it is pointed)
 var marks := {}
 var counts := {}
 var out := {}
@@ -95,14 +102,32 @@ func _ready() -> void:
 	_fit()
 
 
-# Puts these items on the wheel, in this order, with a gap wherever the group changes
+# Puts these items on the wheel, in this order, with a gap wherever the group changes. What was
+# on it and is not any more shrinks away where it rode, the rest slide round to close the gap,
+# and what is new grows in at its place; the wheel stays with whatever was nearest the top.
 func stock(items: Array[String]) -> void:
 	if items == ids:
 		return
-	for s in stands:
-		s.queue_free()
+	var first := ids.is_empty()
+	var rode := {}
+	var had := {}
+	var grown := {}
+	var anchor := ""
+	for i in ids.size():
+		var id := ids[i]
+		rode[id] = _at(i)
+		if not items.has(id):
+			going.append({"stand": stands[i], "at": rode[id], "left": fresh[i]})
+			continue
+		had[id] = stands[i]
+		grown[id] = fresh[i]
+		if anchor == "" or absf(rode[id] - turn) < absf(rode[anchor] - turn):
+			anchor = id
+	var turned := turn
 	stands.clear()
 	spots.clear()
+	slips.clear()
+	fresh.clear()
 	ids = items.duplicate()
 	var at := 0.0
 	var group := ""
@@ -111,15 +136,28 @@ func stock(items: Array[String]) -> void:
 		if group != "":
 			at += 1.0 + (GAP if g != group else 0.0)
 		group = g
-		# The stand rides the rim; the thing hangs in it by its middle, free to turn
-		var stand := Node3D.new()
-		var spin := Node3D.new()
-		spin.add_child(Items.model(id))
-		stand.add_child(spin)
-		rim.add_child(stand)
-		stands.append(stand)
+		if had.has(id):
+			stands.append(had[id])
+			fresh.append(grown[id])
+		else:
+			# The stand rides the rim; the thing hangs in it by its middle, free to turn
+			var stand := Node3D.new()
+			var spin := Node3D.new()
+			spin.add_child(Items.model(id))
+			stand.add_child(spin)
+			rim.add_child(stand)
+			stands.append(stand)
+			fresh.append(1.0 if first else 0.0)
 		spots.append(at)
+		slips.append(0.0)
+	if anchor != "":
+		turn += spots[ids.find(anchor)] - rode[anchor]
 	_limit()
+	for i in ids.size():
+		if had.has(ids[i]):
+			slips[i] = rode[ids[i]] - turned + turn - spots[i]
+	for gone in going:
+		gone["at"] += turn - turned
 	_place()
 
 
@@ -146,9 +184,14 @@ func _step() -> float:
 	return PITCH / _radius()
 
 
+# Where on the rim an item is just now, counted in neighbours from the first
+func _at(i: int) -> float:
+	return spots[i] + slips[i]
+
+
 # How far round from the top an item is just now, clockwise
 func _angle(i: int) -> float:
-	return (spots[i] - turn) * _step()
+	return (_at(i) - turn) * _step()
 
 
 # The hub, in this control's own space: below the bottom edge
@@ -177,11 +220,12 @@ func _limit() -> void:
 	turn = clampf(turn, 0.0, last)
 
 
-# The item nearest to somewhere on the rim
-func _nearest(spot: float) -> int:
+# The item nearest to somewhere on the rim: by where its place is, or by where it is `drawn` just now
+func _nearest(spot: float, drawn := false) -> int:
 	var best := -1
 	for i in spots.size():
-		if best < 0 or absf(spots[i] - spot) < absf(spots[best] - spot):
+		var off := absf((_at(i) if drawn else spots[i]) - spot)
+		if best < 0 or off < absf((_at(best) if drawn else spots[best]) - spot):
 			best = i
 	return best
 
@@ -201,8 +245,8 @@ func item_at(at: Vector2) -> String:
 		return ""
 	var from_hub := at - global_position - _hub()
 	var spot := turn + atan2(from_hub.x, -from_hub.y) / _step()
-	var i := _nearest(spot)
-	return ids[i] if absf(spots[i] - spot) < 0.5 + GAP * 0.5 else ""
+	var i := _nearest(spot, true)
+	return ids[i] if absf(_at(i) - spot) < 0.5 + GAP * 0.5 else ""
 
 
 # Whether a point on the screen is on the wheel: what is above the rim is the room
@@ -236,6 +280,8 @@ func show_item(id: String) -> void:
 	if i >= 0:
 		turn = spots[i]
 		speed = 0.0
+		slips.fill(0.0)
+		fresh.fill(1.0)
 		_place()
 
 
@@ -250,6 +296,15 @@ func _process(delta: float) -> void:
 			# Let go, it runs down and comes to rest with a thing at the top
 			speed = 0.0
 			turn = lerpf(turn, spots[_nearest(turn)], 1.0 - exp(-delta * 9.0))
+	# The things close up where one has gone, and make room where one has come
+	for i in slips.size():
+		slips[i] = 0.0 if absf(slips[i]) < 0.002 else lerpf(slips[i], 0.0, 1.0 - exp(-delta * 10.0))
+		fresh[i] = minf(fresh[i] + delta * 5.0, 1.0)
+	for gone in going.duplicate():
+		gone["left"] -= delta * 6.0
+		if gone["left"] <= 0.0:
+			gone["stand"].queue_free()
+			going.erase(gone)
 	_place()
 	overlay.queue_redraw()
 
@@ -267,13 +322,19 @@ func _place() -> void:
 		if not stand.visible:
 			continue
 		stand.position = hub + Vector3(sin(a) * radius, cos(a) * radius, cos(a))
-		stand.basis = (Basis(Vector3.BACK, -a) * Basis(Vector3.RIGHT, 0.3)).scaled(Vector3.ONE * _size_at(a))
+		stand.basis = (Basis(Vector3.BACK, -a) * Basis(Vector3.RIGHT, 0.3)).scaled(Vector3.ONE * _size_at(a) * maxf(fresh[i], 0.01))
 		var spin: Node3D = stand.get_child(0)
 		spin.position.y = -0.3 + sin(t * 1.3 + i * 2.3) * 0.03
 		spin.rotation.y = 0.35 + a * 0.9 + sin(t * 0.9 + i * 1.7) * 0.35
 		if ids[i] == beckon:
 			spin.position.y = -0.3 + absf(sin(t * 3.2)) * 0.12
 			spin.rotation.y = t * 2.4
+	for gone in going:
+		var a: float = (gone["at"] - turn) * _step()
+		var stand: Node3D = gone["stand"]
+		stand.visible = absf(a) < UNDER
+		stand.position = hub + Vector3(sin(a) * radius, cos(a) * radius, cos(a))
+		stand.basis = (Basis(Vector3.BACK, -a) * Basis(Vector3.RIGHT, 0.3)).scaled(Vector3.ONE * _size_at(a) * maxf(gone["left"], 0.01))
 
 
 # What is drawn sharp over the picture: the marks, each going round with its thing, and a hint
@@ -283,7 +344,7 @@ func _paint() -> void:
 	var h := overlay.size.y
 	var font := get_theme_default_font()
 	for i in ids.size():
-		if not stands[i].visible:
+		if not stands[i].visible or fresh[i] < 0.6:
 			continue
 		var at := _seat(i)
 		var reach := _unit() * _size_at(_angle(i))
@@ -325,6 +386,7 @@ func point_of(id: String) -> Vector2:
 		return Vector2(-1, -1)
 	var at := _seat(i)
 	var room := _unit() * 0.4
-	if at.x < room or at.x > size.x - room or at.y > size.y - room:
+	# (nor if it has gone right under: far enough round, its place comes up the other side)
+	if at.x < room or at.x > size.x - room or at.y > size.y - room or absf(_angle(i)) >= UNDER:
 		show_item(id)
 	return where(id)

@@ -37,6 +37,8 @@ var turned := 0.0
 var wheel := false
 var pool := false
 var knack := false
+var tidy := false
+var book := false
 var from_step := 1
 var first_wait := 0.8
 var second_wait := 1.8
@@ -68,6 +70,10 @@ func _initialize() -> void:
 			first_wait = float(arg.trim_prefix("--at="))
 		if arg.begins_with("--then="):
 			second_wait = float(arg.trim_prefix("--then="))
+		if arg == "--tidy":
+			tidy = true
+		if arg == "--book":
+			book = true
 		if arg == "--pool":
 			pool = true
 		if arg == "--many":
@@ -97,10 +103,10 @@ func _initialize() -> void:
 	if variety:
 		_run_variety.call_deferred()
 		return
-	if many or pool or knack:
+	if many or pool or knack or book:
 		# Three of different kinds (or, for the pool, four), grown, as a save holds them
 		var three: Array = []
-		for i in (4 if pool else (2 if knack else 3)):
+		for i in (4 if pool or book else (2 if knack else 3)):
 			var k := (kind + i * 5) % Cryptlin.KINDS.size()
 			three.append({"id": i + 1, "name": ["Mog", "Pim", "Zog", "Nib"][i], "kind": Cryptlin.KINDS[k]["title"], "seed": maxi(look, 1) + i * 37, "hatched": true, "born": Time.get_unix_time_from_system() - 200000.0, "needs": {"belly": 70.0, "fun": 70.0, "energy": 90.0, "love": 50.0}})
 		var f := FileAccess.open(save, FileAccess.WRITE)
@@ -115,7 +121,11 @@ func _initialize() -> void:
 	main.first_kind = kind
 	main.ask_names = false
 	root.add_child(main)
-	if knack:
+	if tidy:
+		_run_tidy.call_deferred()
+	elif book:
+		_run_book.call_deferred()
+	elif knack:
 		_run_knack.call_deferred()
 	elif pool:
 		_run_pool.call_deferred()
@@ -138,6 +148,18 @@ func _initialize() -> void:
 func _snap(name: String) -> void:
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png("%s/k%d_%s%s.png" % [out, kind, name, "_p" if portrait else ""])
+
+
+# A piece of the picture round a place in the room, blown up, to see small things by
+func _close_up(name: String, at: Vector3, size := Vector2i(340, 220), times := 3) -> void:
+	await RenderingServer.frame_post_draw
+	var shot := root.get_texture().get_image()
+	var scale := Vector2(shot.get_size()) / main.get_viewport().get_visible_rect().size
+	var mid := Vector2i(main.screen_of(at) * scale)
+	var cut := Rect2i(mid - size / 2, size).intersection(Rect2i(Vector2i.ZERO, shot.get_size()))
+	var piece := shot.get_region(cut)
+	piece.resize(cut.size.x * times, cut.size.y * times, Image.INTERPOLATE_NEAREST)
+	piece.save_png("%s/k%d_%s%s.png" % [out, kind, name, "_p" if portrait else ""])
 
 
 func _wait(seconds: float) -> void:
@@ -238,6 +260,112 @@ func _run_ui() -> void:
 	main.dev_toggle()
 	await _wait(0.3)
 	await _snap("u12_dev")
+	quit()
+
+
+# Keeping the place tidy: the wheel before and after a thing is stood in the room, the broom on
+# the wheel and at work on a dropping, each toy new, scuffed and far gone, a ball breaking, and
+# its bits on the floor with the ball gone from the wheel
+func _run_tidy() -> void:
+	await _wait(1.0)
+	var pet := main.who().pet
+	pet.set_needs({"belly": 80.0, "fun": 70.0, "energy": 90.0, "love": 55.0, "age": Cryptlin.GROW_AGE, "bowel": 0.0, "bladder": 0.0})
+	pet.position = Vector3(-1.2, 0, 0.2)
+	pet.ball_cooldown = 9999.0
+	pet.beg_cooldown = 9999.0
+	pet._enter(Cryptlin.State.STARE)
+	main.shelf.show_item("skull")
+	await _wait(1.0)
+	await _snap("t1_wheel_before")
+	main.place_decor(Decor.Kind.SKULL, Vector3(0.9, 0, 0.3))
+	pet._enter(Cryptlin.State.STARE)
+	await _wait(0.12)
+	await _snap("t2_wheel_closing")
+	await _wait(0.9)
+	pet._enter(Cryptlin.State.STARE)
+	await _snap("t3_wheel_after")
+	var dropping := main.leave_mess(Mess.Kind.DROPPING, Vector3(0.1, 0, 1.2), pet)
+	main.leave_mess(Mess.Kind.PUDDLE, Vector3(-0.7, 0, 1.4), pet)
+	main.shelf.show_item("broom")
+	pet._enter(Cryptlin.State.STARE)
+	await _wait(0.6)
+	await _snap("t4_broom_wheel")
+	main._pull("broom", main.screen_of(Vector3(0.9, 0, 1.3)))
+	await _wait(0.4)
+	await _snap("t5_broom_carried")
+	main.hold_point = dropping.position
+	await _until(func() -> bool: return main.sweeping != null and main.sweep_time > 0.2, 2.0)
+	await _snap("t6_sweeping")
+	await _close_up("t6_sweeping_close", dropping.position)
+	await _wait(0.14)
+	await _snap("t6_sweeping2")
+	await _until(func() -> bool: return main.sweeping == null, 3.0)
+	main.grab = Den.Grab.NONE
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	# Each toy three times over: new, scuffed and far gone
+	var row: Array[Ball] = []
+	for k in Ball.NAMES.size():
+		for worn in 3:
+			var toy := Ball.new(k)
+			toy.held = true
+			toy.wear = [0.0, Ball.SCUFFED, Ball.FAR_GONE][worn]
+			toy.show_wear()
+			toy.position = Vector3(-2.0 + k * 1.1 + worn * 0.36, Ball.R, 1.3)
+			toy.rotation.y = 0.5
+			main.add_child(toy)
+			row.append(toy)
+	pet.position = Vector3(-1.9, 0, -0.9)
+	pet._enter(Cryptlin.State.STARE)
+	await _wait(0.6)
+	await _snap("t7_toys_new_scuffed_far_gone")
+	await _close_up("t7_toys_close", Vector3(0, 0.1, 1.3), Vector2i(640, 110), 2)
+	for toy in row:
+		toy.queue_free()
+	# A ball on its last legs, and the kick that ends it
+	main.play_ball(Ball.Kind.BALL)
+	main.ball.vel = Vector3.ZERO
+	main.ball.position = Vector3(0.3, Ball.R, 1.0)
+	main.ball.wear = Ball.WORN_OUT - 0.01
+	main.ball.show_wear()
+	pet.position = Vector3(-0.4, 0, 0.9)
+	pet.yaw = 1.2
+	pet._enter(Cryptlin.State.IDLE, 30.0)
+	main.shelf.show_item("stone")
+	await _wait(0.8)
+	await _snap("t8_worn_ball")
+	main.wear_toy(main.ball, pet)
+	await _wait(0.16)
+	await _snap("t9_breaking")
+	await _close_up("t9_breaking_close", Vector3(0, 0.2, 1.0))
+	await _wait(0.9)
+	await _snap("t10_broken")
+	await _close_up("t10_broken_close", Vector3(0, 0.2, 1.0))
+	quit()
+
+
+# The notebook, leaf by leaf, with four in the room and a good deal found out about them
+func _run_book() -> void:
+	await _wait(1.0)
+	var all := main.pets()
+	for i in all.size():
+		var pet := all[i]
+		pet.position = Vector3(-1.2 + i * 0.8, 0, 0.4 - 0.4 * (i % 2))
+		pet._enter(Cryptlin.State.STARE)
+		pet.me.known = {"food": true, "yuck": true, "toy": true, "ground": true, "lamp": true, "water": true, "knack": i != 1}
+		for liked: int in pet.like_decor:
+			pet.me.known["decor+" + Decor.IDS[liked]] = true
+		if i != 2:
+			pet.me.known["decor-" + Decor.IDS[pet.hate_decor]] = true
+	all[1].me.name = "Bartholomew Mog"
+	all[3].set_needs({"age": 3000.0})
+	main.new_egg() if main.room_for_more() else null
+	main.chosen = all[0].me
+	main.notebook.open()
+	for i in main.notebook.pages():
+		await _wait(0.25)
+		await _snap("b%02d" % i)
+		main.notebook.turn(1)
 	quit()
 
 

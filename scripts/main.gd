@@ -6,7 +6,7 @@ extends Node
 ## cryptlin once it hatches. `who()` is the one in question when a single one is meant.
 ## Nothing is written on the screen to say how any of it works: that is all in the notebook.
 
-enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER }
+enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER, BROOM }
 enum Lamp { BRIGHT, LOW, HEAT, OFF }
 # The part of the floor the pool lies over
 enum Shore { NONE, BACK, LEFT, RIGHT }
@@ -43,6 +43,13 @@ const GROUNDS: Array[String] = ["Flagstones", "Floorboards", "Moss", "Checkers",
 # As in "it is happiest on ..."
 const GROUND_PLAIN: Array[String] = ["flagstones", "floorboards", "moss", "checkered tiles", "dirt", "sand", "gravel"]
 const SCAN_SECONDS := 9.0
+# How long after a toy there is no end of has broken before there is another of its kind
+const TOY_AGAIN_HOURS := 12.0
+# The broom: how near a mess it has to be brought to set about it, how long the sweeping takes,
+# and how long each stroke of it is
+const BROOM_REACH := 0.32
+const SWEEP_SECONDS := 0.7
+const SWEEP_STROKE := 0.24
 # The grounds a foot sinks into (moss, dirt, sand, gravel), and the most footprints there are at once
 const SOFT_GROUNDS: Array[int] = [2, 4, 5, 6]
 const MAX_TRACKS := 28
@@ -112,6 +119,15 @@ var fighters: Array[Cryptlin] = []
 var scuffle_left := 0.0
 var scuffle_beat := 0.0
 var ball: Ball
+# Toys that were bought, have been out in the room and were put away again, by item id: how worn
+# each is (see Ball.wear). And how worn the one of each kind there is no end of was when it was
+# last put away.
+var toybox := {}
+var scuffs := {}
+# By item id, for a kind of toy there is no end of whose last one broke: when (unix time) there
+# will be another
+var broken := {}
+var saved_toy := {}
 var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
 # What the cryptlins have left on the floor (see Mess)
@@ -201,6 +217,11 @@ var scanner: Node3D
 var scan_bar: MeshInstance3D
 var scan_ray: Node3D
 var ray_light: ShaderMaterial
+# The broom and its dustpan, out in the room while there is sweeping to do: the mess they are at
+# just now, and how long they have been at it
+var broom: Node3D
+var sweeping: Mess
+var sweep_time := 0.0
 
 var shelf: Shelf
 var scan_notes: Control
@@ -239,6 +260,14 @@ func _ready() -> void:
 		if m is Dictionary and int(m.get("k", -1)) >= 0 and int(m["k"]) < Mess.LASTS.size():
 			var laid := _lay_mess(int(m["k"]), Vector3(float(m.get("x", 0.0)), 0, float(m.get("z", 0.0))), float(m.get("t", 0.0)), Color.html(str(m.get("c", "4d331a"))), float(m.get("s", 1.0)))
 			laid.visible = laid.gone() < 1.0
+	if saved_toy.has("k") and int(saved_toy["k"]) >= 0 and int(saved_toy["k"]) < Ball.NAMES.size():
+		# The toy that was left lying on the floor, as worn as it was
+		var toy := Ball.new(int(saved_toy["k"]))
+		toy.wear = clampf(float(saved_toy.get("w", 0.0)), 0.0, Ball.WORN_OUT - 1.0)
+		toy.bought = bool(saved_toy.get("b", false))
+		toy.position = in_room(Vector3(float(saved_toy.get("x", 0.0)), Ball.R, float(saved_toy.get("z", 0.0))), Ball.R)
+		toy.show_wear()
+		_set_ball(toy)
 	get_viewport().size_changed.connect(_fit)
 	_fit()
 	if OS.has_feature("web") and str(JavaScriptBridge.eval("window.location.search", true)).contains("dev"):
@@ -923,6 +952,7 @@ func _clear_toys() -> void:
 		s.queue_free()
 	snacks.clear()
 	_clear_ball()
+	_sync()
 
 
 # ---------------------------------------------------------------- what a cryptlin lets on
@@ -994,7 +1024,34 @@ func owns(id: String) -> bool:
 	# (a grave marker is never bought: it is on the shelf while one has been put away)
 	if id in Items.KEPT:
 		return not markers_away.is_empty()
+	# (nor is a toy that has been out in the room and was put away again: it is the room's)
+	if not toybox.get(id, []).is_empty():
+		return true
+	# (and a toy of a kind there is no end of is not to be had for a while after one has broken,
+	# except by the test panel)
+	if broken.has(id) and left_of(id) < 0 and not (dev != null and dev.visible):
+		if Time.get_unix_time_from_system() < float(broken[id]):
+			return false
+		broken.erase(id)
 	return _has_all() or id in Items.FREE or int(stock.get(id, 0)) != 0
+
+
+# Whether a thing is out in the room just now, and so not on the wheel: a thing standing there,
+# the nest and the ground that are in use, the toy on the floor. What gets used up (food, eggs)
+# and the tools are never off the wheel for being in use.
+func in_room_now(id: String) -> bool:
+	var item := Items.find(id)
+	var n: int = item["n"]
+	match item["group"]:
+		"decor":
+			return decor_of(n) != null and not id in Items.KEPT
+		"nest":
+			return n == nest_style
+		"ground":
+			return n == floor_style
+		"toy":
+			return ball != null and ball.kind == n
+	return false
 
 
 # How many of a thing that gets used up are left, or -1 for no end of them
@@ -1027,6 +1084,8 @@ func use(id: String) -> void:
 		"tool":
 			if id == "notebook":
 				notebook.open()
+			elif id == "broom":
+				sweep_one()
 			elif scanning:
 				stop_scan()
 			else:
@@ -1109,8 +1168,25 @@ func _notice_ball() -> void:
 		pet.notice_ball()
 
 
+# A toy comes out into the room: one that was put away, if there is one, as worn as it was; or
+# else one out of what was bought, which is then the room's and no longer the shop's; or else,
+# of a kind there is no end of, the one there always is
 func _new_ball(which: int) -> void:
+	var id := Items.id_of("toy", which)
 	var toy := Ball.new(which)
+	if not toybox.get(id, []).is_empty():
+		toy.bought = true
+		toy.wear = float(toybox[id].pop_back())
+	elif left_of(id) > 0:
+		toy.bought = true
+		_spend(id)
+	else:
+		toy.wear = float(scuffs.get(id, 0.0))
+	toy.show_wear()
+	_set_ball(toy)
+
+
+func _set_ball(toy: Ball) -> void:
 	ball = toy
 	add_child(ball)
 	ball.bounced.connect(func(strength: float) -> void:
@@ -1119,8 +1195,69 @@ func _new_ball(which: int) -> void:
 			splash(toy.position))
 
 
+# One of them has had a kick at the toy, which wears it; and with wear enough it breaks
+func wear_toy(toy: Ball, by: Cryptlin) -> void:
+	if toy != ball:
+		return
+	toy.wear += Ball.WEARS[toy.kind] * by.rough()
+	toy.show_wear()
+	if toy.wear >= Ball.WORN_OUT:
+		break_toy(by)
+
+
+# The toy comes apart: a snap, the pieces of it flying, and whichever of them is near by taking
+# it as its nature has it. Then it is gone, and its bits lie on the floor to be swept up. It does
+# not go back on the wheel: one that was bought is no more, and of a kind there is no end of
+# there is not another to be had for some hours (see owns).
+func break_toy(by: Cryptlin = null) -> void:
+	if ball == null:
+		return
+	var toy := ball
+	var at := toy.position
+	var tint: Color = Ball.TINTS[toy.kind]
+	ball = null
+	if grab == Grab.BALL:
+		grab = Grab.NONE
+		finger = -1
+	shrivelled.erase(toy)
+	toy.queue_free()
+	scuffs.erase(Items.id_of("toy", toy.kind))
+	if not toy.bought:
+		broken[Items.id_of("toy", toy.kind)] = Time.get_unix_time_from_system() + TOY_AGAIN_HOURS * 3600.0
+	sfx.play("snap", 1.0, -2.0)
+	sfx.play(toy.sound, toy.pitch * 0.6, -6.0)
+	Input.vibrate_handheld(50)
+	crumbs(at, tint)
+	for i in 7:
+		# A piece of it, thrown up and out, turning over, and gone by the time it would land
+		var a := TAU * i / 7.0 + randf_range(-0.3, 0.3)
+		var piece := Ps1.part(self, Ps1.box(), Ps1.mat(tint.darkened(0.3 * (i % 2))), at, Vector3(0.09, 0.03, 0.06) * randf_range(0.7, 1.2))
+		var to := in_room(at + Vector3(cos(a), 0, sin(a)) * randf_range(0.35, 0.8), 0.1)
+		var fly := piece.create_tween().set_parallel()
+		fly.tween_property(piece, "position:x", to.x, 0.5)
+		fly.tween_property(piece, "position:z", to.z, 0.5)
+		fly.tween_property(piece, "position:y", at.y + randf_range(0.35, 0.7), 0.22).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		fly.tween_property(piece, "position:y", 0.02, 0.28).set_delay(0.22).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		fly.tween_property(piece, "rotation", Vector3(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0), 0), 0.5)
+		fly.chain().tween_callback(piece.queue_free)
+	_lay_mess(Mess.Kind.BITS, at, Time.get_unix_time_from_system(), tint, 1.0)
+	for pet in pets():
+		if pet == by or pet.position.distance_to(at) < 1.6:
+			pet.toy_broke(at)
+	_sync()
+	save_game()
+
+
+# The toy in the room is put away: back on the wheel, with the wear it has had
 func _clear_ball() -> void:
 	if ball != null:
+		var id := Items.id_of("toy", ball.kind)
+		if ball.bought:
+			if not toybox.has(id):
+				toybox[id] = []
+			toybox[id].append(ball.wear)
+		else:
+			scuffs[id] = ball.wear
 		ball.queue_free()
 		ball = null
 	if grab == Grab.BALL:
@@ -1426,13 +1563,73 @@ func _lay_mess(kind: int, at: Vector3, when: float, tint: Color, big: float) -> 
 	return m
 
 
-# The keeper clears one up
+# The keeper clears one up, which is done with the broom (see _tick_broom)
 func clear_mess(m: Mess) -> void:
 	crumbs(m.position + Vector3(0, 0.08, 0), m.tint)
 	sfx.play("click", 1.4, -4.0)
+	if sweeping == m:
+		sweeping = null
 	messes.erase(m)
 	m.queue_free()
 	save_game()
+
+
+# A tap on the broom: it goes and sweeps one thing up by itself, whatever spoils the place before
+# a heap of earth, and of those the one that has lain longest
+func sweep_one() -> void:
+	var worst: Mess = null
+	for m in messes:
+		if m.visible and m != sweeping and (worst == null or (worst.kind == Mess.Kind.HEAP and m.kind != Mess.Kind.HEAP)):
+			worst = m
+	if worst == null or grab == Grab.BROOM:
+		sfx.play("click", 0.7)
+		return
+	if sweeping == null:
+		broom.position = worst.position
+	broom.visible = true
+	sweeping = worst
+	sweep_time = 0.0
+
+
+# The broom at work. On the end of a finger it follows it across the floor, and whatever mess it
+# comes over it stops at and sweeps into the pan: a few strokes with the dust flying, the mess
+# dwindling, and then it is gone. Let go of (or sent by a tap) it finishes what it was at and
+# goes back to the wheel.
+func _tick_broom(delta: float) -> void:
+	if not broom.visible:
+		return
+	var brush: Node3D = broom.get_node("brush")
+	var pan: Node3D = broom.get_node("pan")
+	if sweeping != null and not sweeping in messes:
+		sweeping = null
+	if grab == Grab.BROOM and sweeping == null:
+		broom.position = broom.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
+		for m in messes:
+			if m.visible and Vector2(m.position.x - hold_point.x, m.position.z - hold_point.z).length() < BROOM_REACH:
+				sweeping = m
+				sweep_time = 0.0
+				break
+	if sweeping == null:
+		brush.position = brush.position.lerp(Vector3(-0.1, 0, 0), 1.0 - exp(-delta * 14.0))
+		brush.rotation.z = lerp_angle(brush.rotation.z, Items.BROOM_LEAN, 1.0 - exp(-delta * 14.0))
+		pan.position = pan.position.lerp(Vector3(0.17, 0, 0.02), 1.0 - exp(-delta * 14.0))
+		broom.visible = grab == Grab.BROOM
+		return
+	# The pan is held to one side of the mess and the brush comes across at it from the other
+	var before := sweep_time
+	sweep_time += delta
+	var stroke := sin(sweep_time * TAU / SWEEP_STROKE)
+	broom.position = broom.position.lerp(sweeping.position, 1.0 - exp(-delta * 14.0))
+	brush.position = Vector3(-0.2 + stroke * 0.12, 0, 0.03)
+	brush.rotation.z = Items.BROOM_LEAN - 0.15 - stroke * 0.3
+	pan.position = Vector3(0.15, 0.01, 0.03)
+	sweeping.scale = Vector3.ONE * (1.0 - 0.75 * sweep_time / SWEEP_SECONDS)
+	if int(sweep_time / SWEEP_STROKE) != int(before / SWEEP_STROKE) or before == 0.0:
+		crumbs(sweeping.position + Vector3(0, 0.06, 0), DUST)
+		sfx.play("sweep", 1.0, -9.0)
+	if sweep_time >= SWEEP_SECONDS:
+		Input.vibrate_handheld(15)
+		clear_mess(sweeping)
 
 
 func droppings() -> int:
@@ -1441,14 +1638,6 @@ func droppings() -> int:
 		if m.kind == Mess.Kind.DROPPING:
 			n += 1
 	return n
-
-
-# The mess under a finger (not a heap of earth, which is nothing to clear), or null
-func _mess_at(at: Vector2) -> Mess:
-	for m in messes:
-		if m.kind != Mess.Kind.HEAP and _ray_hits(at, m.position + Vector3(0, 0.06, 0), 0.24):
-			return m
-	return null
 
 
 # Where a cryptlin goes to do its business: a grown one as far as it can get from its nest and
@@ -1688,11 +1877,14 @@ func _sync() -> void:
 	for place: String in Items.ROW:
 		for item in Items.LIST:
 			var id: String = item["id"]
-			if (id != place and item["group"] != place) or not owns(id):
+			if (id != place and item["group"] != place) or not owns(id) or in_room_now(id):
 				continue
 			have.append(id)
 			if item["group"] in Items.SPENT and left_of(id) >= 0:
 				counts[id] = left_of(id)
+			elif item["group"] == "toy" and left_of(id) >= 0:
+				# (those bought and not yet out, and those that have been out and were put away)
+				counts[id] = left_of(id) + toybox.get(id, []).size()
 	if have.has("marker"):
 		counts["marker"] = markers_away.size()
 	# The marks are what is known of the one in question
@@ -1714,12 +1906,6 @@ func _sync() -> void:
 				marks[id] = "cross"
 		if known.get("water", false) and pet.needs_water():
 			marks["pool"] = "heart"
-	out[Items.id_of("ground", floor_style)] = true
-	out[Items.id_of("nest", nest_style)] = true
-	for d in decors:
-		out[Decor.IDS[d.kind]] = true
-	if ball != null:
-		out[Items.id_of("toy", ball.kind)] = true
 	if scanning:
 		out["scanner"] = true
 	shelf.marks = marks
@@ -1788,6 +1974,10 @@ func _build_room() -> void:
 	scan_bar = Ps1.part(scanner, Ps1.box(), Ps1.mat(Color(0.4, 1.0, 0.55), 1.0), Items.READOUT, Vector3(Items.READOUT_SIZE.x, 0.03, 0.02))
 	scanner.visible = false
 	add_child(scanner)
+	broom = Items.broom()
+	broom.scale = Vector3.ONE * 1.25
+	broom.visible = false
+	add_child(broom)
 	# Its light is the same haze as the lamp's. The shader gives it the shape of a cone; the
 	# mesh only says where to draw, and is a closed tube a unit long and a unit across that
 	# _aim_scanner stretches from the mouth of the gun to the one it is pointed at.
@@ -2388,6 +2578,7 @@ func _process(delta: float) -> void:
 		scanner.rotation = Vector3(0, -0.9, 0)
 		scan_bar.position.y = Items.READOUT.y
 
+	_tick_broom(delta)
 	_lay_due()
 	if scuffle != null:
 		_tick_fight(delta)
@@ -2426,6 +2617,9 @@ func _process(delta: float) -> void:
 	save_timer += delta
 	if save_timer > 10.0:
 		save_game()
+		# (and a toy that broke may be to be had again by now)
+		if not broken.is_empty():
+			_sync()
 
 
 # ---------------------------------------------------------------- touch
@@ -2536,6 +2730,8 @@ func _input(event: InputEvent) -> void:
 					held_egg.rub()
 			Grab.SCANNER:
 				hold_point = _floor_at(event.position, 0.0, 0.3)
+			Grab.BROOM:
+				hold_point = _floor_at(event.position, 0.0, 0.2)
 			Grab.THING:
 				if moved > 14.0 and is_instance_valid(held_thing):
 					_drag_thing(event.position)
@@ -2737,6 +2933,13 @@ func _pull(id: String, at: Vector2) -> void:
 			hold_point = _floor_at(at, 0.0, 0.3)
 			scanner.position = hold_point
 			scanner.visible = true
+		"tool" when id == "broom":
+			# Carried about the floor, to sweep up whatever it is brought to
+			grab = Grab.BROOM
+			hold_point = _floor_at(at, 0.0, 0.2)
+			if not broom.visible:
+				broom.position = hold_point
+				broom.visible = true
 		_:
 			# Grounds, eggs and the notebook have nothing to carry: dragging one up uses it
 			shelf_item = ""
@@ -2783,10 +2986,16 @@ func _release() -> void:
 			if moved < 20.0:
 				tap_lamp()
 		Grab.BALL:
-			if ball != null:
+			if ball != null and shelf.has_point(last_at):
+				# Let go over the wheel, it is put away
+				_clear_ball()
+				sfx.play("click", 0.8)
+				_sync()
+				save_game()
+			elif ball != null:
 				ball.held = false
 				ball.vel = hold_vel.limit_length(7.5)
-			_notice_ball()
+				_notice_ball()
 		Grab.SCANNER:
 			scanner.visible = false
 			if not shelf.has_point(last_at):
@@ -2851,10 +3060,9 @@ func _release() -> void:
 				Input.vibrate_handheld(20)
 			held_egg = null
 		Grab.FLOOR:
-			var mess := _mess_at(press_at) if quick and not light_dragging_was else null
-			if mess != null:
-				clear_mess(mess)
-			elif quick and not light_dragging_was and not pets().is_empty():
+			# (a tap on what they have left on the floor is a tap on the floor: it takes the broom
+			# to clear it up)
+			if quick and not light_dragging_was and not pets().is_empty():
 				var there := _floor_at(press_at, 0.0, 0.35)
 				call_all(there)
 				ripple.position = Vector3(there.x, 0.02, there.z)
@@ -2962,6 +3170,10 @@ func save_game() -> void:
 		"nest_at": [nest_pos.x, nest_pos.z],
 		"decor": things,
 		"mess": left,
+		"toy": {"k": ball.kind, "x": ball.position.x, "z": ball.position.z, "w": ball.wear, "b": ball.bought} if ball != null else {},
+		"toybox": toybox,
+		"scuffs": scuffs,
+		"broken": broken,
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
 		"time": Time.get_unix_time_from_system(),
@@ -3019,6 +3231,20 @@ func _load_game() -> void:
 		saved_decor = d["decor"]
 	if d.get("mess") is Array:
 		saved_mess = d["mess"]
+	# The toy on the floor and those put away, and how worn each is (a save from before toys wore
+	# out has none of this: nothing was out, and whatever comes out is as good as new)
+	if d.get("toy") is Dictionary:
+		saved_toy = d["toy"]
+	if d.get("toybox") is Dictionary:
+		for id: String in d["toybox"]:
+			if Items.find(id).get("group", "") == "toy" and d["toybox"][id] is Array:
+				toybox[id] = d["toybox"][id]
+	if d.get("scuffs") is Dictionary:
+		for id: String in d["scuffs"]:
+			scuffs[id] = clampf(float(d["scuffs"][id]), 0.0, Ball.WORN_OUT - 1.0)
+	if d.get("broken") is Dictionary:
+		for id: String in d["broken"]:
+			broken[id] = float(d["broken"][id])
 	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
 	away = maxf(now - float(d.get("time", now)), 0.0)
 	_muted_at_start = bool(d.get("muted", false))

@@ -53,18 +53,19 @@ bored, sleepy, grumpy, scared, sad, disgusted, poorly). What it shows you of its
 Everything the keeper has rides a wheel at the bottom of the screen, as the things themselves: the hub is below the
 screen, so only the top of the rim shows, with the middle thing highest and nearest, its neighbours lower and turned
 away, and the rest sinking off the bottom corners. No wheel is drawn: only the floating things, with the room showing
-between them. The scanner is first, then food, toys, the egg, things for the room, nests and trays of ground, and the
+between them. The scanner is first, then the broom, food, toys, the egg, things for the room, nests and trays of ground, and the
 notebook last. A sideways drag turns it, and a flick keeps it running; it stops at the first thing and at the last,
 and comes to rest with a thing at the top.
-Tap a thing to use it, or drag it up off the wheel and let go where you want it.
+Tap a thing to use it, or drag it up off the wheel and let go where you want it. What is out in the room is not on the wheel: a thing stood in the room, the nest and the ground that are in use and the toy on the floor leave it, the rest close up over the gap, and it comes back to its place when the thing is put away (dragged back down to the wheel) or another nest or ground takes its place. A thing that has run out leaves it too, and is back when there is more. The tools (scanner, broom, notebook) never leave it.
 
 | Thing | What it does |
 | --- | --- |
 | **Notebook** (N) | The only words in the game: a page on each egg and cryptlin in the room (leaf through them; a cryptlin can be renamed or let go from its own), how to look after them, the wheel of things, what a finger can do, and the odds and ends (the sound). |
 | **Egg** | One more for the room, of a kind that is not there already. The room holds four, eggs and cryptlins together; with four in it the egg only clicks. |
 | **Scanner** (X) | A radar gun of the kind the police point at cars. Pointed at one of them for a few seconds from a lower corner of the screen (dragged up onto it; or tapped, when it goes to the one last touched, or else the one nearest the middle), a thin light flickering from it: its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and notes for how well it is and how at home. Works on an egg too. |
+| **Broom** | A short broom and a tin dustpan, there always and nobody's to buy. Dragged up off the wheel and over a dropping, a puddle, a heap of earth or the bits of a broken toy, it sweeps it up: a few strokes, some dust, and it is gone. A tap on it sends it to sweep one thing up by itself. It is the only way to clear a mess: a tap on one does nothing to it. |
 | **Food**: bone (F), toadstool, candy corn, fish, beetle, berries | It runs over and eats what you drop, loves its favourite, and spits out the one it can't stand. |
-| **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Pick the toy up with a finger and it jumps for it; let go to throw. |
+| **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Carry it down to the wheel to put it away. Play wears a toy out (see below). Pick the toy up with a finger and it jumps for it; let go to throw. |
 | **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the wheel to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
 | **Shelters**: cave, barrel, hollow stump, rag tent, crate, flowerpot | Things it can get inside: it hides in one to watch you, and would sooner have its nest there. |
 | **Pool** | About half the floor under water, from the walls to a stony, muddy edge that wanders across the room: the back of the room, or in a wide one either side. It goes over the part with least on it, and whatever stands there is moved out onto the dry. A finger on the water has hold of it: drag it to another side, or down to the wheel to put it away. The water kinds (frogman, Loch Ness monster, kelpie, merling, Cthulhu spawn) are not at home without one: they are in and out of it as they like, wade about up to their middles for a good while at a time, and sleep at its edge; with none they beg for water (a drop in the thought bubble). The rest take it or leave it: they keep to the dry floor, come down to the edge for a drink, and if they are carried out over it and let go, or shoved in, scramble out by the shortest way, cross. Nothing else will stand in it; food thrown in floats and drifts in to the shallows where any of them can reach it, a toy floats back to the edge, and droppings are left on dry floor. |
@@ -80,7 +81,6 @@ Tap a thing to use it, or drag it up off the wheel and let go where you want it.
 | Tap it | A poke: it jumps (and wakes, grumbling, if it was asleep). Poke it four times running and it has had enough. |
 | Hold a finger on it | Picks it up. Drag to carry it; let go to set it down. Some like it, some don't. |
 | Flick it | Pushes it skidding across the floor. |
-| Tap a dropping or a puddle | Clears it up. |
 | Move the mouse | It watches the pointer. Otherwise it watches you. |
 
 Left alone it wanders, sits and stares at you with its head on one side, slinks off to watch from a shelter or a
@@ -88,9 +88,22 @@ dark corner, visits the things in its room, drags its nest about, gets the zoomi
 digs when the floor is dirt, sand or gravel (and leaves a heap), chases its own tail, sits staring up into the lamp
 or the vent, stretches and yawns when it wakes, and begs with a thought bubble when it is hungry, bored or (a water
 kind) dry. A few hours after a meal it goes off to a corner and leaves a **dropping**, which stays until it is
-cleared up and spoils the place for it meanwhile; it pees more often, and puddles dry by themselves in an hour. A
+swept up with the broom and spoils the place for it meanwhile; it pees more often, and puddles dry by themselves in an hour. A
 baby goes more often and wherever it happens to be. A grown one, content and left to itself, will now and then get
 over-fond of its nest the way a dog does of a cushion, and is mortified if it is caught at it. M mutes the sound.
+
+**Toys wear out.** Every kick wears the toy on the floor a little (`Ball.wear`, `Den.wear_toy`): the stone least and
+the glow orb most, more from a heavy or fierce kind (a bolter, a Cerberus, a yeti) or a playful, bold, grumpy or
+restless nature, less from a slight kind, a shy, sleepy or cuddly one, or a baby (`Cryptlin.rough()`). It shows:
+a third of the way gone the toy is scuffed and dull, and far gone it is patched or cracked, sagging, and has lost
+some of its bounce. Worn right out it comes apart at the next kick (`Den.break_toy`): a snap, the pieces flying,
+whichever of them is near by pleased with itself or startled as its nature has it, and the bits left on the floor
+as a mess for the broom. Three of them with the ball out get through it in about half an hour of play, one alone
+in some hours: days of ordinary visits. A broken toy does not go back on the wheel. Played by itself (and for the
+ball, which is free everywhere) there is another of its kind twelve hours later (`TOY_AGAIN_HOURS`). Inside a host
+page a bought toy is taken from the stock when it is first brought out (the page is told, as for food and eggs)
+and is the room's own from then on, kept in the save whether it is on the floor or put away; when it breaks it is
+gone for good. How worn a toy is goes with it when it is put away.
 
 ## More than one
 The room holds up to four, eggs and cryptlins together. Played by itself a new game starts with one egg, and the
@@ -232,7 +245,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `residents` is the list of those that live there (`scripts/resident.gd`: an egg or a cryptlin, and what the save
   keeps of it), `pets()` the cryptlins among them, and `who()` the one in question when a single one is meant (the
   one last tapped or scanned, or else the eldest). `comfort_of()` is how well the room suits a cryptlin; `learned()`
-  is told when one has shown one of its tastes. The save is version 3 (`residents` is a list); a version 2 save, of
+  is told when one has shown one of its tastes. The save is version 3 (`residents` is a list; `toy` is the toy on the floor, with where it is, how worn and whether it was bought, `toybox` the bought toys that are put away, by item id, each with its wear, `scuffs` the wear on the put-away one of each kind there is no end of, and `broken` when another of such a kind is to be had: a save without them loads with no toy out and every toy as new); a version 2 save, of
   one cryptlin or one egg, loads as a room with that one in it. Each resident in the list holds `id`, `name`,
   `kind`, `seed`, `hatched`, `born`, `warmth`, `at`, `needs` (health among them), `known`, `regard` (what it thinks
   of each of the others, by their ids), `parents` and `parent_names`, `fur`, `nature` and `looks` (what it has from them),
@@ -252,7 +265,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `shaders/water.gdshader`, the sheet a little below it: the two have to be changed together. A cryptlin that does
   not live in water is stopped at the edge in `Cryptlin._move()`, and gets itself out (`State.FLOUNDER`) if it is
   ever further in.
-  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint, a patch of frost or snow, or a clump of toadstools (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
+  `scripts/mess.gd`: droppings, puddles, dug heaps and the bits of a broken toy. The broom is `Items.broom()`, and `Den._tick_broom()` works it. `scripts/track.gd`: a footprint, a patch of frost or snow, or a clump of toadstools (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/knack.gd`: the one thing each kind does that no other does (see Knacks above).
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
   `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes. The scanner itself is
@@ -281,8 +294,8 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock and the empty room inside a host page, and the kind's knack
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--knack|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, the kind at its knack, or one sheet of twelve of the kind, each of another seed
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..19]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes and the broom that sweeps them up, what is on the wheel and what is out in the room, toys wearing out and breaking, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, hair and footprints, the cockatrice and its dummy, the bolter, the yeti, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock and the empty room inside a host page, and the kind's knack
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..19] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--tidy|--knack|--variety [--with=K] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of the scanner on the wheel and pointed at a grown one, a baby and an egg, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), the wheel of things at both of its stops and part of the way round, the wheel before and after a thing is stood in the room with the broom at work and toys worn and breaking (--tidy), the kind at its knack, or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots --pool [--portrait] [--kind=N]   # four in a room with the pool: each place it fits, each lamp, one let go over the middle of it, food and a toy afloat, a drink at the edge, and all asleep
 ```
