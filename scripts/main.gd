@@ -25,6 +25,8 @@ const MAX_RESIDENTS := 4
 # of the dust it raises
 const FIGHT_SOURS := 12.0
 const DUST := Color(0.6, 0.56, 0.5)
+# How many of those that have died the notebook keeps a page for
+const MAX_DEPARTED := 12
 const NAME_HEADS: Array[String] = ["Grub", "Mog", "Snag", "Fizz", "Bork", "Nib", "Skrit", "Womp", "Gloom", "Pim", "Zog", "Murk"]
 const NAME_TAILS: Array[String] = ["nik", "let", "wort", "bo", "gle", "kin", "zle", "by", "mort", "ix"]
 const EGG_SPOT := Vector3(0, 0, 0.3)
@@ -74,6 +76,10 @@ var sfx: Sfx
 var residents: Array[Resident] = []
 var next_id := 1
 var chosen: Resident
+# Those that have died, the longest gone first: each keeps a page in the notebook
+var departed: Array[Resident] = []
+# Grave markers the keeper has put away: the colour of each and whose it is
+var markers_away: Array = []
 # A fight, while one is going on: the ball of dust, the two in it, how long it has left to
 # run, and how long till the next squeak out of it
 var scuffle: Scuffle
@@ -186,7 +192,7 @@ func _ready() -> void:
 	_build_hud()
 	for d: Variant in saved_decor:
 		if d is Dictionary and int(d.get("k", -1)) >= 0 and int(d["k"]) < Decor.IDS.size():
-			_stand(int(d["k"]), Vector3(float(d.get("x", 0.0)), 0, float(d.get("z", 0.0))), float(d.get("r", 0.0)))
+			_stand(int(d["k"]), Vector3(float(d.get("x", 0.0)), 0, float(d.get("z", 0.0))), float(d.get("r", 0.0)), Color.html(str(d.get("c", "808085"))), int(d.get("w", 0)))
 	for m: Variant in saved_mess:
 		if m is Dictionary and int(m.get("k", -1)) >= 0 and int(m["k"]) < Mess.LASTS.size():
 			var laid := _lay_mess(int(m["k"]), Vector3(float(m.get("x", 0.0)), 0, float(m.get("z", 0.0))), float(m.get("t", 0.0)), Color.html(str(m.get("c", "4d331a"))), float(m.get("s", 1.0)))
@@ -370,6 +376,45 @@ func end_fight(broken: bool) -> void:
 		winner._cry("grumble")
 		winner.feel(Cryptlin.Feeling.GRUMPY, 5.0)
 		loser.beaten(winner)
+	save_game()
+
+
+# ---------------------------------------------------------------- dying
+
+# One of them has come to the end (see Cryptlin._dying): it is out of everybody's hands, and no
+# longer one to be called, fed or counted
+func dying(pet: Cryptlin) -> void:
+	if pet in fighters:
+		end_fight(true)
+	if finger != -1 and held_pet == pet:
+		_release()
+	if scanned == pet.me:
+		stop_scan()
+	pet.me.leaving = true
+	_sync()
+
+
+# It is gone. A marker of its own stands where it lay, and its page stays in the notebook.
+func died(pet: Cryptlin) -> void:
+	var r := pet.me
+	r.needs = pet.get_needs()
+	r.lived = pet.age
+	r.died = Time.get_unix_time_from_system()
+	r.pet = null
+	r.leaving = false
+	residents.erase(r)
+	departed.append(r)
+	if departed.size() > MAX_DEPARTED:
+		departed.pop_front()
+	for other in residents:
+		other.regard.erase(str(r.id))
+	var marker := _stand(Decor.Kind.MARKER, pet.position, randf_range(-0.3, 0.3), pet.fur.get_shader_parameter("tint"), r.id)
+	crumbs(marker.position + Vector3(0, 0.1, 0), DUST)
+	if pets().is_empty():
+		_clear_toys()
+	if residents.is_empty():
+		new_egg(-1, r.kind)
+	_sync()
 	save_game()
 
 
@@ -700,6 +745,9 @@ func comfort_of(who: Cryptlin) -> float:
 # Whether something is on the shelf: everything when the game is played by itself; inside a
 # site with a shop, what comes free and what has been bought
 func owns(id: String) -> bool:
+	# (a grave marker is never bought: it is on the shelf while one has been put away)
+	if id in Items.KEPT:
+		return not markers_away.is_empty()
 	return _has_all() or id in Items.FREE or int(stock.get(id, 0)) != 0
 
 
@@ -743,6 +791,11 @@ func use(id: String) -> void:
 			play_ball(n)
 		"egg":
 			lay_egg()
+		"decor" when id == "marker":
+			_bring_marker(_free_spot(Decor.RADII[n]))
+			sfx.play("thud", 1.1, -6.0)
+			_sync()
+			save_game()
 		"decor":
 			# In if it is out, out if it is in
 			var there := decor_of(n)
@@ -831,8 +884,15 @@ func decor_of(kind: int) -> Decor:
 	return null
 
 
-func _stand(kind: int, at: Vector3, turn := 0.0) -> Decor:
-	var d := Decor.new(kind)
+# Stands one of the grave markers that were put away back in the room
+func _bring_marker(at: Vector3) -> Decor:
+	var kept: Dictionary = markers_away.pop_back()
+	return _stand(Decor.Kind.MARKER, at, randf_range(-0.3, 0.3), Color.html(str(kept.get("c", "808085"))), int(kept.get("w", 0)))
+
+
+func _stand(kind: int, at: Vector3, turn := 0.0, tint := Color(0.5, 0.5, 0.52), whose := 0) -> Decor:
+	var d := Decor.new(kind, tint)
+	d.whose = whose
 	add_child(d)
 	d.position = in_room(at, d.radius * 0.6)
 	d.rotation.y = turn
@@ -857,6 +917,8 @@ func place_decor(kind: int, at: Vector3) -> Decor:
 
 
 func remove_decor(d: Decor) -> void:
+	if d.kind == Decor.Kind.MARKER:
+		markers_away.append({"c": d.tint.to_html(false), "w": d.whose})
 	decors.erase(d)
 	d.queue_free()
 	sfx.play("click", 0.8)
@@ -1222,6 +1284,8 @@ func _paint_notes() -> void:
 	_note(screen_of(pet.inside_at("stomach")), Vector2(-200, 50), "Stomach", _word(pet.belly, belly), pet.belly, Color(1.0, 0.72, 0.2), screen_size)
 	var feet := screen_of(pet.global_position)
 	_note(feet, Vector2(0, 64), "Home", _word(pet.comfort, home), pet.comfort, Color(0.6, 0.9, 0.5), screen_size)
+	var well: Array[String] = ["failing", "poorly", "off colour", "well", "in fine fettle"]
+	_note(screen_of(pet.body_centre()), Vector2(200, 130), "Health", _word(pet.health, well), pet.health, Color(0.93, 0.9, 0.8), screen_size)
 
 
 func _note(from: Vector2, offset: Vector2, title: String, word: String, value: float, colour: Color, screen_size: Vector2) -> void:
@@ -1261,6 +1325,8 @@ func _sync() -> void:
 		have.append(id)
 		if item["group"] in Items.SPENT and left_of(id) >= 0:
 			counts[id] = left_of(id)
+	if have.has("marker"):
+		counts["marker"] = markers_away.size()
 	# The marks are what is known of the one in question
 	var pet := who().pet if who() != null else null
 	if pet != null:
@@ -2175,6 +2241,13 @@ func _pull(id: String, at: Vector2) -> void:
 				ball.position = _floor_at(at, 0.75, 0.3)
 			_hold_ball(at)
 			_sync()
+		"decor" when id == "marker":
+			# One of those put away comes back out
+			held_thing = _bring_marker(_floor_at(at, 0.0, 0.3))
+			thing_new = false
+			grab = Grab.THING
+			moved = 15.0
+			_sync()
 		"decor":
 			held_thing = decor_of(n)
 			thing_new = held_thing == null
@@ -2383,7 +2456,7 @@ func save_game() -> void:
 		return
 	var things: Array = []
 	for d in decors:
-		things.append({"k": d.kind, "x": d.position.x, "z": d.position.z, "r": d.rotation.y})
+		things.append({"k": d.kind, "x": d.position.x, "z": d.position.z, "r": d.rotation.y, "c": d.tint.to_html(false), "w": d.whose})
 	var left: Array = []
 	for m in messes:
 		left.append({"k": m.kind, "x": m.position.x, "z": m.position.z, "t": m.made, "c": m.tint.to_html(false), "s": m.size})
@@ -2393,6 +2466,8 @@ func save_game() -> void:
 	file.store_string(JSON.stringify({
 		"v": 3,
 		"residents": living,
+		"gone": departed.map(func(r: Resident) -> Dictionary: return r.to_save()),
+		"markers": markers_away,
 		"next_id": next_id,
 		"floor": floor_style,
 		"nest": nest_style,
@@ -2429,9 +2504,15 @@ func _load_game() -> void:
 			only.needs["age"] = clampf(float(only.needs["age"]) / 420.0, 0.0, 1.0) * Cryptlin.GROW_AGE
 		only.born = float(d.get("born", now - float(only.needs.get("age", Cryptlin.GROW_AGE))))
 		residents.append(only)
+	if d.get("gone") is Array:
+		for saved: Variant in d["gone"]:
+			if saved is Dictionary:
+				departed.append(Resident.from_save(saved))
+	if d.get("markers") is Array:
+		markers_away = d["markers"]
 	# Each has a number of its own (those from older saves are given theirs now)
 	next_id = int(d.get("next_id", 1))
-	for r in residents:
+	for r in residents + departed:
 		if r.id <= 0:
 			r.id = next_id
 		next_id = maxi(next_id, r.id + 1)

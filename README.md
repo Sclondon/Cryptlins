@@ -44,7 +44,7 @@ another; the rest is its own.
 
 Nothing about a cryptlin is ever written on the screen. How it feels shows in its eyes, its ears, the hang of its
 head, and a small drawn **face** that pops up over it when its feeling changes (happy, excited, loving, hungry,
-bored, sleepy, grumpy, scared, sad, disgusted). What it shows you of its tastes is written down in the **notebook**
+bored, sleepy, grumpy, scared, sad, disgusted, poorly). What it shows you of its tastes is written down in the **notebook**
 (a "?" until then), and marked with a heart or a cross on the thing itself.
 
 ## The room and the things in it
@@ -57,7 +57,7 @@ Tap a thing to use it, or drag it up off the row and let go where you want it.
 | --- | --- |
 | **Notebook** (N) | The only words in the game: a page on each egg and cryptlin in the room (leaf through them; a cryptlin can be renamed or let go from its own), how to look after them, the row of things, what a finger can do, and the odds and ends (the sound). |
 | **Egg** | One more for the room, of a kind that is not there already. The room holds four, eggs and cryptlins together; with four in it the egg only clicks. |
-| **Scanner** (X) | Held up to one of them for a few seconds (dragged up onto it; or tapped, when it goes to the one last touched, or else the one nearest the middle): its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and a note for how at home it is. Works on an egg too. |
+| **Scanner** (X) | Held up to one of them for a few seconds (dragged up onto it; or tapped, when it goes to the one last touched, or else the one nearest the middle): its outline, its bones, a stomach that fills as it eats, a heart for how fond it is, lungs for how rested, a brain for how amused, and notes for how well it is and how at home. Works on an egg too. |
 | **Food**: bone (F), toadstool, candy corn, fish, beetle, berries | It runs over and eats what you drop, loves its favourite, and spits out the one it can't stand. |
 | **Toys**: ball (B), stone, bell, glow orb | It chases and kicks the toy and fetches it back; it plays longest with its favourite. Pick the toy up with a finger and it jumps for it; let go to throw. |
 | **Things for the room**: rock, hollow log, fern, skull, crystal, pumpkin, gravestone, water dish | They stay where they are put. Drag them about, or back down to the row to put them away. It sniffs at them and settles beside them, climbs the rock, drinks from the dish. |
@@ -115,6 +115,21 @@ below a third of its health; and a grown one does not fight a baby: it cuffs it 
 **Let go** (on a cryptlin's page of the notebook) asks first, then that one waves and walks off into the dark. No
 egg comes in its place, unless the room is left with nobody in it: an empty room is always sent an egg for nothing.
 
+## Health, and dying
+
+Each has a **health**, 0 to 100, kept with its needs. It wears away while its belly is empty (all of it in four
+days of that: `STARVE_HOURS`), a lost fight takes a little, and it comes back over a couple of days fed and rested
+(`MEND_HOURS`). From a full belly with nobody visiting that is between four and five days to the end, by the same
+`_wear()` whether the game is open or shut. The scanner has a sixth note for it. Under 40 it is **poorly**: it drags
+itself about with its head down, and the poorly face goes up over it. Nothing says so in words.
+
+At no health it dies. It lies down where it is and goes still; a moment later a pale ghost of it gets up, drifts up
+and out through the ceiling, and a small **grave marker** with a band of its own colour stands where it lay. The
+marker is a thing in the room like any other (drag it about, drag it down to the row to put it away, tap it there to
+bring it back out; the others will go and sit by it) but it is never bought or sold: it is on the row only while one
+is put away. Its page stays in the notebook, after those of the living and marked as gone: what it was, how long it
+lived, and what was ever found out about it. One that died while the game was shut is found lying there when it is
+next opened, and goes then. Nothing dies of old age.
 Phone-first: on an upright phone the room is narrow, deep and tall with the lamp near the top of the screen, the
 row of things is bigger, touch targets are generous, and nothing needs a keyboard or hover.
 
@@ -167,7 +182,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, how they get on and fall out, old saves, eggs as stock
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, how they get on and fall out, health and dying, old saves, eggs as stock
 godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, or of three sharing the room
 godot --headless --path . --export-release Web build/index.html
 ```

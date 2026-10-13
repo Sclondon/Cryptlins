@@ -33,6 +33,7 @@ const LIST: Array[Dictionary] = [
 	{"id": "tent", "group": "decor", "n": 12, "name": "Rag tent"},
 	{"id": "crate", "group": "decor", "n": 13, "name": "Crate"},
 	{"id": "pot", "group": "decor", "n": 14, "name": "Flowerpot"},
+	{"id": "marker", "group": "decor", "n": 15, "name": "Grave marker"},
 	{"id": "rags", "group": "nest", "n": 0, "name": "Rag nest"},
 	{"id": "twigs", "group": "nest", "n": 1, "name": "Twig nest"},
 	{"id": "cushion", "group": "nest", "n": 2, "name": "Cushion"},
@@ -50,6 +51,8 @@ const LIST: Array[Dictionary] = [
 const FREE: Array[String] = ["notebook", "scanner", "bone", "ball", "rags", "dirt"]
 # Used up when used: each one fed, or each egg laid, is one fewer on the shelf
 const SPENT: Array[String] = ["food", "egg"]
+# Never bought or sold: on the shelf only while the keeper has one put away
+const KEPT: Array[String] = ["marker"]
 
 
 static func find(id: String) -> Dictionary:

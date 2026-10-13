@@ -43,6 +43,8 @@ func _run() -> void:
 	view.add_child(sun)
 	sun.look_at_from_position(Vector3(-2, 4, 5), Vector3.ZERO)
 	for item in Items.LIST:
+		if item["id"] in Items.KEPT:
+			continue
 		var id: String = item["id"]
 		var model := Items.model(id)
 		model.rotation.y = 0.45
@@ -52,5 +54,5 @@ func _run() -> void:
 		view.get_texture().get_image().save_png("%s/%s.png" % [out, id])
 		model.queue_free()
 		await process_frame
-	print("icons: %d written to %s" % [Items.LIST.size(), out])
+	print("icons: %d written to %s" % [Items.LIST.size() - Items.KEPT.size(), out])
 	quit()

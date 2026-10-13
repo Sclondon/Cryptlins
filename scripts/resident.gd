@@ -22,8 +22,11 @@ var regard := {}
 # Whichever of the two it is in the room just now
 var pet: Cryptlin
 var egg: Egg
-# Sent off into the dark, and on its way out
+# On its way out: sent off into the dark, or dying
 var leaving := false
+# Once it has died: when (unix time), and how long it lived, in seconds
+var died := 0.0
+var lived := 0.0
 
 
 # The thing itself in the room, egg or cryptlin
@@ -47,6 +50,8 @@ func to_save() -> Dictionary:
 		"needs": pet.get_needs() if pet != null else needs,
 		"known": known,
 		"regard": regard,
+		"died": died,
+		"lived": lived,
 		"at": [spot.x, spot.z] if spot != Vector3.INF else [],
 	}
 
@@ -64,6 +69,8 @@ static func from_save(d: Dictionary) -> Resident:
 		r.needs = d["needs"]
 	if d.get("known") is Dictionary:
 		r.known = d["known"]
+	r.died = float(d.get("died", 0.0))
+	r.lived = float(d.get("lived", 0.0))
 	if d.get("regard") is Dictionary:
 		r.regard = d["regard"]
 	if d.get("at") is Array and d["at"].size() == 2:

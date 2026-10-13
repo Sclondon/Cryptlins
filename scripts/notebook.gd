@@ -1,7 +1,8 @@
 class_name Notebook
 extends PanelContainer
 ## The keeper's notebook, opened from the shelf. Everything the game has to say in words is in
-## here: a page on each egg and cryptlin in the room and what has been found out about it, how
+## here: a page on each egg and cryptlin in the room and what has been found out about it (and
+## one kept for each that has died), how
 ## to look after them, what a finger can do, and the few odds and ends (the sound).
 
 const INK := Color(0.17, 0.14, 0.2)
@@ -21,7 +22,9 @@ They leave droppings. Tap one to clear it up: they spoil the place. Puddles dry 
 
 They do not all get on. Two that have fallen out may fight: a tap on the scuffle breaks it up.
 
-The scanner on the shelf shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, and whether it likes its home. Drag it up onto the one you mean."
+One left hungry for days sickens, and in the end dies.
+
+The scanner on the shelf shows what is going on inside one: how full its stomach is, how rested and how amused it is, how fond of you, how well it is, and whether it likes its home. Drag it up onto the one you mean."
 const SHELF := "Everything you have is on the shelf. Slide it sideways to see the rest.
 
 Tap a thing to put it in, or drag it up off the shelf and let go where you want it.
@@ -123,7 +126,7 @@ func open() -> void:
 	if world.finger != -1:
 		world._release()
 	world.stop_scan()
-	page = maxi(world.residents.find(world.who()), 0)
+	page = maxi(everyone().find(world.who()), 0)
 	visible = true
 	refresh()
 	world.sfx.play("click")
@@ -135,8 +138,13 @@ func close() -> void:
 
 
 # How many pages there are just now: one for each in the room, and the rest
+# Those with a page of their own: all that live in the room, then those that have died
+func everyone() -> Array[Resident]:
+	return world.residents + world.departed
+
+
 func pages() -> int:
-	return world.residents.size() + TITLES.size()
+	return everyone().size() + TITLES.size()
 
 
 func turn(by: int) -> void:
@@ -147,14 +155,14 @@ func turn(by: int) -> void:
 
 # Whose page it is open at, or null on the pages that are about no one of them
 func resident() -> Resident:
-	return world.residents[page] if page < world.residents.size() else null
+	return everyone()[page] if page < everyone().size() else null
 
 
 func refresh() -> void:
 	page = mini(page, pages() - 1)
 	var r := resident()
 	var pet := r.pet if r != null else null
-	var rest := page - world.residents.size()
+	var rest := page - everyone().size()
 	rename.visible = pet != null
 	let_go.visible = pet != null
 	let_go.disabled = r != null and r.leaving
@@ -166,14 +174,51 @@ func refresh() -> void:
 	if pet != null:
 		heading.text = r.name
 		body.text = _notes(pet)
-	elif r != null:
+	elif r != null and r.egg != null:
 		heading.text = "An egg"
 		body.text = "%s.
 
 Who knows what is inside? Keep it warm and it will hatch." % r.egg.title()
+	elif r != null:
+		heading.text = "%s, gone" % r.name
+		body.text = _remembrance(r)
 	else:
 		heading.text = TITLES[rest]
 		body.text = [CARE, SHELF, HANDS, ODDS][rest]
+
+
+# The page kept for one that has died: what it was, how long it lived, and as much of its tastes
+# as was ever found out
+func _remembrance(r: Resident) -> String:
+	var was := Cryptlin.profile(r.kind, r.look_seed)
+	var known := r.known
+	var likes: Array[String] = []
+	for kind: int in was["decor"]:
+		if known.get("decor+" + Decor.IDS[kind], false):
+			likes.append("the " + Decor.PLAIN[kind])
+	var hated: int = was["hates"]
+	var water := "yes, a pool to wade in" if Cryptlin.KINDS[r.kind].get("water", false) else "no more than a drink"
+	return "A %s, %s %s.
+It lived %s, and is gone. Its marker stands where it lay.
+
+Loved to eat: %s
+Wouldn't eat: %s
+Favourite toy: %s
+Happiest on: %s
+Liked the lamp: %s
+Liked having about: %s
+Couldn't stand: %s
+Needed water: %s" % [
+		Cryptlin.NATURES[was["nature"]]["title"], Cryptlin.NATURES[was["nature2"]]["title"], Cryptlin.KINDS[r.kind]["title"], _span(r.lived),
+		Snack.PLURALS[was["food"]] if known.get("food", false) else "?",
+		Snack.PLURALS[was["yuck"]] if known.get("yuck", false) else "?",
+		"the " + Ball.PLAIN[was["toy"]] if known.get("toy", false) else "?",
+		Den.GROUND_PLAIN[was["ground"]] if known.get("ground", false) else "?",
+		Den.LAMPS[was["lamp"]]["title"] if known.get("lamp", false) else "?",
+		", ".join(likes) if not likes.is_empty() else "?",
+		"the " + Decor.PLAIN[hated] if known.get("decor-" + Decor.IDS[hated], false) else "?",
+		water if known.get("water", false) else "?",
+	]
 
 
 # What is known of this cryptlin. Its tastes are blank until it has shown them (the test panel

@@ -130,7 +130,7 @@ func _run() -> void:
 	# The egg
 	await _frames(5)
 	check(main.who().egg != null and main.who().pet == null, "a new game starts with an egg (%s)" % main.who().egg.title())
-	check(main.shelf.ids.has("bone") and main.shelf.ids.has("notebook") and main.shelf.ids.size() == Items.LIST.size() and main.shelf.ids.has("egg"), "everything is on the shelf (%d things)" % main.shelf.ids.size())
+	check(main.shelf.ids.has("bone") and main.shelf.ids.has("notebook") and main.shelf.ids.size() == Items.LIST.size() - Items.KEPT.size() and main.shelf.ids.has("egg"), "everything is on the shelf (%d things)" % main.shelf.ids.size())
 	main.use("bone")
 	check(main.snacks.is_empty(), "but there is nothing to feed yet")
 	check(await _until(func() -> bool: return main.who().egg.landed, 300), "the egg drops into the light")
@@ -617,7 +617,7 @@ func _run() -> void:
 	check(main.snacks.size() == 1, "and what was not bought cannot be used")
 	main.dev.visible = true
 	main._sync()
-	check(main.shelf.ids.size() == Items.LIST.size() and main.owns("berries") and main.left_of("fish") == -1, "with the test panel open everything is on the row without end, shop or no shop")
+	check(main.shelf.ids.size() == Items.LIST.size() - Items.KEPT.size() and main.owns("berries") and main.left_of("fish") == -1, "with the test panel open everything is on the row without end, shop or no shop")
 	main.feed(Snack.Kind.FISH)
 	main.dev.visible = false
 	main._sync()
@@ -896,6 +896,34 @@ func _run() -> void:
 		p.set_needs({"belly": 80.0, "health": 100.0})
 		p.fight_cooldown = 9999.0
 
+	# Health: days of an empty belly wear it away, and it mends fed and rested
+	one.set_needs({"belly": 0.0, "health": 100.0, "energy": 90.0})
+	one._wear(24.0 * 3600.0, false, 1.0, false)
+	check(is_equal_approx(one.health, 100.0 - 2400.0 / Cryptlin.STARVE_HOURS) and one.health > 70.0, "a whole day of an empty belly costs it some of its health, and nothing like its life (%.0f)" % one.health)
+	one.belly = 90.0
+	one._wear(6.0 * 3600.0, true, 1.0, true)
+	check(is_equal_approx(one.health, 100.0 - 2400.0 / Cryptlin.STARVE_HOURS + 600.0 / Cryptlin.MEND_HOURS), "fed and asleep, it mends (%.0f)" % one.health)
+	one.set_needs({"belly": 60.0, "health": 30.0, "energy": 90.0})
+	one.flash_time = 0.0
+	one._enter(Cryptlin.State.IDLE, 5.0)
+	await _frames(5)
+	check(one.feeling == Cryptlin.Feeling.POORLY and one.faces[Cryptlin.Feeling.POORLY] != null, "a poorly one shows it")
+	main.start_scan(one.me)
+	await _frames(3)
+	check(main.scanning and main._word(one.health, ["failing", "poorly", "off colour", "well", "in fine fettle"]) == "poorly", "and the scanner has a note of it")
+	main.stop_scan()
+	# The same wearing away whether the game is open or shut
+	one.set_needs({"belly": 0.0, "health": 10.0, "energy": 90.0})
+	two.set_needs({"belly": 0.0, "health": 10.0, "energy": 90.0})
+	one._wear(9.5 * 3600.0, false, 1.0, false)
+	two.pass_time(9.5 * 3600.0, false)
+	check(one.health > 0.0 and absf(one.health - two.health) < 0.001, "an empty belly costs the same by the clock, with the game open or shut (%.3f, %.3f)" % [one.health, two.health])
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	for p: Cryptlin in [one, two]:
+		p.set_needs({"belly": 80.0, "health": 100.0, "energy": 90.0, "bowel": 0.0, "bladder": 0.0})
+		p._enter(Cryptlin.State.IDLE, 2.0)
+
 	# The room holds four and no more
 	await _tap(_on_shelf("egg"))
 	await _tap(_on_shelf("egg"))
@@ -914,6 +942,74 @@ func _run() -> void:
 	check(main.ask.visible and not main.notebook.visible, "which asks first")
 	main._answer(true)
 	check(await _until(func() -> bool: return main.residents.size() == 3, 1200) and not main.parting in main.residents, "saying yes sends that one off, and the rest stay")
+
+	# Dying. One left with an empty belly for days dies: here, while the keeper was away
+	for r in main.residents:
+		if r.egg != null:
+			r.egg.warmth = 100.0
+	check(await _until(func() -> bool: return main.pets().size() == 3, 400), "the two eggs hatch, which makes three")
+	await _frames(30)
+	var third: Cryptlin = main.residents[1].pet
+	var fourth: Cryptlin = main.residents[2].pet
+	var late := third.me.name
+	one.set_needs({"belly": 100.0, "health": 100.0, "energy": 90.0})
+	fourth.set_needs({"belly": 100.0, "health": 100.0, "energy": 90.0})
+	third.set_needs({"belly": 0.0, "health": 2.0, "energy": 90.0})
+	third._wear(1.0 * 3600.0, false, 1.0, false)
+	check(third.health > 0.0, "with an hour less than it takes, it is still alive")
+	await _come_back_after(3.0 * 3600.0)
+	one = main.residents[0].pet
+	third = main.residents[1].pet
+	fourth = main.residents[2].pet
+	check(third.health == 0.0 and third.state == Cryptlin.State.DYING and third.me.leaving and not third in main.pets(), "left hungry past the end of its health, it is found lying still")
+	check(one.health > 90.0 and fourth.health > 90.0, "the others, fed, are none the worse")
+	var lay := third.position
+	check(await _until(func() -> bool: return main.departed.size() == 1, 400) and main.residents.size() == 2, "and then it is gone")
+	var marker := main.decor_of(Decor.Kind.MARKER)
+	check(marker != null and marker.position.distance_to(Vector3(lay.x, 0, lay.z)) < 0.3 and marker.whose == main.departed[0].id, "a marker of its own stands where it lay")
+	check(is_instance_valid(third) and not third.skin.is_empty() and await _until(func() -> bool: return third.lift > 1.0, 600), "a pale ghost of it drifts up")
+	var ghost := third.get_instance_id()
+	check(await _until(func() -> bool: return not is_instance_id_valid(ghost), 1200), "and out through the ceiling")
+	main.notebook.open()
+	main.notebook.page = 2
+	main.notebook.refresh()
+	check(main.notebook.pages() == Notebook.TITLES.size() + 3 and main.notebook.heading.text == late + ", gone" and main.notebook.body.text.contains("It lived") and not main.notebook.let_go.visible, "its page stays in the notebook, marked as gone")
+	main.notebook.close()
+	check(main.toast.text.findn("gone") < 0 and main.toast.text.findn(late) < 0, "nothing is written on the screen about it")
+	# And here in front of the keeper, by the same wearing away
+	late = fourth.me.name
+	fourth.set_needs({"belly": 0.0, "health": 2.0, "energy": 90.0})
+	fourth._wear(1.9 * 3600.0, false, 1.0, false)
+	await _frames(5)
+	check(fourth.health > 0.0 and fourth.state != Cryptlin.State.DYING, "the last of its health lasts as long with the game open")
+	fourth._wear(0.1 * 3600.0, false, 1.0, false)
+	check(await _until(func() -> bool: return fourth.state == Cryptlin.State.DYING, 10), "and then it lies down and goes still")
+	await _tap(_screen(fourth.position + Vector3(0, 0.2, 0)))
+	check(fourth.state == Cryptlin.State.DYING, "past poking")
+	check(await _until(func() -> bool: return main.departed.size() == 2, 400) and main.residents.size() == 1 and main.departed[1].name == late and main.departed[1].lived > 0.0, "and is gone, with how long it lived written down")
+	ghost = fourth.get_instance_id()
+	await _until(func() -> bool: return not is_instance_id_valid(ghost), 1200)
+	# The marker is a thing like any other in the room, and never on sale
+	marker = main.decor_of(Decor.Kind.MARKER)
+	one.position = Vector3(1.6, 0, -1.4)
+	one._enter(Cryptlin.State.IDLE, 30.0)
+	marker.position = Vector3(-1.0, 0, 0.6)
+	await _frames(2)
+	await _slide(_screen(marker.position + Vector3(0, 0.15, 0)), _screen(Vector3(0.6, 0, 1.0)))
+	check(marker.position.x > 0.2, "its marker can be dragged about")
+	check(not main.shelf.ids.has("marker"), "there is none on the row of things while they all stand in the room")
+	await _slide(_screen(marker.position + Vector3(0, 0.15, 0)), _on_shelf("bone"))
+	check(main.markers_away.size() == 1 and main.shelf.ids.has("marker") and main.shelf.counts.get("marker") == 1, "or put away, when it is on the row")
+	main.embedded = true
+	main._sync()
+	check(main.shelf.ids.has("marker") and main.left_of("marker") == 0, "inside a page with a shop too: it is kept, not bought")
+	main.embedded = false
+	main._sync()
+	await _tap(_on_shelf("marker"))
+	check(main.markers_away.is_empty() and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.MARKER).size() == 2 and not main.shelf.ids.has("marker"), "and brought out again")
+	await _restart()
+	one = main.residents[0].pet
+	check(main.departed.size() == 2 and main.departed[1].name == late and main.decors.filter(func(d: Decor) -> bool: return d.kind == Decor.Kind.MARKER and d.whose > 0).size() == 2, "the markers and the pages are kept")
 
 	# A save from when there was only ever one
 	main.queue_free()

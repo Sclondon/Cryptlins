@@ -128,7 +128,7 @@ func _run_ui() -> void:
 	await _wait(1.0)
 	await _snap("u5_cave")
 	# Each of the other shelters in turn, with the cryptlin inside
-	for k in range(Decor.Kind.POOL + 1, Decor.IDS.size()):
+	for k in range(Decor.Kind.POOL + 1, Decor.Kind.POT + 1):
 		var den := main.place_decor(k, Vector3(0.1, 0, 0.3))
 		den.rotation.y = 0.0
 		pet._enter(Cryptlin.State.LURK)
@@ -237,6 +237,23 @@ func _run_many() -> void:
 	await _wait(1.6)
 	await _snap("n4_after")
 	await _wait(2.5)
+	# A poorly one, and the end of it: lying still, the ghost going up, and the marker it leaves
+	all[2].set_needs({"health": 25.0, "belly": 30.0})
+	all[2].flash_time = 0.0
+	all[2].position = Vector3(-0.6, 0, 0.9)
+	all[2].target = Vector3(0.9, 0, 0.9)
+	all[2]._enter(Cryptlin.State.WANDER)
+	await _wait(1.3)
+	await _snap("o1_poorly")
+	all[2].health = 0.0
+	await _wait(1.6)
+	await _snap("o2_still")
+	await _wait(2.4)
+	await _snap("o3_ghost")
+	await _wait(1.4)
+	await _snap("o4_ghost")
+	await _wait(4.0)
+	await _snap("o5_marker")
 	main.new_egg()
 	await _wait(2.0)
 	main.start_scan(all[1].me)
@@ -245,13 +262,13 @@ func _run_many() -> void:
 	main.stop_scan()
 	main.chosen = all[0].me
 	main.notebook.open()
-	for i in main.residents.size():
+	for i in main.notebook.everyone().size():
 		await _wait(0.3)
 		await _snap("m6_page%d" % i)
 		main.notebook.turn(1)
 	await _wait(0.3)
 	await _snap("m7_care")
-	main.notebook.turn(main.notebook.pages() - main.residents.size() - 1)
+	main.notebook.turn(Notebook.TITLES.size() - 1)
 	await _wait(0.3)
 	await _snap("m8_odds")
 	quit()

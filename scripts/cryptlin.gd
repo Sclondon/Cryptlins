@@ -9,7 +9,7 @@ enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
 	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED, INSPECT, SCANNED, VISIT, MOVE_NEST,
 	TOILET, FOND, SCRATCH, STRETCH, DIG, SPIN, GAZE,
-	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED,
+	SNIFF, FOLLOW, TAG, FLEE, SCUFFLE, COWED, DYING,
 }
 # The cryptids they are the young of
 enum Kind {
@@ -48,7 +48,7 @@ const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MO
 enum Want { FOOD, BALL, WATER }
 
 # How it is feeling just now, which shows in its eyes, its ears and how it holds its head
-enum Feeling { CONTENT, HAPPY, EXCITED, LOVING, HUNGRY, BORED, SLEEPY, GRUMPY, SCARED, SAD, DISGUSTED }
+enum Feeling { CONTENT, HAPPY, EXCITED, LOVING, HUNGRY, BORED, SLEEPY, GRUMPY, SCARED, SAD, DISGUSTED, POORLY }
 # What goes up over its head when a feeling comes over it (nothing, for content): a round face
 # sixteen dots across, drawn one dot of the picture to one dot of the face so it stays sharp. Each
 # is its colour and the eight rows of its features: # dark, o white, r red, b blue.
@@ -65,6 +65,7 @@ const FACES: Array[Dictionary] = [
 	{"tint": Color(0.74, 0.62, 1.0), "rows": [".ooo..ooo", ".o#o..o#o", ".ooo..ooo", "", "...####", "...#rr#", "...####", ""]},
 	{"tint": Color(0.5, 0.68, 1.0), "rows": ["", "..#....#", "..#....#", ".b", ".b", "...####", "..#....#", ""]},
 	{"tint": Color(0.62, 0.84, 0.36), "rows": [".#......#", "..#....#", ".#......#", "", "..######", "....rr", "....rr", ""]},
+	{"tint": Color(0.74, 0.8, 0.68), "rows": ["", ".#.#..#.#", "..#....#", ".#.#..#.#", "", "..##..##", "....##", ""]},
 ]
 const FEELINGS: Array[Dictionary] = [
 	{"title": "content", "eye": 1.0, "droop": 0.0, "hang": 0.0, "shake": 0.0},
@@ -78,6 +79,7 @@ const FEELINGS: Array[Dictionary] = [
 	{"title": "scared", "eye": 1.3, "droop": 0.8, "hang": 0.1, "shake": 0.07},
 	{"title": "sad", "eye": 0.7, "droop": 0.8, "hang": 0.32, "shake": 0.0},
 	{"title": "disgusted", "eye": 0.5, "droop": 0.45, "hang": -0.1, "shake": 0.03},
+	{"title": "poorly", "eye": 0.5, "droop": 0.9, "hang": 0.38, "shake": 0.015},
 ]
 # Each cryptlin has two natures of its own on top of what its kind is like: how each changes its
 # needs and habits, and how it takes being picked up ("carry") or pushed about ("push"), which
@@ -148,6 +150,11 @@ const BABY_SIZE := 0.55
 # What losing a fight costs in health, and the health that fighting alone never takes it below
 const FIGHT_HURT := 8.0
 const FIGHT_FLOOR := 30.0
+# Health goes in this many hours of an empty belly (four days: it takes real neglect), and all
+# comes back in this many fed and rested. Below POORLY it shows.
+const STARVE_HOURS := 96.0
+const MEND_HOURS := 48.0
+const POORLY := 40.0
 # How much an hour asleep in the one nest raises what two of them think of each other
 const SLEEP_WARMS := 0.6
 
@@ -1702,6 +1709,8 @@ func _tick_needs(delta: float) -> void:
 		hearts.emitting = true
 		feel(Feeling.HAPPY, 6.0)
 		world.grew_up()
+	if health <= 0.0:
+		_enter(State.DYING)
 
 
 # Time passing, for `seconds` of the clock on the wall: it gets hungrier, more bored and more
@@ -1730,6 +1739,13 @@ func _wear(seconds: float, asleep: bool, effort: float, dark: bool) -> void:
 	fun = clampf(fun, 0.0, 100.0)
 	energy = clampf(energy, 0.0, 100.0)
 	love = clampf(love, 0.0, 100.0)
+	# Its health wears away over days of an empty belly, and mends over a couple of days fed and
+	# rested
+	if belly <= 0.0:
+		health -= seconds * 100.0 / (STARVE_HOURS * HOUR)
+	elif belly > 30.0 and (asleep or energy > 30.0):
+		health += seconds * 100.0 / (MEND_HOURS * HOUR)
+	health = clampf(health, 0.0, 100.0)
 
 
 # The time nobody was looking, lived through in five-minute steps: it sleeps when it is worn out
@@ -1737,7 +1753,7 @@ func _wear(seconds: float, asleep: bool, effort: float, dark: bool) -> void:
 func pass_time(seconds: float, dark: bool) -> bool:
 	var left := minf(seconds, LONGEST_AWAY)
 	var asleep := false
-	while left > 0.0:
+	while left > 0.0 and health > 0.0:
 		var chunk := minf(left, 300.0)
 		left -= chunk
 		_wear(chunk, asleep, 1.1, dark)
@@ -1821,7 +1837,7 @@ func feel(how: int, seconds: float) -> void:
 # Never while it sleeps (it has its z's), begs (it has its bubble) or is under the scanner.
 func _show_emote(delta: float) -> void:
 	emote_again -= delta
-	var lasting := feeling in [Feeling.HUNGRY, Feeling.BORED, Feeling.SAD, Feeling.GRUMPY]
+	var lasting := feeling in [Feeling.HUNGRY, Feeling.BORED, Feeling.SAD, Feeling.GRUMPY, Feeling.POORLY]
 	if feeling != emote_for or (lasting and emote_again <= 0.0 and not emote.visible):
 		# Settling back to plain happiness after something else is not news
 		var news := feeling != Feeling.HAPPY or emote_again <= 0.0
@@ -1831,7 +1847,7 @@ func _show_emote(delta: float) -> void:
 			emote.material_override.albedo_texture = faces[feeling]
 			emote_time = 0.0
 			emote_again = randf_range(10.0, 16.0)
-	if state == State.SLEEP or bubble.visible or xrayed or emote_time > 3.0:
+	if state in [State.SLEEP, State.DYING] or bubble.visible or xrayed or emote_time > 3.0:
 		emote.visible = false
 	if not emote.visible:
 		return
@@ -1853,6 +1869,8 @@ func _feel(delta: float) -> void:
 	flash_time -= delta
 	if flash_time > 0.0:
 		feeling = flash_feeling
+	elif health < POORLY:
+		feeling = Feeling.POORLY
 	elif state == State.SLEEP or energy < 20.0:
 		feeling = Feeling.SLEEPY
 	elif belly < 20.0:
@@ -2073,6 +2091,12 @@ func _process(delta: float) -> void:
 		return
 	anim_t += delta
 	state_time += delta
+	if state == State.DYING:
+		_dying(delta)
+		_move(delta)
+		_animate(delta)
+		_show_emote(delta)
+		return
 	ball_cooldown -= delta
 	food_cooldown -= delta
 	fight_cooldown -= delta
@@ -2088,6 +2112,29 @@ func _process(delta: float) -> void:
 	_think(delta)
 	_move(delta)
 	_animate(delta)
+
+
+# The end of it. It lies still for a moment; then a pale ghost of it gets up out of where it
+# lay (the room puts a marker there) and drifts up and out through the ceiling.
+func _dying(delta: float) -> void:
+	velocity = Vector3.ZERO
+	gaze = position + Vector3(sin(yaw), 0.2, cos(yaw))
+	if step == 0:
+		if state_time > 2.6:
+			step = 1
+			state_time = 0.0
+			world.died(self)
+			_ghost(self, Ps1.xray(Color(0.82, 0.9, 1.0)))
+			curl_goal = 0.0
+			eye_goal = 0.6
+			arm_goal = UP_ARM * 0.4
+			world.sfx.play("coo", 0.5 * voice, -8.0)
+	else:
+		lift += delta * (0.35 + state_time * 0.5)
+		wiggle = sin(anim_t * 2.2) * 0.12
+		yaw += delta * 0.5
+		if lift > Den.lamp_at.y + 2.0:
+			queue_free()
 
 
 func _default_gaze() -> Vector3:
@@ -2215,6 +2262,15 @@ func _enter(s: int, length := 0.0) -> void:
 			wag = 9.0
 		State.SCUFFLE:
 			velocity = Vector3.ZERO
+		State.DYING:
+			# It lies down where it is and goes still
+			world.dying(self)
+			curl_goal = 1.0
+			eye_goal = 0.0
+			droop_goal = 1.0
+			wag = 0.0
+			velocity = Vector3.ZERO
+			_cry("whimper", 0.7, -6.0)
 		State.COWED:
 			droop_goal = 0.9
 			wag = 1.0
@@ -3239,7 +3295,8 @@ func _steer(point: Vector3, speed: float, delta: float, arrive := 0.18) -> bool:
 	var ahead := Vector3(sin(yaw), 0, cos(yaw))
 	var aligned := maxf(ahead.dot(to / away), 0.0)
 	# Slow into the stop so it doesn't overshoot and circle
-	var want := speed * pace * aligned * clampf(away / 0.5, 0.35, 1.0)
+	# (a poorly one drags itself about)
+	var want := speed * pace * aligned * clampf(away / 0.5, 0.35, 1.0) * (0.6 if health < POORLY else 1.0)
 	velocity = velocity.move_toward(ahead * want, delta * 10.0)
 	return false
 
@@ -3262,6 +3319,9 @@ func _keep_off_others(delta: float) -> void:
 	for r in world.residents:
 		if r.egg != null and r.egg.landed:
 			_keep_off(r.egg.position, 0.3 + 0.2 * grow, delta)
+		# (they step round one that is dying, too, which is past being pushed)
+		if r.pet != null and r.pet != self and r.pet.state == State.DYING and r.pet.lift <= 0.05:
+			_keep_off(r.pet.position, 0.3 * (grow + r.pet.grow), delta)
 	for other in world.pets():
 		if other == self or other.lift > 0.05 or other.state == State.SCUFFLE:
 			continue
@@ -3276,7 +3336,7 @@ func _keep_off_others(delta: float) -> void:
 func _move(delta: float) -> void:
 	position.x += velocity.x * delta
 	position.z += velocity.z * delta
-	if state != State.LEAVE:
+	if state != State.LEAVE and state != State.DYING:
 		# It walks round the things in its tank, and stays inside the walls
 		if lift <= 0.05:
 			for thing in world.decors:
