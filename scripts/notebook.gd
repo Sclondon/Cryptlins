@@ -2,9 +2,10 @@ class_name Notebook
 extends PanelContainer
 ## The notebook, opened from the wheel of things: the one the ticket-master of Wayside Station kept
 ## on the things in his cellar, and has left for whoever looks after them now. Everything the game
-## has to say in words is in here, and in his words: a chapter on each egg and cryptlin in the room
-## and what has been found out about it (and one kept for each that has died), then how to look
-## after them, the wheel of things, what a hand can do, and the odds and ends (the sound).
+## has to say in words is in here, and in his words, and there are few of them: a chapter on each
+## egg and cryptlin in the room and what has been found out about it (and one kept for each that
+## has died), and then one short leaf to start the keeper off, with the sound on it. How anything
+## works is not written down: that is for the keeper to find out by trying.
 ##
 ## It is drawn at the size of the screen, not of the room's small picture, in a typewriter face.
 ## It is sized to the screen with a margin all round (see fit), and a chapter that is too long
@@ -30,112 +31,71 @@ const LEAST := Vector2(320.0, 380.0)
 # foot is (the leaves either way, the means of renaming and letting go or the sound, and shut)
 const GAP := 10
 const FOOT_TALL := 68.0
-# The chapters that come after the one for each of those in the room
-const TITLES: Array[String] = ["Standing orders", "What is on the wheel", "What a hand can do", "Odds and ends"]
-const CARE: Array[String] = [
-	"You have the cellar now, so these are yours, and so is this handbook. I kept them going between trains. It is not hard work, only regular.",
-	"They keep the station clock, whether you are down here or not. Miss a day and they have lived it without you.",
-	"Feed each of them once or twice a day. A full belly lasts most of a day. Food goes to whoever gets to it first, so see the shy ones are not left out.",
-	"Give them a toy when they mope. A hatchling is grown in a day or two.",
-	"They sleep when they are worn out. Put the lamp out last thing and they take themselves off to the nest.",
-	"They leave droppings. Sweep them up with the broom, or the place is spoiled for them. Puddles dry on their own in an hour.",
-	"They do not all get on. Two that have fallen out will come to blows. A tap on the scuffle parts them and nobody is hurt.",
-	"Two grown ones that are fond of each other, fed and settled, may pair off. Some hours later there is an egg in the nest, if there is room for one more. I never arranged it and neither can you.",
-	"One left hungry for days sickens, and in the end it dies. There is a marker or two down there to show for it.",
-	"Each kind has one trick that none of the others has. I have not written them out for you. Watch, and it goes in the book when you have seen it.",
-	"The scanner shows what goes on inside one: how full it is, how rested, how amused, how fond of you, how well, and whether it likes its home. Drag it up onto the one you mean.",
+# The one chapter that comes after those for each of those in the room, and all it says: enough
+# to start on and no more. The rest is for the keeper to find out.
+const TITLES: Array[String] = ["To the keeper"]
+const HELP: Array[String] = [
+	"The cellar is yours now, and so are they.",
+	"They want feeding, and they want company.",
+	"The lamp answers to a tap.",
+	"What rides the wheel can be dragged up into the room.",
+	"The gun reads what the eye cannot.",
+	"The rest they will show you, and it goes down in here.",
 ]
-const SHELF: Array[String] = [
-	"Everything you have rides the wheel at the bottom, the scanner first and this book last. Turn it sideways to see the rest.",
-	"Tap a thing to use it, or drag it up off the wheel and let go where you want it. What is out in the cellar is not on the wheel. Put it away and it is back in its place.",
-	"An egg is one more mouth. The cellar holds four, eggs and all.",
-	"Food gets eaten. When a thing runs out it is off the wheel until more comes down.",
-	"Toys get thrown. Pick one up and throw it again, or carry it down to the wheel to put it away.",
-	"Toys do not last. Play wears them and you will see it coming: scuffed first, then patched and sagging. Then one kick too many and you have the pieces to sweep up. The rough ones get through a toy quickest. One you paid for is gone for good. The station ball I can replace, though not the same day.",
-	"The broom and pan are always there. Drag them up and over a mess and it is swept. Or tap the broom and it sees to one by itself. Tapping the mess does nothing. I tried.",
-	"Rocks, logs and the like stay where you put them, and can be dragged about. They will sit on them, drink from them and hide in them.",
-	"To put a thing away, pick it up off the floor and carry it down onto the wheel. The wheel turns to show its place. Let go there and it is put away. Let go anywhere else and you have only moved it. Whatever was sitting in it gets out, and lets you know what it thinks.",
-	"The pool puts half the floor under water. A finger on the water has hold of it: drag it to another side, or down to the wheel. Those that live in water wade about in it and sleep at its edge. The rest keep to the dry, come down for a drink, and are cross if they are put in. Nothing else will stand in it. Food and toys float.",
-	"A tray of ground changes the floor. A nest changes their bed.",
-	"Each of them has its own idea of a good home, and one cellar cannot please them all. The marks on the wheel are what you know of the one you last touched.",
-]
-const HANDS: Array[String] = [
-	"Tap the floor and they come.",
-	"Hold and drag on the floor to swing the lamp. They chase the light.",
-	"Tap the lamp to change it: bright, low, heat, off.",
-	"Rub one to pet it. Tap it to poke it. Four pokes running is one too many.",
-	"Hold a finger on one to pick it up. Flick it to send it sliding. Some take it better than others.",
-	"Drag the nest to move it. It may well get dragged back.",
-	"An egg wants warmth: the lamp, and the heat lamp most of all. Rub it to warm it faster. Tap it and it knocks back. I never got used to that.",
-]
-const ODDS: Array[String] = [
-	"Each of them has a page at the front of this book. One that has hatched can be given a new name there, or let go. It walks off into the dark and that is the last of it. I do not ask where they go.",
-	"One that dies keeps its page. It seemed wrong to tear them out.",
-]
-# The last of the odds and ends, by whether eggs come for nothing (the game played by itself) or
-# are the keeper's own to bring (inside the station's page)
-const EMPTY_FREE := "An empty cellar does not stay empty. An egg turns up. I have stopped wondering who sends them."
-const EMPTY_POSTED := "An empty cellar stays empty until you bring an egg down yourself. It will be on the wheel when you have one."
-const QUIET := "The noise they make can be shut off below. The trains you will have to put up with."
-# A line on each kind: what anybody can see of it, and nothing that has to be found out
+# What is said of an egg, after what is painted on it
+const EGG := "Nobody can say what is in it until it is out. It is cold to the touch."
+# A line or two on each kind: what it looks like and how it struck him. What it needs is the
+# keeper's to work out, and is hinted at here at most.
 const KIND_NOTES: Array[String] = [
-	"Ears, a tail and teeth. The plainest of them and the least trouble, which is not saying much.",
-	"A young sasquatch. Slow, heavy and shy, and it eats like a platelayer.",
-	"The snake is the animal. The rooster on the front of it is stuffed, and the snake is its tail. Do not let on that you know.",
-	"All eyes and wings. Quick and squeaky, and worn out sooner than you would think.",
+	"Ears, a tail and teeth. The least trouble of the lot, which is not saying much.",
+	"A young sasquatch. It eats like a platelayer and does not care to be looked at.",
+	"The snake is the animal. The rooster on the front of it is stuffed. Do not let on that you know.",
+	"All eyes and wings, and worn out sooner than you would think.",
 	"Thin as a rail and always hungry. It lurks.",
-	"A frog that stands up. It jumps higher than is decent, and likes a dance.",
-	"A hump, four flippers and a great deal of neck. Slow on land, shy, and seldom tired.",
-	"A whale off the high slopes. It heaves itself about and is always starving.",
-	"A deer's skull on something thin. It is never full and it keeps to the dark. I feed it first.",
-	"A water horse's foal, all legs. Fast, and off like the down express when the mood takes it.",
-	"A fish that walks. It stares, and it dances.",
-	"A soft head with feelers where the mouth ought to be. Slow and deep in the voice. It watches.",
+	"A frog that stands up. It came in off the river and has not forgotten it.",
+	"A hump, four flippers and a great deal of neck. Not built for dry land.",
+	"A whale off the high slopes. Always starving.",
+	"A deer's skull on something thin. It is never full. I feed it first.",
+	"A water horse's foal, all legs. Off like the down express when the mood takes it.",
+	"A fish that walks. It walks better wet.",
+	"A soft head with feelers where the mouth ought to be. It smells of low tide, and it watches.",
 	"Stout, under a hat as tall as itself. Fond of a dance.",
-	"A slip of a thing on four wings, with a light of its own. Never still, and soon tired.",
-	"A toadstool that got up and walked. Slow and quiet, and it eats little. The easiest lodger I have had.",
+	"A slip of a thing on four wings, with a light of its own. Never still.",
+	"A toadstool that got up and walked. The easiest lodger I have had.",
 	"A hare with antlers coming in. More spring than sense.",
-	"A big head, long hands and two black eyes. It stares more than all the rest together.",
-	"A great soft heap of white fur with a small face low down. Gentle, heavy and hungry.",
-	"Three heads on one pup. The middle one leads. All three are hungry.",
-	"One of the people from underneath. Slow and short in the sight, and it digs up everything.",
-	"A pair of white legs with a lump of a head on top and no arms at all. It walks as if on stilts, and it would sooner stand than sit.",
-	"A monkey with wings, and some of them come in a jacket or a little round hat. Quick and loud, and up on top of things.",
-	"A stout boar with tusks, and wings a size too small for it. It flies a little, with effort, and trots the rest. It roots.",
-	"Tall, in a dark skirt like pleated tin that goes down to the floor, with a round red face set in a hood the shape of the ace of spades. It does not walk, it glides, and it hisses.",
-	"The head of a horse on a long neck, the wings of a bat, the legs of a goat and a fork to its tail. Quick and loud, and it flies when it cares to.",
-	"A fat red worm, all rings, with a round mouth full of teeth at one end and no eyes anywhere. It crawls, and it digs.",
-	"A short wide heap of red or sandy hair with its knuckles on the floor. A flat face, most of it mouth, bandy legs, and feet that turn out.",
-	"A thin kangaroo the colour of ash, with eyes that shine. It goes everywhere in hops, upright, with its fists up in front of it.",
-	"A small flying lizard in red or black: leather wings, a crest, a tail like an oar, and a long beak with teeth in it. Loud, and it sits up on top of things.",
-	"A small person down to the waist and a fish from there on: a great deal of hair, a shell or a starfish in it as often as not, and one long scaled tail where the legs should be. It has no legs at all, and hauls itself along on its arms.",
-]
-# And on each nature (Cryptlin.NATURES): each of them has two
-const NATURE_NOTES: Array[String] = [
-	"Greedy: first to the food and last to leave it.",
-	"Playful: bores quickly, and is hard on its toys.",
-	"Shy: hangs back, and watches from cover.",
-	"Sleepy: tires early. Let it lie.",
-	"Cuddly: likes a hand on it, and sulks if it is pushed.",
-	"Bold: pushes in, and will stare you out.",
-	"Grumpy: quick to take offence, and rough with its things.",
-	"Restless: never in one place for long.",
+	"A big head, long hands and two black eyes. It stares.",
+	"A great soft heap of white fur with a small face low down. It was not made for a warm room.",
+	"Three heads on one pup. All three are hungry.",
+	"One of the people from underneath. The light is not kind to its eyes.",
+	"A pair of white legs with a lump of a head on top. It would sooner stand than sit.",
+	"Wings, and some come in a little jacket. Loud, and up on top of things.",
+	"Stout and tusked, with wings a size too small for it. It roots.",
+	"Tall, in a skirt like pleated tin. It does not walk, it glides.",
+	"A horse's head, a bat's wings, a goat's legs and a fork to its tail. Loud.",
+	"Fat and red, with teeth at one end and no eyes anywhere. It is a long way from the desert.",
+	"A short wide heap of sandy hair with its knuckles on the floor. Hard on its things.",
+	"The colour of ash, and you can see the wall through it.",
+	"A small flying lizard with a beak full of teeth. Loud.",
+	"A small person down to the waist and a fish from there on. Dry floor does not suit it.",
 ]
 # How it seems to be, by the face it last pulled (Cryptlin.FEELINGS)
 const MOODS: Array[String] = [
-	"Content enough, by the look of it.",
+	"Content enough.",
 	"Happy just now.",
 	"Excited about something.",
 	"In a loving mood.",
-	"Hungry. It will tell you so itself.",
-	"Bored. Find it something to do.",
+	"Hungry.",
+	"Bored.",
 	"Sleepy.",
 	"In a temper.",
 	"Frightened of something.",
 	"Low in itself.",
-	"Disgusted, and letting it show.",
-	"Poorly. Feed it and let it rest, and it should mend in a couple of days. Leave it and it will not.",
+	"Disgusted.",
+	"Poorly.",
 ]
+# What begins a row of the list of what has been found out: such a row is set close under the
+# paragraph before it, with no gap between
+const ROW := "\t"
 
 var world: Den
 # The leaf it is open at, counted from the first, and which chapter that is and which leaf of it
@@ -290,9 +250,10 @@ func _tall(text: String, wide: float) -> float:
 	return set_out.get_size().y + LINE_GAP * (set_out.get_line_count() - 1) + 2.0
 
 
-# Sets every chapter out over as many leaves as it needs at the size the notebook is: paragraph
-# by paragraph, a new leaf whenever the next will not fit, and a paragraph too long for a leaf by
-# itself broken between two words.
+# Sets every chapter out over as many leaves as it needs at the size the notebook is, which is
+# one for nearly all of them: paragraph by paragraph and row by row of the list, a new leaf
+# only when the next will not fit (so a leaf is full before the chapter runs on), and a
+# paragraph too long for a leaf by itself broken between two words.
 func _lay_out() -> void:
 	leaves.clear()
 	for which in chapters():
@@ -300,8 +261,8 @@ func _lay_out() -> void:
 		var count := 0
 		for para in _words_of(which):
 			var room := _room()
-			if not held.is_empty() and _tall("\n\n".join(held + [para]), room.x) > room.y:
-				leaves.append({"chapter": which, "part": count, "text": "\n\n".join(held)})
+			if not held.is_empty() and _tall(_set_out(held + [para]), room.x) > room.y:
+				leaves.append({"chapter": which, "part": count, "text": _set_out(held)})
 				held = []
 				count += 1
 			var rest: String = para
@@ -323,7 +284,7 @@ func _lay_out() -> void:
 				count += 1
 				rest = " ".join(words.slice(most))
 			held.append(rest)
-		leaves.append({"chapter": which, "part": count, "text": "\n\n".join(held)})
+		leaves.append({"chapter": which, "part": count, "text": _set_out(held)})
 
 
 func refresh() -> void:
@@ -358,35 +319,34 @@ func refresh() -> void:
 
 # Everything a chapter says, over however many leaves (the one it is open at, if none is given)
 func said(which := -1) -> String:
-	return "\n\n".join(_words_of(chapter if which < 0 else which))
+	return _set_out(_words_of(chapter if which < 0 else which))
+
+
+# Some paragraphs as they stand on a leaf: a gap between one and the next, and none between
+# two rows of the list
+func _set_out(paras: Array) -> String:
+	var text := ""
+	var row := false
+	for para: String in paras:
+		var next := para.begins_with(ROW)
+		if text != "":
+			text += "\n" if row and next else "\n\n"
+		text += para.trim_prefix(ROW)
+		row = next
+	return text
 
 
 # What a chapter says, a paragraph at a time
 func _words_of(which: int) -> Array[String]:
 	var all := everyone()
 	if which >= all.size():
-		match which - all.size():
-			0:
-				return CARE
-			1:
-				return SHELF
-			2:
-				return HANDS
-		var odds := ODDS.duplicate()
-		odds.append(EMPTY_POSTED if world._inside_a_page() else EMPTY_FREE)
-		odds.append(QUIET)
-		return odds
+		return HELP
 	var r := all[which]
-	var paras: Array[String] = []
 	if r.pet != null:
-		paras.assign(_notes(r.pet).split("\n\n"))
-	elif r.egg != null:
-		paras.append("%s.%s" % [r.egg.title(), _parents(r, " Laid in the nest down here. Its parents are %s and %s.")])
-		paras.append("I cannot tell you what is in it. Nobody can, until it is out.")
-		paras.append("Keep it warm and it will hatch. The lamp does it slowly, the heat lamp quicker, and a hand rubbing it quickest of all.")
-	else:
-		paras.assign(_remembrance(r).split("\n\n"))
-	return paras
+		return _paras(r.pet)
+	if r.egg != null:
+		return ["%s.%s" % [r.egg.title(), _parents(r, " Its parents are %s and %s.")], EGG]
+	return _remembrance(r)
 
 
 # A line about the parents of one that was bred in the room, or nothing for one that was not
@@ -396,85 +356,65 @@ func _parents(r: Resident, line: String) -> String:
 
 # The chapter kept for one that has died: what it was, how long it lived, and as much of its
 # tastes as was ever found out
-func _remembrance(r: Resident) -> String:
+func _remembrance(r: Resident) -> Array[String]:
+	var paras: Array[String] = [
+		"%s.%s" % [_a(Cryptlin.KINDS[r.kind]["title"]), _parents(r, " Its parents were %s and %s.")],
+		"It lived %s, and is gone." % _span(r.lived),
+	]
 	var was := Cryptlin.profile(r.kind, r.look_seed)
-	var both := Cryptlin.natures(r.kind, r.look_seed, r.nature)
-	var known := r.known
-	var likes: Array[String] = []
-	for kind: int in was["decor"]:
-		if known.get("decor+" + Decor.IDS[kind], false):
-			likes.append("the " + Decor.PLAIN[kind])
-	var hated: int = was["hates"]
-	var water := "yes, a pool to wade in" if Cryptlin.KINDS[r.kind].get("water", false) else "no more than a drink"
-	return "A %s, %s %s.%s
+	paras.append_array(_found(r.known, false, was["food"], was["yuck"], was["toy"], was["ground"], was["lamp"], was["decor"], was["hates"], Cryptlin.KINDS[r.kind].get("water", false), r.kind, [
+		"Ate gladly", "Would not touch", "Best toy", "Floor it liked", "Lamp it liked", "Liked about the place", "Could not abide", "Wanted water", "Its knack",
+	]))
+	return paras
 
-It lived %s, and is gone. Its marker stands where it lay. I have left what I knew of it.
 
-Ate gladly: %s
-Would not touch: %s
-Best toy: %s
-Floor it liked: %s
-Lamp it liked: %s
-Liked about the place: %s
-Could not abide: %s
-Wanted water: %s" % [
-		Cryptlin.NATURES[both[0]]["title"], Cryptlin.NATURES[both[1]]["title"], Cryptlin.KINDS[r.kind]["title"], _parents(r, " Its parents were %s and %s."), _span(r.lived),
-		Snack.PLURALS[was["food"]] if known.get("food", false) else "?",
-		Snack.PLURALS[was["yuck"]] if known.get("yuck", false) else "?",
-		"the " + Ball.PLAIN[was["toy"]] if known.get("toy", false) else "?",
-		Den.GROUND_PLAIN[was["ground"]] if known.get("ground", false) else "?",
-		Den.LAMPS[was["lamp"]]["title"] if known.get("lamp", false) else "?",
-		", ".join(likes) if not likes.is_empty() else "?",
-		"the " + Decor.PLAIN[hated] if known.get("decor-" + Decor.IDS[hated], false) else "?",
-		water if known.get("water", false) else "?",
+# What is known of this cryptlin, in paragraphs: what it is, how old and how it seems, and then
+# only what it has shown of itself, a row for each thing as it is found out (the test panel
+# gives them all away). A page begins nearly empty, and fills.
+func _paras(pet: Cryptlin) -> Array[String]:
+	var paras: Array[String] = [
+		"%s. %s%s" % [_a("baby " + pet.kind_name() if pet.is_baby() else pet.kind_name()), KIND_NOTES[pet.kind], _parents(pet.me, " Its parents are %s and %s.")],
+		"Hatched %s ago. %s" % [_span(Time.get_unix_time_from_system() - pet.me.born), MOODS[pet.feeling]],
 	]
+	paras.append_array(_found(pet.me.known, world.dev.visible, pet.fav_food, pet.yuck_food, pet.fav_toy, pet.fav_ground, pet.fav_lamp, pet.like_decor, pet.hate_decor, pet.needs_water(), pet.kind, [
+		"Eats gladly", "Will not touch", "Best toy", "Floor it likes", "Lamp it likes", "Likes about the place", "Cannot abide", "Wants water", "Its knack",
+	]))
+	return paras
 
 
-# What is known of this cryptlin, in paragraphs. Its tastes are blank until it has shown them
-# (the test panel gives them away).
+# The same as one run of words, as it stands on its leaves
 func _notes(pet: Cryptlin) -> String:
-	var open := world.dev.visible
-	var known := pet.me.known
+	return _set_out(_paras(pet))
+
+
+# A thing with "a" or "an" before it, to begin a sentence
+func _a(what: String) -> String:
+	return ("An " if what.left(1).to_lower() in "aeiou" else "A ") + what
+
+
+# The rows of the list: one for each thing that has been found out (or, with `open`, for every
+# one), under the names in `heads`, and nothing at all for what has not
+func _found(known: Dictionary, open: bool, food: int, yuck: int, toy: int, ground: int, lamp: int, liked: Array, hated: int, wet: bool, kind: int, heads: Array[String]) -> Array[String]:
 	var likes: Array[String] = []
-	for kind in pet.like_decor:
-		if open or known.get("decor+" + Decor.IDS[kind], false):
-			likes.append("the " + Decor.PLAIN[kind])
-	var hates: String = Decor.PLAIN[pet.hate_decor]
-	var water := "yes, a pool to wade in" if pet.needs_water() else "no more than a drink"
-	var grown := "Hatched %s ago, and full grown." % _span(Time.get_unix_time_from_system() - pet.me.born)
-	if pet.is_baby():
-		grown = "Hatched %s ago. Grown in about %s." % [_span(Time.get_unix_time_from_system() - pet.me.born), _span(pet.growing_left())]
-	return "A %s %s%s.%s %s
-
-%s
-%s
-
-%s %s
-
-What they show you, write down. I did.
-
-Eats gladly: %s
-Will not touch: %s
-Best toy: %s
-Floor it likes: %s
-Lamp it likes: %s
-Likes about the place: %s
-Cannot abide: %s
-Wants water: %s
-Its knack: %s" % [
-		pet.nature_name(), "baby " if pet.is_baby() else "", pet.kind_name(), _parents(pet.me, " Hatched from an egg laid down here. Its parents are %s and %s."), KIND_NOTES[pet.kind],
-		NATURE_NOTES[pet.nature], NATURE_NOTES[pet.nature2],
-		grown, MOODS[pet.feeling],
-		Snack.PLURALS[pet.fav_food] if open or known.get("food", false) else "?",
-		Snack.PLURALS[pet.yuck_food] if open or known.get("yuck", false) else "?",
-		"the " + Ball.PLAIN[pet.fav_toy] if open or known.get("toy", false) else "?",
-		Den.GROUND_PLAIN[pet.fav_ground] if open or known.get("ground", false) else "?",
-		Den.LAMPS[pet.fav_lamp]["title"] if open or known.get("lamp", false) else "?",
-		", ".join(likes) if not likes.is_empty() else "?",
-		"the " + hates if open or known.get("decor-" + Decor.IDS[pet.hate_decor], false) else "?",
-		water if open or known.get("water", false) else "?",
-		"it %s." % Knack.NOTES[pet.kind] if open or known.get("knack", false) else "?",
+	for thing: int in liked:
+		if open or known.get("decor+" + Decor.IDS[thing], false):
+			likes.append("the " + Decor.PLAIN[thing])
+	var rows: Array[String] = []
+	var all := [
+		[open or known.get("food", false), Snack.PLURALS[food]],
+		[open or known.get("yuck", false), Snack.PLURALS[yuck]],
+		[open or known.get("toy", false), "the " + Ball.PLAIN[toy]],
+		[open or known.get("ground", false), Den.GROUND_PLAIN[ground]],
+		[open or known.get("lamp", false), Den.LAMPS[lamp]["title"]],
+		[not likes.is_empty(), ", ".join(likes)],
+		[open or known.get("decor-" + Decor.IDS[hated], false), "the " + Decor.PLAIN[hated]],
+		[open or known.get("water", false), "a pool to wade in" if wet else "no more than a drink"],
+		[open or known.get("knack", false), "it %s." % Knack.NOTES[kind]],
 	]
+	for i in all.size():
+		if all[i][0]:
+			rows.append("%s%s: %s" % [ROW, heads[i], all[i][1]])
+	return rows
 
 
 # A length of time in the two biggest units that matter: "1 day 3 hours", "40 minutes"

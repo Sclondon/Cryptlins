@@ -427,7 +427,7 @@ func _snowball(pet: Cryptlin) -> void:
 # whose knack is in the water) it is one of the things it may take it into its head to do; the
 # turn comes off, and is written in the notebook; and when it is over nothing is left changed
 func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
-	check(not pet.me.known.get("knack", false) and main.notebook._notes(pet).contains("Its knack: ?"), "its knack is not written down before it has been seen")
+	check(not pet.me.known.get("knack", false) and not main.notebook._notes(pet).contains("Its knack"), "its knack is not written down before it has been seen")
 	var wet := pet.kind in [Cryptlin.Kind.NESSIE, Cryptlin.Kind.KELPIE]
 	if wet:
 		main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
@@ -878,11 +878,14 @@ func _pages() -> void:
 		await _frames(2)
 		var inside := screen.grow(-Notebook.EDGE + 0.5).encloses(book.get_global_rect())
 		var spilt: Array[String] = []
+		var half_empty: Array[String] = []
 		var words := {}
 		for i in book.pages():
 			await _frames(2)
 			var frame := book.leaf.get_global_rect()
 			var fits := book.body.get_minimum_size().y <= frame.size.y + 0.5 and book.body.get_visible_line_count() == book.body.get_line_count() and book.get_global_rect().grow(1.0).encloses(frame)
+			if book.page + 1 < book.pages() and book.leaves[book.page + 1]["chapter"] == book.chapter and book.body.get_minimum_size().y < frame.size.y * 0.6:
+				half_empty.append("%d (%s)" % [i + 1, book.heading.text])
 			for part: Control in [book.title, book.heading, book.rename, book.sound, book.folio]:
 				fits = fits and (not part.is_visible_in_tree() or book.get_global_rect().encloses(part.get_global_rect()))
 			inside = inside and screen.grow(-Notebook.EDGE + 0.5).encloses(book.get_global_rect())
@@ -895,7 +898,7 @@ func _pages() -> void:
 			whole = whole and str(words.get(which, "")).replace(" ", "") == book.said(which).replace("\n", "").replace(" ", "")
 		check(inside, "%d by %d: the notebook keeps inside the screen, with a margin all round" % [shape.x, shape.y])
 		check(spilt.is_empty() and whole, "  and each of its %d leaves holds its words whole, with none lost between them %s" % [book.pages(), spilt])
-		check(book.pages() >= book.chapters() and (shape.y > 1000 or book.pages() > book.chapters()), "  a chapter too long for one leaf runs over onto the next (%d leaves for %d chapters)" % [book.pages(), book.chapters()])
+		check(book.pages() >= book.chapters() and (shape.y < 1000 or book.pages() == book.chapters()) and half_empty.is_empty(), "  a chapter has a leaf to itself on a phone, and where one runs on its leaf is full first (%d leaves for %d chapters) %s" % [book.pages(), book.chapters(), half_empty])
 	for r in main.residents:
 		r.name = names[r]
 		for what: String in r.known.keys():
@@ -1880,7 +1883,7 @@ func _run() -> void:
 	# The notebook
 	await _tap(_on_shelf("notebook"))
 	check(main.notebook.visible and main.notebook.heading.text == "Smoke", "a tap on the notebook opens it at the cryptlin's page")
-	check(main.notebook.said().contains(Snack.PLURALS[pet.fav_food]) and main.notebook.said().contains(pet.nature_name()), "which says what has been found out")
+	check(main.notebook.said().contains(Snack.PLURALS[pet.fav_food]) and main.notebook.said().contains(Notebook.KIND_NOTES[pet.kind]) and not main.notebook.said().contains("?"), "which says what it is and what has been found out, and has no row for what has not")
 	main.use("bone")
 	check(main.snacks.is_empty(), "nothing on the shelf answers while it is open")
 	var turned := {}
@@ -1888,7 +1891,12 @@ func _run() -> void:
 		main.notebook.turn(1)
 		turned[main.notebook.heading.text] = true
 		check(main.notebook.body.text.length() > 60, "page %d: %s" % [i + 2, main.notebook.heading.text])
-	check(Notebook.TITLES.all(func(title: String) -> bool: return turned.has(title)) and main.notebook.said(main.notebook.chapters() - 3).contains("broom") and main.notebook.said(main.notebook.chapters() - 3).contains("Toys do not last"), "every chapter comes round, and the one on the wheel has the broom and toys wearing out in it")
+	var help := main.notebook.said(main.notebook.chapters() - 1)
+	check(Notebook.TITLES.size() == 1 and turned.has(Notebook.TITLES[0]) and help.split(" ").size() < 70 and not RegEx.create_from_string("[0-9!]").search(help), "after them comes one short leaf to start the keeper off, with no numbers in it (%d words)" % help.split(" ").size())
+	var longest := 0
+	for note: String in Notebook.KIND_NOTES + Knack.NOTES:
+		longest = maxi(longest, note.split(" ").size())
+	check(Notebook.KIND_NOTES.size() == Cryptlin.KINDS.size() and longest <= 22, "and a kind is a line or two, and its knack one (%d words at most)" % longest)
 	await _pages()
 	main.notebook.close()
 

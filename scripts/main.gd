@@ -4,7 +4,8 @@ extends Node
 ## This builds the room, the lamp and the shelf of things, reads the touches and keeps the save.
 ## Up to four live here at once (see Resident): each starts as an egg (scripts/egg.gd) and is a
 ## cryptlin once it hatches. `who()` is the one in question when a single one is meant.
-## Nothing is written on the screen to say how any of it works: that is all in the notebook.
+## Nothing is written on the screen to say how any of it works, and the notebook says little more:
+## the keeper finds out by trying.
 
 enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER, BROOM }
 enum Lamp { BRIGHT, LOW, HEAT, OFF }
@@ -280,8 +281,6 @@ func _ready() -> void:
 			_spawn_pet(r, on_dry(Vector3(randf_range(-1.0, 1.0), 0, randf_range(-0.6, 0.8)), 0.3, 0.2))
 		else:
 			_lay_egg(r, false)
-	if not residents.is_empty() and pets().is_empty():
-		_say("Still an egg")
 	# They have been living their lives while the game was shut (grown, asleep, hungry, glad to
 	# see you: they show all that themselves)
 	if away > 0.0:
@@ -294,7 +293,6 @@ func _ready() -> void:
 	# _sync).
 	if residents.is_empty() and not embedded:
 		new_egg(first_kind)
-		_say("An egg!")
 	_sync()
 
 
@@ -758,7 +756,6 @@ func _on_hatched(r: Resident) -> void:
 	r.pet.hearts.emitting = true
 	sfx.play("crack", 0.7)
 	Input.vibrate_handheld(60)
-	_say("It hatched!") # (what it is, is for the notebook)
 	# Once it has had its moment, it wants a name
 	if ask_names:
 		get_tree().create_timer(3.5).timeout.connect(open_namer.bind(r))
@@ -814,7 +811,6 @@ func _name_done(_typed := "") -> void:
 	if typed != "":
 		naming.name = typed
 	sfx.play("click", 0.8)
-	_say("This is %s" % naming.name)
 	_sync()
 	save_game()
 
@@ -841,7 +837,6 @@ func _answer(yes: bool) -> void:
 	if yes and parting in residents and parting.pet != null and not parting.leaving:
 		parting.leaving = true
 		parting.pet.leave()
-		_say("Goodbye, %s" % parting.name)
 		_sync()
 
 
@@ -859,7 +854,6 @@ func _on_left(r: Resident) -> void:
 		if not light_on:
 			set_lamp(Lamp.BRIGHT)
 		new_egg(-1, r.kind)
-		_say("An egg!")
 	_sync()
 	save_game()
 
@@ -2440,6 +2434,7 @@ func _dress(b: Button, action: Callable) -> void:
 	b.pressed.connect(action)
 
 
+# Words across the top of the screen, for the test panel alone: nothing is ever written there in play
 func _say(text: String) -> void:
 	toast.text = text
 	var tw := create_tween()

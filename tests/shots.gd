@@ -36,6 +36,8 @@ var side_on := false
 var dark := false
 # With --with: the other kind stands behind the kind in question, and there is a thing of the room behind the last of them
 var over := false
+# With --book: nothing has been found out about any of them yet
+var fresh := false
 var bare := false
 var per_row := 4
 var turned := 0.0
@@ -82,6 +84,8 @@ func _initialize() -> void:
 			second_wait = float(arg.trim_prefix("--then="))
 		if arg == "--tidy":
 			tidy = true
+		if arg == "--fresh":
+			fresh = true
 		if arg == "--book":
 			book = true
 		if arg == "--pool":
@@ -386,6 +390,8 @@ func _run_book() -> void:
 		var pet := all[i]
 		pet.position = Vector3(-1.2 + i * 0.8, 0, 0.4 - 0.4 * (i % 2))
 		pet._enter(Cryptlin.State.STARE)
+		if fresh:
+			continue
 		pet.me.known = {"food": true, "yuck": true, "toy": true, "ground": true, "lamp": true, "water": true, "knack": i != 1}
 		for liked: int in pet.like_decor:
 			pet.me.known["decor+" + Decor.IDS[liked]] = true
@@ -398,7 +404,7 @@ func _run_book() -> void:
 	main.notebook.open()
 	for i in main.notebook.pages():
 		await _wait(0.25)
-		await _snap("b%02d" % i)
+		await _snap("b%s%02d" % ["_fresh" if fresh else "", i])
 		main.notebook.turn(1)
 	quit()
 
