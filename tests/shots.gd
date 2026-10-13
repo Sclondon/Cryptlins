@@ -44,6 +44,7 @@ var bare := false
 var per_row := 4
 var turned := 0.0
 var wheel := false
+var tuck := false
 var walk := false
 var pool := false
 var knack := false
@@ -115,6 +116,8 @@ func _initialize() -> void:
 			dark = true
 		if arg == "--walk":
 			walk = true
+		if arg == "--tuck":
+			tuck = true
 		if arg == "--wheel":
 			wheel = true
 		if arg == "--poses":
@@ -162,6 +165,8 @@ func _initialize() -> void:
 		_run_many.call_deferred()
 	elif walk:
 		_run_walk.call_deferred()
+	elif tuck:
+		_run_tuck.call_deferred()
 	elif wheel:
 		_run_wheel.call_deferred()
 	elif scan_only:
@@ -408,6 +413,50 @@ func _run_book() -> void:
 		await _wait(0.25)
 		await _snap("b%s%02d" % ["_fresh" if fresh else "", i])
 		main.notebook.turn(1)
+	quit()
+
+
+# The wheel tucked away and brought back: up, part of the way down, and away with only its tab
+# left; and, inside a host page, the wheel of a keeper whose ball has broken and whose bones are
+# all fed
+func _run_tuck() -> void:
+	await _wait(1.0)
+	var pet := main.who().pet
+	pet.set_needs({"belly": 60.0, "fun": 70.0, "energy": 80.0, "love": 55.0, "age": Cryptlin.GROW_AGE})
+	pet.position = Vector3(0.3, 0, 0.2)
+	pet.ball_cooldown = 9999.0
+	pet.beg_cooldown = 9999.0
+	pet._enter(Cryptlin.State.STARE)
+	main.place_decor(Decor.Kind.ROCK, Vector3(1.2, 0, -0.9))
+	main.place_decor(Decor.Kind.SKULL, Vector3(-0.9, 0, 1.2))
+	main.shelf.show_item("bone")
+	await _wait(0.8)
+	await _snap("u1_wheel_up")
+	main.tuck(true)
+	await _until(func() -> bool: return main.shelf.sunk >= 0.5, 1.0)
+	await _snap("u2_sliding")
+	await _wait(0.6)
+	pet._enter(Cryptlin.State.STARE)
+	await _snap("u3_tucked")
+	main.tuck(false)
+	await _wait(0.6)
+	main.embedded = true
+	main.stock = {"fish": 2}
+	main._sync()
+	main.shelf.show_item("ball")
+	await _wait(0.6)
+	await _snap("u4_given")
+	for i in 3:
+		main.feed(Snack.Kind.BONE, Vector3(-1.5 + i * 0.3, 2.0, -1.2))
+	main.play_ball(Ball.Kind.BALL)
+	main.ball.vel = Vector3.ZERO
+	main.ball.position = Vector3(0.9, Ball.R, 0.9)
+	main.ball.wear = Ball.WORN_OUT
+	main.wear_toy(main.ball, pet)
+	pet._enter(Cryptlin.State.STARE)
+	main.shelf.show_item("fish")
+	await _wait(1.2)
+	await _snap("u5_ball_broken_bones_gone")
 	quit()
 
 

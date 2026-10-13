@@ -22,6 +22,9 @@ const REACH := 0.56
 const UNDER := 1.7
 # Screen units to one pixel of the shelf's picture
 const COARSE := 2.0
+# How long it takes to slide away or back, and the size of its tab (screen units)
+const TUCK_SECONDS := 0.3
+const TAB := Vector2(46.0, 24.0)
 
 var view: SubViewport
 var camera: Camera3D
@@ -54,6 +57,13 @@ var beckon := ""
 var sought := ""
 var held := false
 var t := 0.0
+# Tucked away off the bottom of the screen, so that the whole room can be seen: only its tab is
+# left, in the corner. `sunk` is how far down it has gone just now (0 up, 1 away), which follows
+# `tucked` over a moment. With `tab` off there is no tab, and no tucking it (see Den.tuck).
+var tucked := false
+var sunk := 0.0
+var tab := true
+var picture: TextureRect
 # How much of its height, at the bottom, is more room under the wheel and no part of the wheel's
 # own measure (screen units): on an upright phone the wheel rides this far up off the bottom edge,
 # clear of what a phone's browser draws over it there, and its things sink away through this
@@ -94,7 +104,7 @@ func _ready() -> void:
 
 	var post := ShaderMaterial.new()
 	post.shader = load("res://shaders/ps1_float.gdshader")
-	var picture := TextureRect.new()
+	picture = TextureRect.new()
 	picture.texture = view.get_texture()
 	picture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -210,7 +220,7 @@ func _angle(i: int) -> float:
 
 # The hub, in this control's own space: below the bottom edge
 func _hub() -> Vector2:
-	return Vector2(size.x * 0.5, (CREST + _radius()) * _unit())
+	return Vector2(size.x * 0.5, (CREST + _radius()) * _unit() + _slid())
 
 
 # Where an item is just now (the middle of it), in this control's own space
@@ -265,9 +275,27 @@ func item_at(at: Vector2) -> String:
 
 # Whether a point on the screen is on the wheel: what is above the rim is the room
 func has_point(at: Vector2) -> bool:
-	if not visible or not get_global_rect().has_point(at):
+	if not visible or tucked or not get_global_rect().has_point(at):
 		return false
 	return (at - global_position).distance_to(_hub()) < (_radius() + REACH) * _unit()
+
+
+# How far down the screen it has slid on its way off the bottom: slow away, quick between, slow in
+func _slid() -> float:
+	return smoothstep(0.0, 1.0, sunk) * (size.y + 12.0)
+
+
+# The middle of its tab, in this control's own space. With the wheel up it is in the top corner
+# of the strip, which the rim has fallen well away from by there, so that it is in the way of
+# nothing on the wheel; it goes down with the wheel, and with that tucked away sits at the bottom
+# edge, above the room that is left under the wheel (see drop).
+func _tab_at() -> Vector2:
+	return Vector2(size.x - TAB.x * 0.5 - 8.0, lerpf(TAB.y * 0.5 + 4.0, size.y - drop - TAB.y * 0.5 - 6.0, smoothstep(0.0, 1.0, sunk)))
+
+
+# Whether a point on the screen is on the tab (a finger's width more than is drawn of it)
+func on_tab(at: Vector2) -> bool:
+	return visible and tab and Rect2(_tab_at() - TAB * 0.5, TAB).grow(11.0).has_point(at - global_position)
 
 
 # Turns, of itself, to bring this item to the top and keep it there ("" to leave off)
@@ -309,6 +337,8 @@ func show_item(id: String) -> void:
 
 func _process(delta: float) -> void:
 	t += delta
+	sunk = move_toward(sunk, 1.0 if tucked else 0.0, delta / TUCK_SECONDS)
+	picture.position.y = _slid()
 	if not held and not spots.is_empty():
 		if absf(speed) > 0.5:
 			turn += speed * delta
@@ -388,9 +418,17 @@ func _paint() -> void:
 			var corner := at + Vector2(reach * 0.14, reach * 0.42)
 			overlay.draw_string_outline(font, corner, "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0, 0, 0, 0.8))
 			overlay.draw_string(font, corner, "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Icons.BONE)
+	if tab:
+		# The tab: a dark chip with an arrowhead on it, down to tuck the wheel away and up to bring
+		# it back
+		var mid := _tab_at()
+		var way := -1.0 if tucked else 1.0
+		overlay.draw_rect(Rect2(mid - TAB * 0.5, TAB), Color(0.05, 0.04, 0.05, 0.5))
+		overlay.draw_rect(Rect2(mid - TAB * 0.5, TAB), Color(Icons.AMBER, 0.3), false, 2.0)
+		overlay.draw_polyline(PackedVector2Array([mid + Vector2(-10, -4 * way), mid + Vector2(0, 5 * way), mid + Vector2(10, -4 * way)]), Color(Icons.AMBER, 0.85), 3.0)
 	for way: float in [-1.0, 1.0]:
 		if can_scroll(way):
-			var c := Vector2(w * 0.5 + way * (w * 0.5 - 14.0), tall * 0.3)
+			var c := Vector2(w * 0.5 + way * (w * 0.5 - 14.0), tall * 0.3 + _slid())
 			overlay.draw_colored_polygon(PackedVector2Array([c + Vector2(7 * way, 0), c + Vector2(-5 * way, -10), c + Vector2(-5 * way, 10)]), Color(Icons.AMBER, 0.55))
 
 

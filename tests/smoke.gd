@@ -868,7 +868,10 @@ func _toys() -> void:
 	main.ball.wear = 30.0
 	main._clear_toys()
 	check(main.shelf.ids.has("ball") and main.shelf.counts.get("ball") == 1 and main.toybox.get("ball", []).size() == 1, "and put away, it is the one on the wheel")
+	main.tuck(true)
 	await _restart()
+	check(main.shelf.tucked and main.shelf.sunk == 1.0, "a wheel that was tucked away is still away the next time, with no sliding about it")
+	main.tuck(false)
 	main.embedded = true
 	main._sync()
 	pet = main.who().pet
@@ -1251,6 +1254,88 @@ func _wheel(pet: Cryptlin, shape: String) -> void:
 	main._clear_toys()
 	pet._enter(Cryptlin.State.IDLE, 0.2)
 	await _frames(2)
+	await _tucking(pet, shape)
+
+
+# The wheel tucked away off the bottom of the screen and brought back: by its tab, by a flick down
+# on it and a flick up from the bottom edge, and by a thing carried down to be put away
+func _tucking(pet: Cryptlin, shape: String) -> void:
+	var shelf := main.shelf
+	var screen := main.get_viewport().get_visible_rect().size
+	var top := shelf.global_position + Vector2(shelf.size.x * 0.5, Shelf.CREST * shelf._unit())
+	var tab := shelf.global_position + shelf._tab_at()
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet.position = Vector3(0, 0, -1.6)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	var under: Array[String] = []
+	for shown in shelf.ids:
+		shelf.show_item(shown)
+		for id in shelf.ids:
+			var at := shelf.where(id)
+			if Rect2(Vector2.ZERO, screen).has_point(at) and shelf.on_tab(at):
+				under.append(id)
+	shelf.show_item("rock")
+	await _frames(2)
+	check(shelf.on_tab(tab) and not shelf.has_point(tab) and under.is_empty() and tab.x > screen.x - 80.0, "%s: the wheel's tab is in its corner, off the wheel and over none of its things, whichever way it is turned %s" % [shape, under])
+	main.start_scan()
+	var mess := main.leave_mess(Mess.Kind.PUDDLE, Vector3(0.3, 0, 0.3), pet)
+	main.sweep_one()
+	await _tap(_px(tab))
+	check(shelf.tucked and not main.scanning and not main.broom.visible and main.sweeping == null and mess in main.messes, "%s: a tap on the tab tucks it away, with the scanner and the broom put back first" % shape)
+	check(shelf.sunk > 0.0 and shelf.sunk < 1.0 and shelf.where("rock").y > top.y + 1.0, "%s: it slides down, and is part of the way there a moment later (%.2f)" % [shape, shelf.sunk])
+	check(await _until(func() -> bool: return shelf.sunk >= 1.0, 60), "%s: and is away within the second" % shape)
+	main.clear_mess(mess)
+	var low := shelf.global_position + shelf._tab_at()
+	var showing := 0
+	for id in shelf.ids:
+		if shelf.where(id).y > 0.0 and shelf.where(id).y - shelf._unit() * 0.55 < screen.y:
+			showing += 1
+	check(showing == 0 and not shelf.has_point(top), "%s: tucked away, none of its things show and none answers" % shape)
+	check(shelf.on_tab(low) and low.y < screen.y - shelf.drop - 10.0 and low.y > screen.y - shelf.drop - 40.0 and (shape == "wide" or shelf.drop > 40.0), "%s: only the tab is left, at the bottom edge and clear of what is under it (%d up)" % [shape, roundi(screen.y - low.y)])
+	check(not shelf.on_tab(low - Vector2(70, 0)) and not shelf.on_tab(low - Vector2(0, 50)), "%s: and it takes no more of the floor than a finger's width round it" % shape)
+	main.ripple.visible = false
+	await _tap(_px(top))
+	check(main.ripple.visible and shelf.tucked and main.snacks.is_empty() and not main.scanning, "%s: a tap where the wheel was is a tap on the floor" % shape)
+	main.ripple.visible = false
+	await _tap(_px(low - Vector2(80, 0)))
+	check(main.ripple.visible and shelf.tucked, "%s: and so is one just beside the tab" % shape)
+	pet.position = Vector3(0, 0, -1.6)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	# The things in the room are still to be dragged about, and down to be put away
+	var skull := main.place_decor(Decor.Kind.SKULL, Vector3(0.5, 0, 0.2))
+	await _frames(2)
+	await _slide(_screen(skull.position + Vector3(0, 0.1, 0)), _screen(Vector3(-0.6, 0, 0.6)))
+	check(shelf.tucked and main.decor_of(Decor.Kind.SKULL) != null and skull.position.distance_to(Vector3(-0.6, 0, 0.6)) < 0.5, "%s: a thing in the room is dragged about with the wheel away" % shape)
+	var bottom := Vector2(screen.x * 0.5, screen.y - shelf.drop - 24.0)
+	_touch(_screen(skull.position + Vector3(0, 0.1, 0)), true)
+	await _frames(2)
+	var from := main.screen_of(skull.position + Vector3(0, 0.1, 0))
+	for i in 8:
+		_drag(_px(from.lerp(bottom, float(i + 1) / 8.0)), _px((bottom - from) / 8.0))
+		await _frames(1)
+	check(not shelf.tucked and main.stowing == "skull", "%s: carried down to the bottom edge, it brings the wheel back up to be put away on" % shape)
+	await _frames(30)
+	_touch(_px(bottom), false)
+	await _frames(2)
+	check(main.decor_of(Decor.Kind.SKULL) == null and shelf.ids.has("skull") and not shelf.tucked and shelf.sunk == 0.0, "%s: and let go there, it is put away" % shape)
+	# A flick down on the wheel, and a flick up from the bottom edge
+	shelf.show_item("rock")
+	await _frames(2)
+	await _slide(_px(top - Vector2(0, 20)), _px(top + Vector2(3, 40)), 4)
+	check(shelf.tucked and main.decor_of(Decor.Kind.ROCK) == null and main.snacks.is_empty(), "%s: a flick down on the wheel tucks it away, and uses nothing" % shape)
+	await _frames(30)
+	await _slide(_px(bottom), _px(bottom - Vector2(4, 130)), 4)
+	check(not shelf.tucked, "%s: a flick up from the bottom edge brings it back" % shape)
+	await _frames(30)
+	await _tap(_px(shelf.global_position + shelf._tab_at()))
+	await _frames(30)
+	main.save_game()
+	var kept: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(save))
+	check(shelf.tucked and kept.get("tucked") == true, "%s: whether it is tucked away is kept in the save" % shape)
+	await _tap(_px(shelf.global_position + shelf._tab_at()))
+	check(not shelf.tucked and await _until(func() -> bool: return shelf.sunk <= 0.0, 60), "%s: and a tap on the tab brings it back up" % shape)
+	main.light_goal = Vector3.ZERO
+	pet._enter(Cryptlin.State.IDLE, 0.2)
 
 
 func _settled(pet: Cryptlin) -> bool:
@@ -2627,8 +2712,15 @@ func _run() -> void:
 	main.notebook.open()
 	main.notebook.close()
 	check(main.residents.is_empty() and main.who() == null and main.shelf.beckon == "", "and empty it stays, with no egg in stock")
+	main.tuck(true)
+	check(main.shelf.tucked and main.shelf.tab, "the wheel can be tucked away meanwhile")
 	main.stock = {"egg": 1}
 	main._sync()
+	check(not main.shelf.tucked and not main.shelf.tab, "an egg come into stock for the empty room brings the wheel back up by itself, and it has no tab")
+	main.tuck(true)
+	var corner := main.shelf.global_position + main.shelf._tab_at()
+	await _tap(root.get_final_transform() * corner)
+	check(not main.shelf.tucked and not main.shelf.on_tab(corner), "and it is not to be tucked away while the egg is held out")
 	var middle := root.get_final_transform() * (main.shelf.global_position + Vector2(main.shelf.size.x * 0.5, 0))
 	check(main.shelf.ids.has("egg") and main.shelf.counts.get("egg") == 1 and main.shelf.beckon == "egg" and absf(_on_shelf("egg").x - middle.x) < 4.0, "an egg in stock is at the middle of the wheel, asking to be picked")
 	await _tap(_on_shelf("egg"))

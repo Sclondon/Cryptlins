@@ -7,7 +7,7 @@ extends Node
 ## Nothing is written on the screen to say how any of it works, and the notebook says little more:
 ## the keeper finds out by trying.
 
-enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER, BROOM }
+enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP, SCANNER, BROOM, TAB }
 enum Lamp { BRIGHT, LOW, HEAT, OFF }
 # The part of the floor the pool lies over
 enum Shore { NONE, BACK, LEFT, RIGHT }
@@ -143,6 +143,8 @@ var broken := {}
 # like one that was bought, until it breaks)
 var used := {}
 var saved_toy := {}
+# Whether the save had the wheel tucked away (see tuck)
+var saved_tucked := false
 var snacks: Array[Snack] = []
 var decors: Array[Decor] = []
 # What the cryptlins have left on the floor (see Mess)
@@ -270,6 +272,8 @@ func _ready() -> void:
 	add_child(sfx)
 	sfx.muted = _muted_at_start
 	_build_hud()
+	shelf.tucked = saved_tucked
+	shelf.sunk = 1.0 if saved_tucked else 0.0
 	for d: Variant in saved_decor:
 		if d is Dictionary and int(d.get("k", -1)) >= 0 and int(d["k"]) < Decor.IDS.size():
 			_stand(int(d["k"]), Vector3(float(d.get("x", 0.0)), 0, float(d.get("z", 0.0))), float(d.get("r", 0.0)), Color.html(str(d.get("c", "808085"))), int(d.get("w", 0)))
@@ -1058,9 +1062,40 @@ func _over_wheel(at: Vector2) -> bool:
 	return shelf.has_point(at) or (shelf.visible and at.y > shelf.global_position.y + (shelf.size.y - shelf.drop) * 0.35)
 
 
+# Tucks the wheel of things away off the bottom of the screen, so that the whole room can be
+# seen, or brings it back: by the tab in its corner, a flick down on it, or a flick up from the
+# bottom edge. The scanner and the broom are put back first. It is not to be tucked away while
+# an empty room inside a host page has an egg held out on it (see _sync). Kept in the save.
+func tuck(away: bool) -> void:
+	if away and _egg_waiting():
+		away = false
+	if shelf.tucked == away:
+		return
+	if away:
+		stop_scan()
+		if broom.visible and grab != Grab.BROOM:
+			if sweeping != null:
+				sweeping.scale = Vector3.ONE
+			sweeping = null
+			broom.visible = false
+		shelf.let_go()
+		shelf.bring("")
+	shelf.tucked = away
+	sfx.play("click", 0.8 if away else 1.1, -8.0)
+	save_game()
+
+
+# An empty room inside a host page, and an egg in stock to lay in it
+func _egg_waiting() -> bool:
+	return embedded and residents.is_empty() and owns("egg")
+
+
 # A thing on the end of a finger has come down over the wheel (or, with "", gone back up): the
 # wheel makes room for it at its place and turns to show where that is
 func _offer(id: String) -> void:
+	# (tucked away, it comes back up for the thing to be put away on)
+	if id != "":
+		tuck(false)
 	if id == stowing:
 		return
 	stowing = id
@@ -2006,6 +2041,10 @@ func _sync() -> void:
 	if waiting and shelf.beckon == "":
 		shelf.show_item("egg")
 	shelf.beckon = "egg" if waiting else ""
+	# (and is not to be tucked away meanwhile: the egg held out is the only way on)
+	shelf.tab = not waiting
+	if waiting:
+		tuck(false)
 	if who() != null:
 		dev_label.text = "%d/%d\n%s" % [who().kind + 1, Cryptlin.KINDS.size(), Cryptlin.KINDS[who().kind]["title"]]
 		dev_egg.text = "Hatch" if who().egg != null else "Egg"
@@ -2818,6 +2857,8 @@ func _input(event: InputEvent) -> void:
 					_offer("" if ball.visible else Items.id_of("toy", ball.kind))
 			Grab.SNACK:
 				hold_point = _held_at(event.position, 0.75)
+				if _over_wheel(event.position):
+					tuck(false)
 			Grab.PET:
 				if carrying:
 					hold_point = _floor_at(event.position, 0.0, 0.4) + Vector3(0, 0.8, 0)
@@ -2878,7 +2919,7 @@ func _press(e: InputEventScreenTouch) -> void:
 	if finger != -1 or _over_ui(e.position):
 		return
 	# A touch anywhere puts the scanner down
-	if scanning and not shelf.has_point(e.position):
+	if scanning and not shelf.has_point(e.position) and not shelf.on_tab(e.position):
 		stop_scan()
 		return
 	finger = e.index
@@ -2888,7 +2929,10 @@ func _press(e: InputEventScreenTouch) -> void:
 	moved = 0.0
 	held_thing = null
 	thing_new = false
-	if shelf.has_point(e.position):
+	if shelf.on_tab(e.position):
+		# The tab in the corner of the wheel: let go of, it tucks the wheel away or brings it back
+		grab = Grab.TAB
+	elif shelf.has_point(e.position):
 		grab = Grab.SHELF
 		shelf_item = shelf.item_at(e.position)
 		sliding = false
@@ -2982,6 +3026,10 @@ func _drag_shelf(e: InputEventScreenDrag) -> void:
 		shelf.drag(e.relative.x, get_process_delta_time())
 	elif absf(gone.x) > 16.0 and absf(gone.x) > absf(gone.y):
 		sliding = true
+	elif gone.y > 36.0 and gone.y > absf(gone.x) * 1.5:
+		# A flick down on it tucks it away
+		shelf_item = ""
+		tuck(true)
 
 
 # Something dragged up off the shelf: it comes into the room on the end of the finger
@@ -3077,6 +3125,8 @@ func _release() -> void:
 	light_dragging = false
 	release_time = clock
 	match was:
+		Grab.TAB:
+			tuck(not shelf.tucked)
 		Grab.SHELF:
 			shelf.let_go()
 			if not sliding and moved < 14.0 and shelf_item != "":
@@ -3164,6 +3214,10 @@ func _release() -> void:
 				Input.vibrate_handheld(20)
 			held_egg = null
 		Grab.FLOOR:
+			# A flick up from the bottom edge, where the wheel is tucked away, brings it back
+			var up := press_at.y - last_at.y
+			if shelf.tucked and press_at.y > shelf.global_position.y + (shelf.size.y - shelf.drop) * 0.5 and clock - press_time < 0.4 and up > 40.0 and up > absf(last_at.x - press_at.x) * 1.5:
+				tuck(false)
 			# (a tap on what they have left on the floor is a tap on the floor: it takes the broom
 			# to clear it up)
 			if quick and not light_dragging_was and not pets().is_empty():
@@ -3280,6 +3334,7 @@ func save_game() -> void:
 		"scuffs": scuffs,
 		"broken": broken,
 		"used": used,
+		"tucked": shelf.tucked if shelf != null else saved_tucked,
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
 		"time": Time.get_unix_time_from_system(),
@@ -3354,6 +3409,7 @@ func _load_game() -> void:
 	if d.get("used") is Dictionary:
 		for id: String in d["used"]:
 			used[id] = int(d["used"][id])
+	saved_tucked = bool(d.get("tucked", false))
 	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
 	away = maxf(now - float(d.get("time", now)), 0.0)
 	_muted_at_start = bool(d.get("muted", false))
