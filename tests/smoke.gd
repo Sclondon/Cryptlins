@@ -1338,6 +1338,52 @@ func _tucking(pet: Cryptlin, shape: String) -> void:
 	pet._enter(Cryptlin.State.IDLE, 0.2)
 
 
+# The handbook's way to the ticket counter, which is there inside the station only: a Shop button
+# at the foot of every leaf, and a line on the keeper's leaf
+func _counter() -> void:
+	var book := main.notebook
+	var was := root.size
+	book.open_at(0)
+	await _frames(2)
+	check(not book.shop.is_visible_in_tree() and not book.said(book.chapters() - 1).contains("counter"), "played by itself the handbook has no Shop button, and says nothing of a counter")
+	main.embedded = true
+	for shape: Vector2i in [Vector2i(540, 1170), Vector2i(1280, 720)]:
+		root.size = shape
+		await _frames(5)
+		book.open_at(0)
+		await _frames(3)
+		var fits := book.shop.is_visible_in_tree() and book.rename.is_visible_in_tree() and Rect2(Vector2.ZERO, main.get_viewport().get_visible_rect().size).grow(-Notebook.EDGE + 0.5).encloses(book.get_global_rect())
+		var along := -INF
+		var parts: Array = [book.folio]
+		parts.append_array(book.foot_buttons)
+		for part: Control in parts:
+			if part.is_visible_in_tree():
+				fits = fits and book.get_global_rect().grow(-20.0).encloses(part.get_global_rect()) and part.size.x >= 44.0
+		for part: Control in book.shop.get_parent().get_children():
+			if part.is_visible_in_tree():
+				fits = fits and part.get_global_rect().position.x >= along
+				along = part.get_global_rect().end.x
+		check(fits, "%d by %d: inside the station a cryptlin's leaf has a Shop button, and the row at its foot still fits" % [shape.x, shape.y])
+		book.open_at(book.chapters() - 1)
+		await _frames(3)
+		var helps := 0
+		for l in book.leaves:
+			if l["chapter"] == book.chapters() - 1:
+				helps += 1
+		check(book.shop.is_visible_in_tree() and book.sound.is_visible_in_tree() and book.said().contains("counter") and helps == 1 and book.body.get_visible_line_count() == book.body.get_line_count(), "%d by %d: the keeper's leaf has it too, says where things are to be had, and is still one leaf" % [shape.x, shape.y])
+	var said: Array = []
+	main.told.connect(func(message: Dictionary) -> void: said.append(message))
+	var saved := FileAccess.get_modified_time(save)
+	main.save_timer = 5.0
+	book.shop.pressed.emit()
+	check(not book.visible and said.size() == 1 and said[0] == {"type": "CRYPTLINS_SHOP"} and main.save_timer == 0.0 and FileAccess.get_modified_time(save) >= saved, "a tap on it saves the game, shuts the handbook and tells the page the keeper wants the counter")
+	main.embedded = false
+	main.to_shop()
+	check(said.size() == 1, "which it is never told when the game is played by itself")
+	root.size = was
+	await _frames(5)
+
+
 func _settled(pet: Cryptlin) -> bool:
 	return pet.state in Cryptlin.INTERRUPTIBLE and not pet.airborne
 
@@ -2074,6 +2120,7 @@ func _run() -> void:
 	check(Notebook.KIND_NOTES.size() == Cryptlin.KINDS.size() and longest <= 22, "and a kind is a line or two, and its knack one (%d words at most)" % longest)
 	await _pages()
 	main.notebook.close()
+	await _counter()
 
 	# The room is kept
 	main.place_decor(Decor.Kind.SKULL, Vector3(1.0, 0, -1.0))

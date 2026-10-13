@@ -130,6 +130,15 @@ static func paint(ci: CanvasItem, symbol: String, c: Vector2, r: float, tint := 
 			ci.draw_rect(Rect2(c - Vector2(0.8, 0.8) * r, Vector2(1.6, 1.6) * r), bone)
 			for pip: Vector2 in [Vector2(-0.42, -0.42), Vector2(0.42, 0.42), Vector2(0, 0), Vector2(-0.42, 0.42), Vector2(0.42, -0.42)]:
 				ci.draw_circle(c + pip * r, r * 0.15, dark)
+		"ticket":
+			# A railway ticket: a card with a bite out of each end and a line where it tears
+			ci.draw_rect(Rect2(c + Vector2(-0.95, -0.55) * r, Vector2(1.9, 1.1) * r), amber)
+			for end: float in [-1.0, 1.0]:
+				ci.draw_circle(c + Vector2(0.95 * end, 0) * r, r * 0.2, Icons.MOSS * tint)
+			for i in 4:
+				ci.draw_rect(Rect2(c + Vector2(0.3, -0.45 + i * 0.26) * r, Vector2(0.09, 0.13) * r), dark)
+			ci.draw_rect(Rect2(c + Vector2(-0.65, -0.28) * r, Vector2(0.7, 0.16) * r), dark)
+			ci.draw_rect(Rect2(c + Vector2(-0.65, 0.08) * r, Vector2(0.45, 0.14) * r), dark)
 		"pencil":
 			ci.draw_line(c + Vector2(-0.55, 0.55) * r, c + Vector2(0.65, -0.65) * r, amber, r * 0.34)
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.95, 0.95) * r, c + Vector2(-0.72, 0.42) * r, c + Vector2(-0.42, 0.72) * r]), bone)

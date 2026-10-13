@@ -3233,6 +3233,8 @@ func _release() -> void:
 # Inside another page (the station's basement): tell it when the room is on the screen, so it
 # can lift whatever it was covering the load with, and take from it what has been bought.
 #   out: {type: "CRYPTLINS_READY"}, {type: "CRYPTLINS_USED", item: <id>}
+#        {type: "CRYPTLINS_SHOP"}: the keeper has asked for the ticket counter (the handbook's
+#        Shop button); the game has saved, and expects to be hidden
 #   in:  {type: "CRYPTLINS_STOCK", items: {<id>: <how many, or -1 for no end of them>}}
 #        {type: "CRYPTLINS_SHOW"} and {type: "CRYPTLINS_HIDE"}: in front, or covered and left
 # The page loads the game out of sight, so it rests (see rest) until it is first shown.
@@ -3254,6 +3256,16 @@ func _bridge() -> void:
 
 func _inside_a_page() -> bool:
 	return OS.has_feature("web") and bool(JavaScriptBridge.eval("window.parent !== window", true))
+
+
+# The Shop button in the handbook: the keeper wants the ticket counter. The game is saved, the
+# handbook shut and the page told, which covers the game and takes them there.
+func to_shop() -> void:
+	if not embedded:
+		return
+	notebook.close()
+	save_game()
+	_post({"type": "CRYPTLINS_SHOP"})
 
 
 func _post(message: Dictionary) -> void:

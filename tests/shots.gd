@@ -45,6 +45,8 @@ var per_row := 4
 var turned := 0.0
 var wheel := false
 var tuck := false
+# With --book: as it is inside the station, with the way to the ticket counter
+var station := false
 var walk := false
 var pool := false
 var knack := false
@@ -116,6 +118,8 @@ func _initialize() -> void:
 			dark = true
 		if arg == "--walk":
 			walk = true
+		if arg == "--station":
+			station = true
 		if arg == "--tuck":
 			tuck = true
 		if arg == "--wheel":
@@ -408,6 +412,10 @@ func _run_book() -> void:
 	all[3].set_needs({"age": 3000.0})
 	main.new_egg() if main.room_for_more() else null
 	main.chosen = all[0].me
+	if station:
+		main.embedded = true
+		main.stock = {"fish": 2}
+		main._sync()
 	main.notebook.open()
 	for i in main.notebook.pages():
 		await _wait(0.25)
@@ -658,6 +666,10 @@ func _run_many() -> void:
 	await _snap("m5_scan")
 	main.stop_scan()
 	main.chosen = all[0].me
+	if station:
+		main.embedded = true
+		main.stock = {"fish": 2}
+		main._sync()
 	main.notebook.open()
 	for i in main.notebook.everyone().size():
 		main.notebook.open_at(i)

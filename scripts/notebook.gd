@@ -31,6 +31,8 @@ const LEAST := Vector2(320.0, 380.0)
 # foot is (the leaves either way, the means of renaming and letting go or the sound, and shut)
 const GAP := 10
 const FOOT_TALL := 68.0
+const FOOT_WIDE := 84.0
+const FOOT_NARROW := 72.0
 # The one chapter that comes after those for each of those in the room, and all it says: enough
 # to start on and no more. The rest is for the keeper to find out.
 const TITLES: Array[String] = ["To the keeper"]
@@ -41,6 +43,11 @@ const HELP: Array[String] = [
 	"What rides the wheel can be dragged up into the room.",
 	"The gun reads what the eye cannot.",
 	"The rest they will show you, and it goes down in here.",
+]
+# What that leaf goes on to say inside the station, where there is a ticket counter to send the
+# keeper to (the Shop button at its foot goes there)
+const COUNTER: Array[String] = [
+	"Food, toys, things for the room and eggs are to be had for tickets at the counter upstairs.",
 ]
 # What is said of an egg, after what is painted on it
 const EGG := "Nobody can say what is in it until it is out. It is cold to the touch."
@@ -112,6 +119,8 @@ var folio: Label
 var rename: IconButton
 var sound: IconButton
 var let_go: IconButton
+var shop: IconButton
+var foot_buttons: Array[Button] = []
 
 
 func _init(den: Den) -> void:
@@ -154,7 +163,10 @@ func _init(den: Den) -> void:
 	rename = world.icon_button(foot, "pencil", func() -> void: world.open_namer(resident()), "Rename")
 	let_go = world.icon_button(foot, "moon", func() -> void: world.ask_let_go(resident()), "Let go")
 	sound = world.icon_button(foot, "sound_on", world.toggle_sound, "Sound")
-	for b: Button in [rename, let_go, sound]:
+	# (inside the station only: the way to the ticket counter upstairs)
+	shop = world.icon_button(foot, "ticket", world.to_shop, "Shop")
+	shop.visible = false
+	for b: Button in [rename, let_go, sound, shop]:
 		b.custom_minimum_size = Vector2(84, FOOT_TALL)
 	folio = _line(foot, 19, FAINT)
 	folio.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -162,6 +174,9 @@ func _init(den: Den) -> void:
 	folio.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	for b: Button in [back, world.icon_button(foot, "right", turn.bind(1)), world.icon_button(foot, "check", close)]:
 		b.custom_minimum_size = Vector2(84, FOOT_TALL)
+	for b in foot.get_children():
+		if b is Button:
+			foot_buttons.append(b)
 
 
 func _line(parent: Node, size: int, colour: Color) -> Label:
@@ -303,6 +318,10 @@ func refresh() -> void:
 	let_go.visible = pet != null
 	let_go.disabled = r != null and r.leaving
 	sound.visible = rest == TITLES.size() - 1
+	shop.visible = world.embedded
+	# (with all of them on the one leaf, each gives up a little of its width)
+	for b in foot_buttons:
+		b.custom_minimum_size.x = FOOT_NARROW if shop.visible and rename.visible else FOOT_WIDE
 	sound.symbol = "sound_off" if world.sfx.muted else "sound_on"
 	sound.caption = "Muted" if world.sfx.muted else "Sound"
 	folio.text = "%d / %d" % [page + 1, pages()]
@@ -340,7 +359,7 @@ func _set_out(paras: Array) -> String:
 func _words_of(which: int) -> Array[String]:
 	var all := everyone()
 	if which >= all.size():
-		return HELP
+		return HELP + COUNTER if world.embedded else HELP
 	var r := all[which]
 	if r.pet != null:
 		return _paras(r.pet)
