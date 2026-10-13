@@ -1,9 +1,13 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --faces:
 ## each of the faces that go up over its head. With --many: three of different kinds sharing the room.
+## With --variety: one sheet of twelve of the kind, each of another seed, stood in rows facing
+## the front under an even light (or side on, as babies, in the dark, or as the scanner shows
+## them; with --with=K every
+## other one is of kind K, to see two kinds side by side).
 
 # The save this run uses: one for each kind and shape of screen, so that several can be run at once
 var save := "user://shots_test.json"
@@ -18,6 +22,11 @@ var egg_only := false
 var faces_only := false
 var baby := false
 var many := false
+var variety := false
+var beside := -1
+var side_on := false
+var dark := false
+var bare := false
 
 
 func _initialize() -> void:
@@ -38,12 +47,25 @@ func _initialize() -> void:
 			ui_only = true
 		if arg == "--many":
 			many = true
+		if arg == "--variety":
+			variety = true
+		if arg.begins_with("--with="):
+			beside = int(arg.trim_prefix("--with="))
+		if arg == "--side":
+			side_on = true
+		if arg == "--xray":
+			bare = true
+		if arg == "--dark":
+			dark = true
 		if arg == "--portrait":
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
 	save = "user://shots_test_%d%s.json" % [kind, "_p" if portrait else ""]
 	DisplayServer.window_set_size(Vector2i(540, 1170) if portrait else Vector2i(1280, 720))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
+	if variety:
+		_run_variety.call_deferred()
+		return
 	if many:
 		# Three of different kinds, grown, as a save holds them
 		var three: Array = []
@@ -297,6 +319,64 @@ func _run_many() -> void:
 	main.notebook.turn(Notebook.TITLES.size() - 1)
 	await _wait(0.3)
 	await _snap("m8_odds")
+	quit()
+
+
+# Twelve of the kind on one sheet, four to a row: six seeds from before there were more colours
+# and six from since, counted on from --seed. The room holds four, so each row is the room
+# opened afresh with four in it, and the strip they stand in is cut out of the picture.
+func _run_variety() -> void:
+	var strip := Rect2i(320, 370, 640, 220)
+	var sheet := Image.create(strip.size.x, strip.size.y * 3, false, Image.FORMAT_RGB8)
+	for row in 3:
+		var four: Array = []
+		for i in 4:
+			var n := row * 4 + i
+			var k := beside if beside >= 0 and n % 2 == 1 else kind
+			var s := look + n / 2 + 1 + (Cryptlin.OLD_SEEDS if n % 2 == 1 and beside < 0 else 0)
+			four.append({"id": i + 1, "name": "Seed %d" % s, "kind": Cryptlin.KINDS[k]["title"], "seed": s, "hatched": true, "born": Time.get_unix_time_from_system() - 200000.0, "needs": {"belly": 80.0, "fun": 80.0, "energy": 90.0, "love": 50.0}})
+		var f := FileAccess.open(save, FileAccess.WRITE)
+		f.store_string(JSON.stringify({"v": 3, "residents": four, "next_id": 5, "time": Time.get_unix_time_from_system()}))
+		f.close()
+		main = load("res://main.tscn").instantiate()
+		main.save_path = save
+		main.ask_names = false
+		root.add_child(main)
+		await _wait(0.6)
+		if dark:
+			main.set_lamp(Den.Lamp.OFF)
+		else:
+			var sun := DirectionalLight3D.new()
+			sun.light_energy = 0.45
+			main.add_child(sun)
+			sun.look_at_from_position(Vector3(0.5, 2.0, 4.0), Vector3(0, 0.4, 0))
+		var all := main.pets()
+		for frame in 80:
+			for i in all.size():
+				var pet := all[i]
+				if baby:
+					pet.age = 0.0
+					pet.grow = pet.size_goal()
+				pet.position = Vector3(-1.5 + i * 1.0, 0, 1.9)
+				pet.yaw = PI * 0.5 if side_on else 0.0
+				pet.velocity = Vector3.ZERO
+				pet.fight_cooldown = 99.0
+				pet.emote_again = 99.0
+				pet.emote.visible = false
+				pet.gaze = main.camera.global_position
+				pet.xray(bare)
+				if pet.state != Cryptlin.State.IDLE:
+					pet._enter(Cryptlin.State.IDLE, 60.0)
+			await process_frame
+		await RenderingServer.frame_post_draw
+		var shot := root.get_texture().get_image()
+		shot.convert(Image.FORMAT_RGB8)
+		sheet.blit_rect(shot, strip, Vector2i(0, strip.size.y * row))
+		main.queue_free()
+		await _wait(0.2)
+	var tag := "%s%s%s%s%s" % ["_with%d" % beside if beside >= 0 else "", "_side" if side_on else "", "_baby" if baby else "", "_dark" if dark else "", "_xray" if bare else ""]
+	sheet.resize(sheet.get_width() * 2, sheet.get_height() * 2, Image.INTERPOLATE_NEAREST)
+	sheet.save_png("%s/k%d_variety%s.png" % [out, kind, tag])
 	quit()
 
 

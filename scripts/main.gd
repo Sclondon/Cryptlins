@@ -426,9 +426,9 @@ func would_pair(a: Cryptlin, b: Cryptlin) -> bool:
 
 
 # Two of them have paired off (see Cryptlin._pair), `ago` seconds since: one or other of them
-# will lay an egg some hours on. What will be in it is settled now: the kind of one parent, the
-# coat of the other, a nature from one of them, and a look and tastes of its own from a seed
-# mixed out of both of theirs.
+# will lay an egg some hours on. What will be in it is settled now: the kind of one parent and
+# the size of its head, the coat and markings of the other, a nature from one of them, and the
+# rest of its look and its tastes from a seed mixed out of both of theirs.
 func paired(a: Cryptlin, b: Cryptlin, ago := 0.0) -> void:
 	var when := Time.get_unix_time_from_system() - ago
 	a.me.paired = when
@@ -441,7 +441,8 @@ func paired(a: Cryptlin, b: Cryptlin, ago := 0.0) -> void:
 	egg.kind = pair[0].kind
 	egg.fur = pair[1].fur_colour.to_html(false)
 	egg.nature = pair.pick_random().nature
-	egg.look_seed = (a.look_seed * 31 + b.look_seed * 17 + next_id * 7919) % 1000000 + 1
+	egg.looks = {"marks": pair[1].marks, "head": pair[0].shape["head"]}
+	egg.look_seed = Cryptlin.OLD_SEEDS + 1 + (a.look_seed * 31 + b.look_seed * 17 + next_id * 7919) % 1000000
 	egg.parents = [a.me.id, b.me.id]
 	egg.parent_names = [a.me.name, b.me.name]
 	pair.pick_random().me.expecting = {"due": when + EGG_HOURS * Cryptlin.HOUR, "egg": egg.to_save()}
@@ -520,7 +521,7 @@ func new_egg(kind := -1, not_kind := -1) -> Resident:
 	var r := Resident.new()
 	r.id = next_id
 	next_id += 1
-	r.look_seed = randi() % 1000000 + 1
+	r.look_seed = Cryptlin.new_seed()
 	r.kind = kind
 	if kind < 0:
 		var fresh: Array[int] = []
@@ -722,7 +723,7 @@ func dev_show(kind: int, as_egg := false, new_look := false) -> void:
 	_clear_toys()
 	r.kind = posmod(kind, Cryptlin.KINDS.size())
 	if new_look:
-		r.look_seed = randi() % 1000000 + 1
+		r.look_seed = Cryptlin.new_seed()
 	r.warmth = 0.0
 	r.at = at
 	if not light_on:

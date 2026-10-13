@@ -211,6 +211,72 @@ const EYES: Array[Array] = [
 	[Color(0.5, 0.9, 1.0), Color(0.8, 1.0, 1.0), Color(1.0, 0.4, 0.3)],
 	[Color(1.0, 0.3, 0.1), Color(1.0, 0.55, 0.1), Color(1.0, 0.85, 0.2)],
 ]
+# A seed up to this is one from before there were more colours to draw from, and keeps to the
+# lists above so that it stays the colour it has always been; a seed over it draws from these too
+const OLD_SEEDS := 1000000
+const FURS_MORE: Array[Array] = [
+	[Color(0.3, 0.42, 0.56), Color(0.6, 0.5, 0.34)],
+	[Color(0.44, 0.3, 0.2), Color(0.42, 0.4, 0.36)],
+	[Color(0.56, 0.3, 0.2), Color(0.24, 0.3, 0.26)],
+	[Color(0.36, 0.28, 0.22), Color(0.2, 0.26, 0.3)],
+	[Color(0.3, 0.34, 0.4), Color(0.4, 0.4, 0.34)],
+	[Color(0.3, 0.46, 0.4), Color(0.46, 0.4, 0.14)],
+	[Color(0.18, 0.28, 0.3), Color(0.34, 0.4, 0.36)],
+	[Color(0.44, 0.4, 0.42), Color(0.28, 0.3, 0.3)],
+	[Color(0.22, 0.17, 0.15), Color(0.14, 0.16, 0.2)],
+	[Color(0.3, 0.26, 0.24), Color(0.36, 0.42, 0.38)],
+	[Color(0.5, 0.24, 0.3), Color(0.2, 0.3, 0.5)],
+	[Color(0.3, 0.44, 0.4), Color(0.42, 0.36, 0.26)],
+	[Color(0.5, 0.5, 0.2), Color(0.2, 0.4, 0.42)],
+	[Color(0.9, 0.55, 0.4), Color(0.75, 0.85, 0.4)],
+	[Color(0.8, 0.7, 0.5), Color(0.3, 0.5, 0.25)],
+	[Color(0.56, 0.44, 0.36), Color(0.36, 0.34, 0.3)],
+	[Color(0.6, 0.56, 0.44), Color(0.4, 0.5, 0.5)],
+	[Color(0.88, 0.86, 0.8), Color(0.8, 0.86, 0.9)],
+	[Color(0.22, 0.2, 0.24), Color(0.38, 0.2, 0.14)],
+]
+const EYES_MORE: Array[Array] = [
+	[Color(0.8, 0.6, 1.0)], [Color(1.0, 0.95, 0.6)], [Color(1.0, 0.45, 0.6)], [Color(1.0, 0.4, 0.0)],
+	[Color(1.0, 0.35, 0.05)], [Color(0.6, 1.0, 0.6)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.7, 0.5)],
+	[Color(0.9, 0.7, 1.0)], [Color(0.8, 1.0, 0.6)], [Color(1.0, 0.5, 0.7)], [Color(0.9, 0.6, 1.0)],
+	[Color(1.0, 0.6, 0.4)], [Color(0.8, 1.0, 0.7)], [Color(1.0, 0.7, 0.5)], [Color(0.8, 1.0, 0.5)],
+	[Color(1.0, 0.8, 0.4)], [Color(0.7, 1.0, 0.8)], [Color(1.0, 0.2, 0.3)],
+]
+# How far one of a kind can be from the next in its proportions, each as the least and the most
+# of what its body was drawn at: the size of its head, of its eyes and how far apart they sit,
+# its build (slight to stout), the length of its limbs, of its ears, of whatever its kind wears
+# on its head or back (horns, antlers, a comb, a crest, a hat, a long neck), and of its tail.
+const SHAPE := {
+	"head": [0.82, 1.3], "eye": [0.72, 1.42], "gap": [0.86, 1.18], "build": [0.84, 1.22],
+	"limb": [0.78, 1.36], "ear": [0.6, 1.55], "crest": [0.55, 1.55], "tail": [0.55, 1.75],
+}
+# Where a kind's body will not take as much as that
+const SHAPES: Array[Dictionary] = [
+	{}, {"head": [0.88, 1.2], "limb": [0.75, 1.5]}, {}, {}, {}, {"limb": [0.85, 1.3]},
+	{"limb": [0.9, 1.15], "crest": [0.66, 1.4]}, {"head": [0.88, 1.16], "limb": [0.8, 1.6]},
+	{"head": [0.85, 1.22], "limb": [0.84, 1.2]}, {"limb": [0.8, 1.22]}, {}, {"head": [0.85, 1.2]},
+	{"crest": [0.6, 1.4]}, {"head": [0.85, 1.25]}, {"crest": [0.75, 1.3]}, {}, {"head": [0.86, 1.2], "crest": [0.85, 1.25]},
+	{}, {"limb": [0.8, 1.25], "eye": [0.75, 1.2]},
+]
+# What can be painted on a coat, and how likely each is for most kinds
+enum Mark { PLAIN, SPOTS, PATCHES, STRIPES, BELLY, SOCKS, BLAZE, FRECKLES, POINTS }
+const MARKS: Array[float] = [3.0, 2.0, 2.0, 2.0, 2.0, 1.5, 1.2, 1.5, 1.5]
+# The coat is painted this many dots round and down, and drawn this much brighter than painted
+const COAT := 32
+const COAT_GAIN := 4.0
+# The odd thing one may have that the next has not, with the chance of each: a tuft, whiskers, a
+# snaggle tooth, a torn ear, one eye bigger than the other, eyes of two colours, and a horn or
+# antler broken short. EXTRAS is which of them each kind can have.
+const CHANCES := {"tuft": 0.3, "whiskers": 0.3, "tooth": 0.3, "torn": 0.22, "odd": 0.3, "split": 0.14, "broken": 0.22}
+const EXTRAS: Array[Array] = [
+	["tuft", "whiskers", "tooth", "torn", "split", "broken"], ["tuft", "tooth", "odd", "split"], ["odd", "split"],
+	["tuft", "torn", "odd", "split"], ["tooth", "torn", "odd", "split"], ["tooth", "odd", "split"],
+	["tooth", "odd", "split"], ["odd", "split"], ["torn", "split", "broken"], ["torn", "odd", "split"],
+	["whiskers", "tooth", "torn", "odd", "split"], ["odd", "split"], ["whiskers", "tooth", "odd", "split"],
+	["tuft", "torn", "odd", "split"], ["tooth", "odd", "split"],
+	["whiskers", "tooth", "torn", "odd", "split", "broken"], ["odd", "split"],
+	["whiskers", "tooth", "odd", "split", "broken"], ["tooth", "torn", "odd", "split"],
+]
 
 var world: Den
 # What the room keeps of it: its name, and what has been found out about it
@@ -247,6 +313,19 @@ var heads: Array[Node3D] = []
 # backbone runs when its head is not straight above it (0 for up to the neck)
 var gut := 1.0
 var back_y := 0.0
+# What is its own about its shape (see looks()): the size of its head, of each eye, and of what
+# its kind wears on its head or back; how far longer legs raise its body, and whether it goes on
+# four of them; where a tuft would grow on its head; what is painted on its coat (the marking,
+# the seed it is drawn from, and a second marking over it), and the odd things it has (EXTRAS)
+var shape := {}
+var head_size := 1.0
+var eye_sizes: Array[float] = []
+var crest := 1.0
+var stand := 0.0
+var fours := false
+var crown := Vector3.ZERO
+var marks: Array[int] = [Mark.PLAIN, 0, Mark.PLAIN]
+var extras: Array[String] = []
 var fur: ShaderMaterial
 var pale: ShaderMaterial
 var dark: ShaderMaterial
@@ -254,6 +333,8 @@ var bone: ShaderMaterial
 var black: ShaderMaterial
 var maw: ShaderMaterial
 var eye_mat: ShaderMaterial
+# The one for each eye, left and right: the same, unless its eyes are of two colours
+var eye_mats: Array[ShaderMaterial] = []
 
 # Needs, 0 (bad) to 100 (good)
 var belly := 70.0
@@ -478,9 +559,175 @@ static func colours(k: int, s: int) -> Array[Color]:
 	rng.seed = s
 	var furs: Array = FURS[k]
 	var eye_set: Array = EYES[k]
+	if s > OLD_SEEDS:
+		furs = furs + FURS_MORE[k]
+		eye_set = eye_set + EYES_MORE[k]
 	var fur_colour: Color = furs[rng.randi() % furs.size()]
 	var eye_colour: Color = eye_set[rng.randi() % eye_set.size()]
+	# No two are quite the one colour: each drifts a little from what was picked, by a generator
+	# of its own so that what is picked stays as it always was
+	var drift := RandomNumberGenerator.new()
+	drift.seed = s * 2749 + k * 31 + 5
+	fur_colour = Color.from_hsv(
+		fposmod(fur_colour.h + drift.randf_range(-0.035, 0.035), 1.0),
+		clampf(fur_colour.s * drift.randf_range(0.78, 1.28), 0.0, 1.0),
+		clampf(fur_colour.v * drift.randf_range(0.88, 1.14), 0.0, 1.0))
+	eye_colour = Color.from_hsv(fposmod(eye_colour.h + drift.randf_range(-0.03, 0.03), 1.0), eye_colour.s, eye_colour.v)
 	return [fur_colour, eye_colour]
+
+
+# A seed for a new one: over OLD_SEEDS, so that it has the wider choice of colours
+static func new_seed() -> int:
+	return OLD_SEEDS + 1 + randi() % 1000000
+
+
+# What a kind and seed make of its shape and markings, besides what colours() and _build() have
+# always drawn: how far along each span of SHAPE it comes (0 to 1), what is painted on its coat,
+# and which of the odd things in EXTRAS it has. Always drawn in the same order from a generator
+# of its own, so that a saved cryptlin stays who it was; anything new is drawn last.
+static func looks(k: int, s: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = s * 6151 + k * 389 + 71
+	var me := {}
+	for what: String in SHAPE:
+		me[what] = rng.randf()
+	var weight := 0.0
+	for share in MARKS:
+		weight += share
+	var first := int(Mark.PLAIN)
+	var pick := rng.randf() * weight
+	for i in MARKS.size():
+		pick -= MARKS[i]
+		if pick < 0.0:
+			first = i
+			break
+	var over := rng.randi_range(Mark.BELLY, Mark.POINTS) if rng.randf() < 0.35 else int(Mark.PLAIN)
+	me["marks"] = [first, rng.randi() % 100000, over if over != first else int(Mark.PLAIN)]
+	var odd: Array[String] = []
+	for extra: String in CHANCES:
+		if rng.randf() < float(CHANCES[extra]) and extra in EXTRAS[k]:
+			odd.append(extra)
+	me["extras"] = odd
+	# Which side the odd thing is on, and how much smaller the smaller eye is
+	me["side"] = rng.randi() % 2
+	me["wink"] = rng.randf_range(0.66, 0.86)
+	return me
+
+
+# How far along a span of SHAPE one of this kind comes, as what its body is multiplied by
+static func span(k: int, what: String, along: float) -> float:
+	var limits: Array = SHAPES[k].get(what, SHAPE[what])
+	return lerpf(limits[0], limits[1], along)
+
+
+# The picture painted on a coat of colour `base`: `painted` is the marking, the seed it is drawn
+# from and a second marking over it. It goes round a body from the front (both edges) by way of
+# the back (the middle) and is the same on both sides, and from the top down; cones have only
+# its top half, so the top is also the tips of ears. Kept at 1/COAT_GAIN of its strength so that
+# a marking can be paler than the coat.
+static func coat(painted: Array, base: Color) -> ImageTexture:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(painted[1]) * 31 + 7
+	var layers: Array[Dictionary] = []
+	for type: int in [int(painted[0]), int(painted[2])]:
+		if type != Mark.PLAIN:
+			layers.append(_layer(type, base, rng))
+	var img := Image.create(COAT, COAT, false, Image.FORMAT_RGB8)
+	var under := base.srgb_to_linear()
+	for y in COAT:
+		for x in COAT:
+			var c := base
+			for layer in layers:
+				if _marked(layer, x, y):
+					c = layer["ink"]
+			var lit := c.srgb_to_linear()
+			var part := Color(lit.r / maxf(under.r, 0.004), lit.g / maxf(under.g, 0.004), lit.b / maxf(under.b, 0.004)) / COAT_GAIN
+			img.set_pixel(x, y, Color(minf(part.r, 1.0), minf(part.g, 1.0), minf(part.b, 1.0)))
+	return ImageTexture.create_from_image(img)
+
+
+# One marking, ready to paint: its kind, its colour, and where its blots or bands fall
+static func _layer(type: int, base: Color, rng: RandomNumberGenerator) -> Dictionary:
+	var darker := base.darkened(rng.randf_range(0.32, 0.52))
+	var paler := base.lerp(Color(0.96, 0.93, 0.84), rng.randf_range(0.26, 0.5))
+	# Another colour near its own, for a coat that has any colour to it
+	var other := Color.from_hsv(fposmod(base.h + rng.randf_range(0.07, 0.13) * (1.0 if rng.randf() < 0.5 else -1.0), 1.0), minf(base.s * 1.3 + 0.12, 1.0), base.v * 0.72)
+	if base.s < 0.2:
+		other = darker
+	var roll := rng.randf()
+	var layer := {"type": type, "ink": darker if roll < 0.5 else (paler if roll < 0.8 else other), "blots": [], "dots": {}}
+	var blots: Array = layer["blots"]
+	match type:
+		Mark.SPOTS:
+			# Round spots, few and big or many and small; each is how far round from the front,
+			# how far down, and how big
+			var big := rng.randf_range(0.07, 0.15)
+			for i in int(lerpf(16.0, 6.0, (big - 0.07) / 0.08)):
+				blots.append(Vector3(rng.randf(), rng.randf_range(0.08, 0.9), big * rng.randf_range(0.75, 1.2)))
+		Mark.PATCHES:
+			# A few big ragged patches, not the same on both sides
+			for i in rng.randi_range(2, 4):
+				blots.append(Vector3(rng.randf(), rng.randf_range(0.15, 0.8), rng.randf_range(0.2, 0.34)))
+			layer["rag"] = rng.randi() % 1000
+		Mark.STRIPES:
+			# Bands round it or stripes down it, so many of them, with a kink
+			layer["down"] = rng.randf() < 0.4
+			layer["bands"] = rng.randi_range(3, 6)
+			layer["kink"] = rng.randf_range(0.0, 0.12)
+			layer["wide"] = rng.randf_range(0.0, 0.5)
+		Mark.BELLY:
+			layer["ink"] = paler if roll < 0.85 else darker
+			layer["wide"] = rng.randf_range(0.18, 0.32)
+		Mark.SOCKS:
+			layer["ink"] = paler if roll < 0.7 else darker
+			layer["wide"] = rng.randf_range(0.66, 0.8)
+		Mark.BLAZE:
+			layer["ink"] = paler
+			layer["wide"] = rng.randf_range(0.07, 0.14)
+		Mark.FRECKLES:
+			layer["ink"] = darker if roll < 0.7 else other
+			var dots: Dictionary = layer["dots"]
+			for i in rng.randi_range(40, 90):
+				dots[Vector2i(rng.randi() % (COAT / 2), rng.randi_range(3, COAT - 6))] = true
+		Mark.POINTS:
+			layer["ink"] = darker if roll < 0.75 else paler
+			layer["wide"] = rng.randf_range(0.1, 0.17)
+	return layer
+
+
+# Whether a marking covers one dot of the coat
+static func _marked(layer: Dictionary, x: int, y: int) -> bool:
+	var u := (x + 0.5) / COAT
+	var down := (y + 0.5) / COAT
+	# How far round from the front, 0 to 1 at the middle of the back, either side alike
+	var about := minf(u, 1.0 - u) * 2.0
+	match int(layer["type"]):
+		Mark.SPOTS:
+			for blot: Vector3 in layer["blots"]:
+				if Vector2(about - blot.x, down - blot.y).length() < blot.z:
+					return true
+		Mark.PATCHES:
+			var rag := sin(x * 1.9 + int(layer["rag"])) * sin(y * 2.3 + int(layer["rag"]) * 0.7) * 0.05
+			for blot: Vector3 in layer["blots"]:
+				var across := absf(u - blot.x)
+				if Vector2(minf(across, 1.0 - across) * 2.0, down - blot.y).length() < blot.z + rag:
+					return true
+		Mark.STRIPES:
+			var along := about if layer["down"] else down
+			var off := down if layer["down"] else about
+			return sin((along + sin(off * 9.0) * float(layer["kink"])) * PI * 2.0 * int(layer["bands"])) > float(layer["wide"])
+		Mark.BELLY:
+			return (about < float(layer["wide"]) and down > 0.4) or down > 0.9
+		Mark.SOCKS:
+			return down > float(layer["wide"])
+		Mark.BLAZE:
+			return about < float(layer["wide"]) and down < 0.6
+		Mark.FRECKLES:
+			var dots: Dictionary = layer["dots"]
+			return dots.has(Vector2i(mini(x, COAT - 1 - x), y))
+		Mark.POINTS:
+			return down < float(layer["wide"])
+	return false
 
 
 func _build() -> void:
@@ -532,7 +779,25 @@ func _build() -> void:
 	var chub := rng.randf_range(0.94, 1.14)
 	var horns := rng.randf() < 0.45
 	var odd_eyes := rng.randf() < 0.35
+	# The rest of its looks are its own too. One bred here has its markings from the parent whose
+	# coat it wears, and its head from the other.
+	shape = looks(kind, look_seed)
+	if me != null and me.looks.get("marks") is Array and me.looks["marks"].size() == 3:
+		shape["marks"] = me.looks["marks"]
+	if me != null and me.looks.has("head"):
+		shape["head"] = clampf(float(me.looks["head"]), 0.0, 1.0)
+	for i in 3:
+		marks[i] = int(shape["marks"][i])
+	extras.assign(shape["extras"])
+	if odd_eyes and kind == Kind.GREMLIN and not "odd" in extras:
+		extras.append("odd")
+	head_size = span(kind, "head", shape["head"])
+	crest = span(kind, "crest", shape["crest"])
+	chub *= span(kind, "build", shape["build"])
 	fur = Ps1.mat(fur_colour * 0.76, 0.0, 0.35)
+	if marks[0] != Mark.PLAIN or marks[2] != Mark.PLAIN:
+		fur.set_shader_parameter("tex", coat(marks, fur_colour))
+		fur.set_shader_parameter("gain", COAT_GAIN)
 	pale = Ps1.mat(fur_colour.lightened(0.2) * 0.9, 0.0, 0.35)
 	dark = Ps1.mat(fur_colour.darkened(0.5), 0.0, 0.35)
 	bone = Ps1.mat(Color(0.92, 0.89, 0.78), 0.0, 0.35)
@@ -540,6 +805,9 @@ func _build() -> void:
 	maw = Ps1.mat(Color(0.16, 0.03, 0.06))
 	# The eyes give off their own light, so they are all you see of it in the dark
 	eye_mat = Ps1.mat(eye_colour, 0.85)
+	eye_mats = [eye_mat, eye_mat]
+	if "split" in extras:
+		eye_mats[int(shape["side"])] = Ps1.mat(Color.from_hsv(fposmod(eye_colour.h + 0.38, 1.0), eye_colour.s, eye_colour.v), 0.85)
 	match kind:
 		Kind.SQUATCH:
 			_build_squatch(chub, rng)
@@ -578,10 +846,11 @@ func _build() -> void:
 		Kind.CERBERUS:
 			_build_cerberus(chub)
 		_:
-			_build_gremlin(chub, ear_len, horns, odd_eyes)
+			_build_gremlin(chub, ear_len, horns)
 
 	if brain_at == Vector3.ZERO:
 		brain_at = Vector3(0, head_y + 0.02, 0)
+	_shape_up()
 	_build_bubble()
 	_build_hearts()
 	for i in 3:
@@ -598,7 +867,8 @@ func _build() -> void:
 	_build_emote()
 
 
-func _build_gremlin(chub: float, ear_len: float, horns: bool, odd_eyes: bool) -> void:
+func _build_gremlin(chub: float, ear_len: float, horns: bool) -> void:
+	crown = Vector3(0, 0.47, 0.02)
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.13 * side, 0.2, 0))
 		_part(leg, _capsule(0.07, 0.2), fur, Vector3(0, -0.08, 0))
@@ -625,13 +895,11 @@ func _build_gremlin(chub: float, ear_len: float, horns: bool, odd_eyes: bool) ->
 		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.5, 0), Vector3(0.13, ear_len, 0.045))
 		_part(ear, _cone(), pale, Vector3(0, ear_len * 0.42, 0.028), Vector3(0.08, ear_len * 0.78, 0.02))
 		ears.append(ear)
-		var size := 0.1
-		if odd_eyes:
-			size = 0.112 if side < 0.0 else 0.088
-		_eye(Vector3(0.135 * side, 0.25, 0.215), size)
+		_eye(Vector3(0.135 * side, 0.25, 0.215), 0.1)
 		_part(neck, _cone(), bone, Vector3(0.055 * side, 0.112, 0.283), Vector3(0.022, 0.05, 0.022))
 		if horns:
-			_part(neck, _cone(), bone, Vector3(0.12 * side, 0.5, 0.03), Vector3(0.04, 0.14, 0.04), Vector3(0, 0, -0.35 * side))
+			var long := 0.14 * crest * _snapped(side)
+			_part(neck, _cone(), bone, Vector3((0.1 + long * 0.16) * side, 0.43 + long * 0.5, 0.03), Vector3(0.045, long, 0.045), Vector3(0, 0, -0.35 * side))
 	_part(neck, _sphere(), dark, Vector3(0, 0.175, 0.3), Vector3(0.035, 0.025, 0.03))
 	mouth_node = _pivot(neck, Vector3(0, 0.085, 0.262))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.15, 0.07, 0.06))
@@ -645,6 +913,7 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 	top_y = 0.95
 	gravity = 15.0
 	brain_at = Vector3(0, 0.4, 0.04)
+	crown = Vector3(0, 0.52, 0)
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.18 * side, 0.24, 0.02))
 		_part(leg, _capsule(0.07, 0.24), dark, Vector3(0, -0.1, 0))
@@ -693,7 +962,7 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 		eye.rotation.x = -0.62
 		_part(eye, _sphere(), black, Vector3.ZERO, Vector3(0.068, 0.078, 0.03))
 		_part(eye, _cone(), black, Vector3(0, 0.16, 0), Vector3(0.06, 0.28, 0.026))
-		var pupil := _part(eye, _sphere(), eye_mat, Vector3(0, 0, 0.03), Vector3(0.036, 0.046, 0.03))
+		var pupil := _part(eye, _sphere(), _eye_mat(), Vector3(0, 0, 0.03), Vector3(0.036, 0.046, 0.03))
 		eyes.append(eye)
 		pupils.append(pupil)
 	# Its mouth is somewhere under the hair, and only shows when it opens
@@ -733,8 +1002,11 @@ func _build_cockatrice(chub: float) -> void:
 	neck = _pivot(torso, Vector3(0, neck_y, 0.07))
 	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.2, 0.2, 0.2))
 	_part(neck, _cone(), yellow, Vector3(0, 0.19, 0.24), Vector3(0.065, 0.16, 0.045), Vector3(PI * 0.5, 0, 0))
+	var comb := neck.get_child_count()
 	for i in 3:
 		_part(neck, _cone(), red, Vector3(0, 0.43 - i * 0.02, 0.09 - i * 0.09), Vector3(0.035, 0.13 - i * 0.02, 0.06), Vector3(-0.2 - i * 0.2, 0, 0))
+	_swell(neck, comb, Vector3(0, 0.37, 0.02), Vector3.ONE * crest)
+	top_y += 0.12 * (crest - 1.0)
 	_part(neck, _sphere(), red, Vector3(0, 0.06, 0.17), Vector3(0.03, 0.06, 0.03))
 	for side: float in [-1.0, 1.0]:
 		_eye(Vector3(0.12 * side, 0.25, 0.13), 0.065)
@@ -771,9 +1043,11 @@ func _build_mothman(chub: float, ear_len: float) -> void:
 		_part(a, _cone(), skin, Vector3(0.1 * side, -0.17, -0.03), Vector3(0.2, 0.38, 0.012))
 		_part(a, _sphere(), skin, Vector3(0.1 * side, -0.36, -0.03), Vector3(0.15, 0.12, 0.012))
 		_part(a, _sphere(), eye_mat, Vector3(0.1 * side, -0.34, -0.015), Vector3(0.045, 0.045, 0.008))
+		_swell(a, 1, Vector3(0, -0.05, -0.03), Vector3(lerpf(1.0, crest, 0.7), lerpf(1.0, crest, 0.4), 1.0))
 		arms.append(a)
 
 	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
+	crown = Vector3(0, 0.41, -0.03)
 	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.24, 0.22, 0.22))
 	for side: float in [-1.0, 1.0]:
 		var ear := _pivot(neck, Vector3(0.08 * side, 0.38, 0.02))
@@ -864,10 +1138,12 @@ func _build_frogman(chub: float) -> void:
 
 # A hump, four flippers and a long neck with a small head on the end of it
 func _build_nessie(chub: float) -> void:
+	# Some have a great deal more neck than others
+	var up := 0.62 * crest
 	neck_y = 0.38
-	head_y = 0.62
+	head_y = up
 	centre_y = 0.4
-	top_y = 1.22
+	top_y = 0.5 + up
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.25 * chub * side, 0.13, -0.16))
 		_part(leg, _sphere(), dark, Vector3(0.07 * side, -0.08, -0.03), Vector3(0.16, 0.035, 0.11))
@@ -886,12 +1162,12 @@ func _build_nessie(chub: float) -> void:
 		arms.append(a)
 
 	neck = _pivot(torso, Vector3(0, neck_y, 0.24 * chub))
-	_part(neck, _capsule(0.075, 0.66), fur, Vector3(0, 0.3, 0.02), Vector3.ONE, Vector3(0.08, 0, 0))
-	_part(neck, _sphere(), fur, Vector3(0, 0.62, 0.08), Vector3(0.14, 0.11, 0.19))
+	_part(neck, _capsule(0.075, up + 0.04), fur, Vector3(0, up * 0.5 - 0.01, 0.02), Vector3.ONE, Vector3(0.08, 0, 0))
+	_part(neck, _sphere(), fur, Vector3(0, up, 0.08), Vector3(0.14, 0.11, 0.19))
 	for side: float in [-1.0, 1.0]:
-		_part(neck, _sphere(), pale, Vector3(0.055 * side, 0.73, 0.02), Vector3.ONE * 0.028)
-		_eye(Vector3(0.09 * side, 0.67, 0.13), 0.05)
-	mouth_node = _pivot(neck, Vector3(0, 0.585, 0.23))
+		_part(neck, _sphere(), pale, Vector3(0.055 * side, up + 0.11, 0.02), Vector3.ONE * 0.028)
+		_eye(Vector3(0.09 * side, up + 0.05, 0.13), 0.05)
+	mouth_node = _pivot(neck, Vector3(0, up - 0.035, 0.23))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.08, 0.035, 0.05))
 
 
@@ -913,9 +1189,11 @@ func _build_bolter(chub: float, rng: RandomNumberGenerator) -> void:
 	_part(neck, _sphere(), fur, Vector3(0, 0.22, -0.02), Vector3(0.36 * chub, 0.31, 0.47 * chub))
 	_part(neck, _sphere(), pale, Vector3(0, 0.13, 0.05), Vector3(0.33 * chub, 0.24, 0.43 * chub))
 	var rock := BoxMesh.new()
+	var scree := neck.get_child_count()
 	for i in 4:
 		var at := Vector3(rng.randf_range(-0.16, 0.16), 0.5 - i * 0.02, 0.05 - i * 0.12)
 		_part(neck, rock, dark, at, Vector3(0.11, 0.07, 0.1) * rng.randf_range(0.7, 1.2), Vector3(rng.randf(), rng.randf(), rng.randf()))
+	_swell(neck, scree, Vector3(0, 0.44, -0.1), Vector3.ONE * crest)
 	tail = _pivot(neck, Vector3(0, 0.24, -0.42 * chub))
 	_part(tail, _capsule(0.07, 0.4), fur, Vector3(0, 0.1, -0.13), Vector3.ONE, Vector3(-0.9, 0, 0))
 	for side: float in [-1.0, 1.0]:
@@ -970,9 +1248,12 @@ func _build_wendigo(chub: float) -> void:
 		ears.append(ear)
 		_eye(Vector3(0.085 * side, 0.23, 0.125), 0.068, true)
 		# Antlers: a beam and two tines
+		var rack := neck.get_child_count()
 		_part(neck, _cone(), skull, Vector3(0.15 * side, 0.52, -0.04), Vector3(0.03, 0.44, 0.03), Vector3(0, 0, -0.5 * side))
 		_part(neck, _cone(), skull, Vector3(0.24 * side, 0.52, -0.04), Vector3(0.02, 0.2, 0.02), Vector3(0, 0, -1.15 * side))
 		_part(neck, _cone(), skull, Vector3(0.13 * side, 0.5, 0.05), Vector3(0.02, 0.18, 0.02), Vector3(0.7, 0, -0.15 * side))
+		_swell(neck, rack, Vector3(0.06 * side, 0.33, -0.04), Vector3.ONE * crest * _snapped(side))
+	top_y = neck_y + 0.36 + 0.48 * crest
 	mouth_node = _pivot(neck, Vector3(0, 0.065, 0.2))
 	_part(mouth_node, _sphere(), black, Vector3.ZERO, Vector3(0.065, 0.035, 0.11))
 
@@ -986,6 +1267,7 @@ func _build_kelpie(chub: float) -> void:
 	ear_splay = 0.25
 	gut = 0.75
 	back_y = 0.62
+	fours = true
 	brain_at = Vector3(0, 0.42, 0.1)
 	var weed := Ps1.mat(Color(0.1, 0.32, 0.2), 0.0, 0.35)
 	var wrack := Ps1.mat(Color(0.22, 0.42, 0.16), 0.0, 0.35)
@@ -1076,8 +1358,11 @@ func _build_merfolk(chub: float) -> void:
 	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0.02), Vector3(0.3, 0.24, 0.27))
 	_part(neck, _sphere(), pale, Vector3(0, 0.13, 0.07), Vector3(0.26, 0.15, 0.22))
 	_part(neck, _sphere(), fin, Vector3(0, 0.1, 0.245), Vector3(0.15, 0.06, 0.06))
+	var ridge := neck.get_child_count()
 	for i in 3:
 		_part(neck, _cone(), fin, Vector3(0, 0.47 - i * 0.05, 0.08 - i * 0.13), Vector3(0.018, 0.2 - i * 0.03, 0.09), Vector3(-0.3 - i * 0.35, 0, 0))
+	_swell(neck, ridge, Vector3(0, 0.36, 0), Vector3.ONE * crest)
+	top_y += 0.2 * (crest - 1.0)
 	for side: float in [-1.0, 1.0]:
 		var ear := _pivot(neck, Vector3(0.26 * side, 0.2, -0.04))
 		_part(ear, _cone(), fin, Vector3(0, 0.1, 0), Vector3(0.1, 0.2, 0.02))
@@ -1116,6 +1401,7 @@ func _build_spawn(chub: float) -> void:
 		_part(wing, _cone(), web, Vector3(0.2 * side, 0.16, 0), Vector3(0.17, 0.4, 0.012), Vector3(0, 0, -0.9 * side))
 		_part(wing, _cone(), web, Vector3(0.2 * side, -0.02, 0), Vector3(0.11, 0.3, 0.012), Vector3(0, 0, -1.9 * side))
 		_part(wing, _capsule(0.015, 0.44), dark, Vector3(0.17 * side, 0.14, 0.01), Vector3.ONE, Vector3(0, 0, -0.9 * side))
+		wing.scale = Vector3.ONE * lerpf(1.0, crest, 0.7)
 		flaps.append(wing)
 		var a := _pivot(torso, Vector3(0.25 * chub * side, 0.46, 0.05))
 		_part(a, _capsule(0.045, 0.22), fur, Vector3(0, -0.08, 0))
@@ -1134,7 +1420,7 @@ func _build_spawn(chub: float) -> void:
 	# Five feelers hang over its mouth, the middle one longest
 	for i in 5:
 		var across := i - 2.0
-		var drop := 0.3 - absf(across) * 0.05
+		var drop := (0.3 - absf(across) * 0.05) * lerpf(1.0, crest, 0.8)
 		_part(neck, _capsule(0.032, drop), fur if i % 2 == 0 else pale, Vector3(across * 0.062, 0.1 - drop * 0.5, 0.27 - absf(across) * 0.03), Vector3.ONE, Vector3(-0.15, 0, across * 0.12))
 	mouth_node = _pivot(neck, Vector3(0, 0.06, 0.2))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.08, 0.05, 0.04))
@@ -1176,8 +1462,11 @@ func _build_gnome(chub: float, rng: RandomNumberGenerator) -> void:
 	_part(neck, _sphere(), flesh, Vector3(0, 0.17, 0), Vector3(0.24, 0.2, 0.22))
 	_part(neck, _sphere(), rosy, Vector3(0, 0.15, 0.22), Vector3.ONE * 0.062)
 	_part(neck, _sphere(), bone, Vector3(0, 0.05, 0.13), Vector3(0.16, 0.11, 0.1))
-	_part(neck, _cone(), bone, Vector3(0, -0.06, 0.16), Vector3(0.1, 0.18, 0.06), Vector3(PI, 0, 0))
-	_part(neck, _cone(), hat, Vector3(0, 0.55, -0.02), Vector3(0.27, 0.6, 0.27), Vector3(-0.1, 0, 0.05))
+	# A beard and a hat as long as it has had time to grow them
+	var beard := 0.18 * span(kind, "tail", shape["tail"])
+	_part(neck, _cone(), bone, Vector3(0, 0.03 - beard * 0.5, 0.16), Vector3(0.1, beard, 0.06), Vector3(PI, 0, 0))
+	_part(neck, _cone(), hat, Vector3(0, 0.25 + 0.3 * crest, -0.02), Vector3(0.27, 0.6 * crest, 0.27), Vector3(-0.1, 0, 0.05))
+	top_y = neck_y + 0.26 + 0.6 * crest
 	for side: float in [-1.0, 1.0]:
 		var ear := _pivot(neck, Vector3(0.22 * side, 0.16, -0.02))
 		_part(ear, _cone(), flesh, Vector3(0, 0.07, 0), Vector3(0.05, 0.14, 0.03))
@@ -1223,6 +1512,7 @@ func _build_fae() -> void:
 		var wing := _pivot(torso, Vector3(0.02 * side, 0.42, -0.07))
 		_part(wing, _sphere(), gauze, Vector3(0.2 * side, 0.12, 0), Vector3(0.2, 0.1, 0.008), Vector3(0, 0, 0.55 * side))
 		_part(wing, _sphere(), gauze, Vector3(0.14 * side, -0.1, 0), Vector3(0.13, 0.07, 0.008), Vector3(0, 0, -0.5 * side))
+		wing.scale = Vector3.ONE * lerpf(1.0, crest, 0.8)
 		flaps.append(wing)
 		var a := _pivot(torso, Vector3(0.11 * side, 0.4, 0))
 		_part(a, _capsule(0.02, 0.2), pale, Vector3(0, -0.08, 0))
@@ -1268,6 +1558,7 @@ func _build_fungus(chub: float, rng: RandomNumberGenerator) -> void:
 
 	neck = _pivot(torso, Vector3(0, neck_y, 0))
 	_part(neck, _sphere(), stalk, Vector3(0, 0.16, 0), Vector3(0.2, 0.2, 0.19))
+	var cap := neck.get_child_count()
 	_part(neck, _sphere(), gills, Vector3(0, 0.34, 0), Vector3(0.4, 0.04, 0.4))
 	var dome: Array[Vector2] = [
 		Vector2(0.42, 0.33), Vector2(0.44, 0.37), Vector2(0.4, 0.46), Vector2(0.32, 0.54), Vector2(0.2, 0.61), Vector2(0.0, 0.64),
@@ -1287,6 +1578,9 @@ func _build_fungus(chub: float, rng: RandomNumberGenerator) -> void:
 	# And a small one of its own, coming up on the side
 	_part(neck, _capsule(0.022, 0.14), stalk, Vector3(-0.3, 0.52, -0.08), Vector3.ONE, Vector3(0, 0, 0.6))
 	_part(neck, _sphere(), fur, Vector3(-0.345, 0.585, -0.08), Vector3(0.065, 0.04, 0.065), Vector3(0, 0, 0.6))
+	# A wide flat cap or a tall narrow one
+	_swell(neck, cap, Vector3(0, 0.34, 0), Vector3(crest, 2.0 - crest, crest))
+	top_y = neck_y + 0.34 + 0.32 * (2.0 - crest)
 	for side: float in [-1.0, 1.0]:
 		_eye(Vector3(0.085 * side, 0.15, 0.155), 0.06)
 	mouth_node = _pivot(neck, Vector3(0, 0.05, 0.175))
@@ -1334,6 +1628,7 @@ func _build_jackalope(chub: float, ear_len: float) -> void:
 		_part(neck, _sphere(), pale, Vector3(0.15 * side, 0.1, 0.06), Vector3.ONE * 0.07)
 		# Antlers, in front of the ears: a proper rack, a beam sweeping up and out with a brow
 		# tine and three more standing off it
+		var rack := neck.get_child_count()
 		var root := Vector3(0.08 * side, 0.34, 0.03)
 		var fork := _spike(neck, horn, root, Vector3(0.45 * side, 1.0, -0.1), 0.34, 0.058, _drum(0.7, 1.0, 1.0))
 		var tip := _spike(neck, horn, fork, Vector3(0.8 * side, 0.6, 0.15), 0.32, 0.044)
@@ -1341,6 +1636,7 @@ func _build_jackalope(chub: float, ear_len: float) -> void:
 		_spike(neck, horn, fork, Vector3(0.05 * side, 1.0, 0.0), 0.28, 0.04)
 		_spike(neck, horn, fork.lerp(tip, 0.4), Vector3(0.25 * side, 1.0, -0.1), 0.23, 0.034)
 		_spike(neck, horn, fork.lerp(tip, 0.75), Vector3(0.3 * side, 1.0, 0.1), 0.15, 0.03)
+		_swell(neck, rack, root, Vector3.ONE * crest * _snapped(side))
 	mouth_node = _pivot(neck, Vector3(0, 0.075, 0.2))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.03))
 
@@ -1375,13 +1671,15 @@ func _build_alien(chub: float) -> void:
 	neck = _pivot(torso, Vector3(0, neck_y, 0.01))
 	_part(neck, _capsule(0.035, 0.12), fur, Vector3(0, 0.03, 0))
 	_part(neck, _sphere(), fur, Vector3(0, 0.3, -0.02), Vector3(0.3, 0.26, 0.3))
+	_swell(neck, 1, Vector3(0, 0.2, 0.05), Vector3.ONE * crest)
+	top_y = neck_y + 0.2 + 0.38 * crest
 	_part(neck, _sphere(), fur, Vector3(0, 0.15, 0.05), Vector3(0.19, 0.17, 0.2))
 	# Great slanted eyes, all dark but for the light in them
 	for side: float in [-1.0, 1.0]:
 		var eye := _pivot(neck, Vector3(0.115 * side, 0.2, 0.225))
 		eye.rotation = Vector3(-0.1, 0.45 * side, 0.45 * side)
 		_part(eye, _sphere(), black, Vector3.ZERO, Vector3(0.1, 0.062, 0.03))
-		var pupil := _part(eye, _sphere(), eye_mat, Vector3(0, 0, 0.03), Vector3(0.026, 0.026, 0.02))
+		var pupil := _part(eye, _sphere(), _eye_mat(), Vector3(0, 0, 0.03), Vector3(0.026, 0.026, 0.02))
 		eyes.append(eye)
 		pupils.append(pupil)
 	mouth_node = _pivot(neck, Vector3(0, 0.05, 0.215))
@@ -1432,6 +1730,7 @@ func _build_yeti(chub: float, rng: RandomNumberGenerator) -> void:
 		_part(neck, _cone(), pale, Vector3((i - 1) * 0.07, 0.47, 0.02), Vector3(0.05, 0.14, 0.04), Vector3(0.3, 0, (i - 1) * -0.4))
 	for side: float in [-1.0, 1.0]:
 		_part(neck, _cone(), blue, Vector3(0.21 * side, 0.4, 0), Vector3(0.045, 0.14, 0.045), Vector3(0, 0, -0.6 * side))
+		_swell(neck, neck.get_child_count() - 1, Vector3(0.17 * side, 0.34, 0), Vector3.ONE * crest * _snapped(side))
 		_eye(Vector3(0.085 * side, 0.21, 0.245), 0.055)
 		_part(neck, _cone(), bone, Vector3(0.05 * side, 0.1, 0.265), Vector3(0.018, 0.05, 0.018))
 	mouth_node = _pivot(neck, Vector3(0, 0.07, 0.265))
@@ -1447,6 +1746,7 @@ func _build_cerberus(chub: float) -> void:
 	ear_splay = 1.5
 	gut = 0.8
 	back_y = 0.5
+	fours = true
 	var collar := Ps1.mat(Color(0.62, 0.1, 0.08), 0.0, 0.35)
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.14 * side, 0.24, -0.2))
@@ -1503,10 +1803,80 @@ func _hound_head(on: Node3D, collar: Material) -> Array[Node3D]:
 # An eye on the head (or on another one). Hollow ones are dark with the light in the pupil.
 func _eye(at: Vector3, size: float, hollow := false, on: Node3D = null) -> void:
 	var eye := _pivot(neck if on == null else on, at)
-	_part(eye, _sphere(), black if hollow else eye_mat, Vector3.ZERO, Vector3.ONE * size)
-	var pupil := _part(eye, _sphere(), eye_mat if hollow else black, Vector3(0, 0, size * 0.68), Vector3.ONE * size * 0.5)
+	var lit := _eye_mat()
+	_part(eye, _sphere(), black if hollow else lit, Vector3.ZERO, Vector3.ONE * size)
+	var pupil := _part(eye, _sphere(), lit if hollow else black, Vector3(0, 0, size * 0.68), Vector3.ONE * size * 0.5)
 	eyes.append(eye)
 	pupils.append(pupil)
+
+
+# How much is left of a horn or antler on this side (-1 left, 1 right) of one that has broken one
+func _snapped(side: float) -> float:
+	return 0.42 if "broken" in extras and (side > 0.0) == (int(shape["side"]) == 1) else 1.0
+
+
+# The light for the next eye to be made: they are made left then right
+func _eye_mat() -> ShaderMaterial:
+	return eye_mats[eyes.size() % 2]
+
+
+# Makes everything hung on `parent` from its child number `from` on bigger or smaller by `by`,
+# about the point `anchor`: for whatever one of a kind has more or less of than the next
+func _swell(parent: Node3D, from: int, anchor: Vector3, by: Vector3) -> void:
+	for i in range(from, parent.get_child_count()):
+		var part: Node3D = parent.get_child(i)
+		part.transform = Transform3D(Basis.from_scale(by) * part.basis, anchor + (part.position - anchor) * by)
+
+
+# Once its kind's body is built, what is its own about its proportions (see SHAPE): its head and
+# eyes, its ears, tail and limbs, and then the odd things it has
+func _shape_up() -> void:
+	head_y *= head_size
+	top_y = neck_y + (top_y - neck_y) * head_size
+	var gap := span(kind, "gap", shape["gap"])
+	var eye_size := span(kind, "eye", shape["eye"])
+	for i in eyes.size():
+		var eye := eyes[i]
+		var ball: Node3D = eye.get_child(0)
+		# Never so big, nor so close, that the two run into each other
+		var room := absf(eye.position.x) * gap / maxf(ball.scale.x, 0.01)
+		var size := minf(eye_size, room * 0.96)
+		if "odd" in extras and i % 2 != int(shape["side"]):
+			size *= float(shape["wink"])
+		eye_sizes.append(size)
+		# Set wider on a about head they sit further back on it
+		eye.position.z -= eye.position.x * eye.position.x * (gap - 1.0) / maxf(absf(eye.position.z), 0.08)
+		eye.position.x *= gap
+	var ear_long := span(kind, "ear", shape["ear"])
+	for i in ears.size():
+		ears[i].scale = Vector3(lerpf(1.0, ear_long, 0.4), ear_long, 1.0)
+		if "torn" in extras and i == int(shape["side"]):
+			ears[i].scale = Vector3(1.0, ear_long * 0.5, 1.0)
+	tail.scale = Vector3.ONE * span(kind, "tail", shape["tail"])
+	# Longer legs raise the rest of it; one that goes on four has front legs to match, and the
+	# rest have arms as long or short as their legs are
+	var limb := span(kind, "limb", shape["limb"])
+	if legs[0].get_parent() == self:
+		stand = legs[0].position.y * (limb - 1.0)
+		for leg in legs:
+			leg.position.y *= limb
+	for leg in legs:
+		leg.scale.y = limb
+	for a in arms:
+		a.scale.y = (a.position.y + stand) / a.position.y if fours else lerpf(1.0, limb, 0.6)
+	gut *= minf(span(kind, "build", shape["build"]) + 0.06, 1.0)
+
+	var lip := mouth_node.position
+	var side := 1.0 if int(shape["side"]) == 1 else -1.0
+	if "tooth" in extras:
+		_part(neck, _cone(), bone, lip + Vector3(0.035 * side, 0.03, 0.012), Vector3(0.024, 0.075, 0.024))
+	if "whiskers" in extras:
+		for flank: float in [-1.0, 1.0]:
+			for tilt: float in [-0.25, 0.3]:
+				_spike(neck, bone, lip + Vector3(0.04 * flank, 0.035, -0.02), Vector3(flank, tilt, 0.25), 0.2, 0.011)
+	if "tuft" in extras and crown != Vector3.ZERO:
+		for i in 3:
+			_spike(neck, dark, crown + Vector3((i - 1) * 0.025, -0.02, 0), Vector3((i - 1) * 0.5 + 0.15 * side, 1.0, 0.3 - i * 0.3), 0.15 - absf(i - 1.0) * 0.03, 0.03)
 
 
 func _sphere() -> SphereMesh:
@@ -1532,7 +1902,8 @@ func _drum(top: float, bottom: float, height: float) -> CylinderMesh:
 	return m
 
 
-# A shape turned on a lathe: points of (radius, height) from the bottom up, spun round
+# A shape turned on a lathe: points of (radius, height) from the bottom up, spun round. What is
+# painted on it goes round from the front and down from the top, as on a ball.
 func _lathe(shape: Array[Vector2], sides: int) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -1544,7 +1915,7 @@ func _lathe(shape: Array[Vector2], sides: int) -> ArrayMesh:
 			var around := TAU * j / sides
 			var out := Vector3(sin(around), 0, cos(around))
 			st.set_normal((out * along.y + Vector3.UP * -along.x).normalized())
-			st.set_uv(Vector2(float(j) / sides, float(i) / shape.size()))
+			st.set_uv(Vector2(float(j) / sides, 1.0 - float(i) / (shape.size() - 1)))
 			st.add_vertex(out * shape[i].x + Vector3.UP * shape[i].y)
 	for i in shape.size() - 1:
 		for j in sides:
@@ -1596,7 +1967,7 @@ func _part(parent: Node3D, mesh: Mesh, mat: Material, at: Vector3, size := Vecto
 
 # A thought bubble that shows what it is asking for
 func _build_bubble() -> void:
-	bubble = _pivot(self, Vector3(0.35, top_y + hover + 0.35, 0))
+	bubble = _pivot(self, Vector3(0.35, top_y + stand + hover + 0.35, 0))
 	var white := Ps1.flat(Color(0.95, 0.95, 0.9))
 	for p: MeshInstance3D in [
 		_part(bubble, _sphere(), white, Vector3.ZERO, Vector3(0.24, 0.2, 0.01)),
@@ -1656,7 +2027,7 @@ func _build_hearts() -> void:
 	hearts.scale_amount_min = 0.6
 	hearts.scale_amount_max = 1.1
 	hearts.color_ramp = fade
-	hearts.position = Vector3(0, top_y + hover - 0.1, 0)
+	hearts.position = Vector3(0, top_y + stand + hover - 0.1, 0)
 	hearts.emitting = false
 	hearts.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(hearts)
@@ -1801,18 +2172,18 @@ func pass_time(seconds: float, dark: bool) -> bool:
 # ---------------------------------------------------------------- what you can do to it
 
 func body_centre() -> Vector3:
-	return global_position + Vector3(0, (centre_y + hover * (1.0 - curl) - curl * 0.2) * grow, 0)
+	return global_position + Vector3(0, (centre_y + (stand + hover) * (1.0 - curl) - curl * 0.2) * grow, 0)
 
 
 # How tall it stands (to the top of whatever is on its head), off the floor if it floats
 func tall() -> float:
-	return (top_y + hover * (1.0 - curl)) * grow
+	return (top_y + (stand + hover) * (1.0 - curl)) * grow
 
 
 # How far above its feet the top of its head is just now: lower sat down or curled up, and
 # higher on a baby, whose head is big for it
 func top() -> float:
-	return (neck_y + (top_y - neck_y) * neck.scale.y + hover * (1.0 - curl) - sit * 0.1 - curl * 0.3) * grow
+	return (neck_y + (top_y - neck_y) * neck.scale.y / head_size + (stand + hover) * (1.0 - curl) - sit * 0.1 - curl * 0.3) * grow
 
 
 # One of the kinds that live in water
@@ -3496,7 +3867,7 @@ func _animate(delta: float) -> void:
 	squash_v += (-squash * 140.0 - squash_v * 11.0) * delta
 	squash = clampf(squash + squash_v * delta, -0.3, 0.4)
 	var breath := sin(anim_t * (1.3 if curl > 0.5 else 2.6)) * (0.03 if curl > 0.5 else 0.012)
-	torso.position.y = absf(sin(phase)) * 0.05 * gait - sit * 0.1 - curl * 0.15 + hover * (1.0 - curl) * (1.0 + sin(anim_t * 2.2) * 0.22)
+	torso.position.y = stand * (1.0 - sit * 0.3 - curl * 0.7) + absf(sin(phase)) * 0.05 * gait - sit * 0.1 - curl * 0.15 + hover * (1.0 - curl) * (1.0 + sin(anim_t * 2.2) * 0.22)
 	torso.rotation.x = gait * minf(speed, 3.5) * 0.07 + curl * 0.12
 	torso.rotation.z = wiggle + sin(anim_t * 42.0) * float(FEELINGS[feeling]["shake"])
 	torso.scale = Vector3(1.0 + squash * 0.6 + breath, 1.0 - squash + breath, 1.0 + squash * 0.6 + breath)
@@ -3512,7 +3883,7 @@ func _animate(delta: float) -> void:
 	# A baby is small with a big head, and grows into its size
 	grow = move_toward(grow, size_goal(), delta * 0.25)
 	scale = Vector3.ONE * grow
-	neck.scale = Vector3.ONE * lerpf(1.0, 1.28, clampf(inverse_lerp(adult_size, BABY_SIZE, grow), 0.0, 1.0))
+	neck.scale = Vector3.ONE * head_size * lerpf(1.0, 1.28, clampf(inverse_lerp(adult_size, BABY_SIZE, grow), 0.0, 1.0))
 
 	arm = arm.lerp(arm_goal, ease_fast)
 	var wave := sin(anim_t * 9.0) * arm_wave
@@ -3541,7 +3912,7 @@ func _animate(delta: float) -> void:
 		blink = randf_range(1.5, 5.0)
 	eye_open = lerpf(eye_open, eye_goal * float(FEELINGS[feeling]["eye"]) if blink > 0.0 else 0.0, 1.0 - exp(-delta * 30.0))
 	for i in eyes.size():
-		eyes[i].scale = Vector3(1.0, maxf(eye_open, 0.07), 1.0)
+		eyes[i].scale = Vector3(1.0, maxf(eye_open, 0.07), 1.0) * eye_sizes[i]
 		var socket: Node3D = eyes[i].get_parent()
 		var d := (socket.global_transform.affine_inverse() * gaze - eyes[i].position).normalized()
 		var off := Vector2(d.x, d.y).limit_length(0.55)
@@ -3584,12 +3955,12 @@ func _animate(delta: float) -> void:
 		_show_insides()
 	if bubble.visible:
 		bubble.global_basis = world.camera.global_basis
-		bubble.position.y = top_y + hover + 0.35 + sin(anim_t * 2.0) * 0.03
+		bubble.position.y = top_y + stand + hover + 0.35 + sin(anim_t * 2.0) * 0.03
 	if zzz[0].visible:
 		var cam_right := world.camera.global_basis.x
 		for i in 3:
 			var u := fmod(anim_t * 0.4 + i / 3.0, 1.0)
-			zzz[i].global_position = global_position + Vector3(0, (top_y - 0.4) * grow + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
+			zzz[i].global_position = global_position + Vector3(0, (top_y + stand - 0.4) * grow + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
 			zzz[i].modulate.a = sin(u * PI) * 0.9
 
 

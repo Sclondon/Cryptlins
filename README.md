@@ -148,15 +148,28 @@ anything else): never a baby, in either place; never unless each thinks well of 
 is not enough; never close kin, which is a parent with its own young or two with a parent in common (each resident
 has a number, and those of its two parents).
 
-The egg is of the kind of one parent (there are no cross-bred bodies). What hatches wears the coat of the other
-parent and has the first of its two natures from one of them; the rest of its look and its tastes come from a seed
-mixed out of both of theirs. Its page in the notebook names its parents.
+The egg is of the kind of one parent (there are no cross-bred bodies), and what hatches has that parent's size of
+head for its kind. It wears the coat of the other parent, markings and all, and has the first of its two natures
+from one of them; the rest of its look and its tastes come from a seed mixed out of both of theirs. Its page in the notebook names its parents.
 next opened, and goes then. Nothing dies of old age.
 Phone-first: on an upright phone the room is narrow, deep and tall with the lamp near the top of the screen, the
 row of things is bigger, touch targets are generous, and nothing needs a keyboard or hover.
 
-Each cryptlin is shaped by its kind and a seed, both kept in the save: fur and eye colour, ear length, build, horns,
-odd-sized eyes, its natures and its tastes.
+Each cryptlin is shaped by its kind and a seed, both kept in the save, and no two of a kind come out alike:
+
+- **Proportions**: the size of its head, of its eyes and how far apart they sit, a slight or a stout build, long
+  or short limbs, ears and tail, and more or less of whatever its kind wears (horns, antlers, a comb, a crest, a
+  hat and beard, a cap, wings, feelers, a length of neck).
+- **Markings**, painted on its coat: spots, patches, stripes, a pale belly, socks, a blaze, freckles, dark points,
+  one over another now and then, and some plain.
+- **Odd things**, by chance and only where they suit the kind: a tuft, whiskers, a snaggle tooth, a torn ear, one
+  eye bigger than the other, eyes of two colours, a horn or antler broken short.
+- **Colour**: fur and eyes from its kind's own colours, each drifting a little in hue and brightness.
+
+A seed of a million or less is one from before there were more colours, and keeps to the colours its kind had
+then, so a cryptlin from an old save is still the colour it was; new eggs have seeds above that and the wider
+choice. `Cryptlin.colours()` and the first draws in `_build()` are as they always were; everything since comes
+from `Cryptlin.looks()`, which has a generator of its own.
 
 ## How it works
 
@@ -177,7 +190,7 @@ odd-sized eyes, its natures and its tastes.
   is told when one has shown one of its tastes. The save is version 3 (`residents` is a list); a version 2 save, of
   one cryptlin or one egg, loads as a room with that one in it. Each resident in the list holds `id`, `name`,
   `kind`, `seed`, `hatched`, `born`, `warmth`, `at`, `needs` (health among them), `known`, `regard` (what it thinks
-  of each of the others, by their ids), `parents` and `parent_names`, `fur` and `nature` (what it has from them),
+  of each of the others, by their ids), `parents` and `parent_names`, `fur`, `nature` and `looks` (what it has from them),
   `paired` and `expecting` (when it last paired off, and the egg due as a result); `gone` holds the same for those
   that have died, with `died` and `lived`, and `markers` the grave markers that are put away.
 - `scripts/shelf.gd`: the row of things along the bottom, its own little 3D picture with nothing behind it.
@@ -209,7 +222,7 @@ them out.
 ## Tests and builds
 
 ```
-godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
-godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, or of three sharing the room (and falling out, pairing off, and one of them dying)
+godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]   # egg, hatching, feeding, toys, the room, shelters, the pool, messes, lamp, sleep, time away, save/load, how one seed looks and how seeds differ, letting go, several in one room, how they get on and fall out, health and dying, pairing off and its limits, old saves, eggs as stock
+godot --path . -s tests/shots.gd -- --shots=C:/tmp/shots [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces|--many|--variety [--with=K] [--side] [--baby] [--dark] [--xray]]   # screenshots of each doing, of the egg hatching, of the room, shelters, pool, scanner and notebook, of every face, of three sharing the room (and falling out, pairing off, and one of them dying), or one sheet of twelve of the kind, each of another seed
 godot --headless --path . --export-release Web build/index.html
 ```

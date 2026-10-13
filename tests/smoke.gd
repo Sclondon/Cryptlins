@@ -55,6 +55,41 @@ func _come_back_after(seconds: float) -> void:
 	await _frames(5)
 
 
+# What is its own about how one looks: the same every time for the one seed, not the same from
+# seed to seed, colours it has always had for a seed from before there were more, and a body
+# whose proportions stay inside what its kind allows
+func _looks(pet: Cryptlin) -> void:
+	var k := pet.kind
+	check(Cryptlin.looks(k, 7) == Cryptlin.looks(k, 7) and Cryptlin.colours(k, 7) == Cryptlin.colours(k, 7), "one seed always looks the same")
+	var heads := {}
+	var coats := {}
+	var odd := {}
+	var kept := true
+	for s in 40:
+		var drawn := Cryptlin.looks(k, s + 1)
+		heads[snappedf(Cryptlin.span(k, "head", drawn["head"]), 0.05)] = true
+		coats[drawn["marks"][0]] = true
+		for extra: String in drawn["extras"]:
+			odd[extra] = true
+			kept = kept and extra in Cryptlin.EXTRAS[k]
+		# The coat is one of those its kind has always had, give or take the drift
+		var fur := Cryptlin.colours(k, s + 1)[0]
+		var near := false
+		for old: Color in Cryptlin.FURS[k]:
+			near = near or (absf(fur.r - old.r) + absf(fur.g - old.g) + absf(fur.b - old.b) < 0.45)
+		kept = kept and near
+	check(heads.size() >= 5 and coats.size() >= 5 and not odd.is_empty(), "forty seeds give heads of %d sizes, %d sorts of coat and %d odd things" % [heads.size(), coats.size(), odd.size()])
+	check(kept, "each in a colour its kind has always had, with only the odd things its kind can have")
+	check(Cryptlin.new_seed() > Cryptlin.OLD_SEEDS, "a new one has a seed from since there were more colours")
+	check(pet.eye_sizes.size() == pet.eyes.size() and pet.head_size > 0.8 and pet.head_size < 1.35, "its own is built to its proportions")
+	var tex := Cryptlin.coat([Cryptlin.Mark.SPOTS, 5, Cryptlin.Mark.SOCKS], Color(0.4, 0.5, 0.3)).get_image()
+	var shades := {}
+	for y in Cryptlin.COAT:
+		for x in Cryptlin.COAT:
+			shades[tex.get_pixel(x, y).to_html(false)] = true
+	check(shades.size() >= 2 and tex.get_pixel(3, 2) == tex.get_pixel(Cryptlin.COAT - 4, 2), "a marked coat is painted in more than one shade, the same on both sides")
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
@@ -193,6 +228,7 @@ func _run() -> void:
 	check(pet.kind == kind, "what was in the egg is a %s" % pet.kind_name())
 	check(pet.legs.size() == 2 and pet.eyes.size() >= 1, "a cryptlin is built")
 	check(pet.nature != pet.nature2 and pet.nature_name().contains(", "), "with two natures (%s)" % pet.nature_name())
+	_looks(pet)
 	check(pet.is_baby() and pet.growing_left() > 24.0 * 3600.0, "a baby, with more than a day of growing to do")
 
 	# Its name
@@ -1156,6 +1192,10 @@ func _run() -> void:
 	check(child.kind in [one.kind, mate.kind] and child.is_baby(), "into a baby of a parent's kind (%s)" % child.kind_name())
 	check(child.fur_colour.to_html(false) in [one.fur_colour.to_html(false), mate.fur_colour.to_html(false)], "in the coat of one of them")
 	check(child.nature in [one.nature, mate.nature] and child.nature != child.nature2, "with a nature from one of them (%s)" % child.nature_name())
+	var coated := one if child.fur_colour.to_html(false) == one.fur_colour.to_html(false) else mate
+	var other := mate if coated == one else one
+	check(child.marks == coated.marks, "the markings that go with that coat")
+	check(is_equal_approx(float(child.shape["head"]), float(other.shape["head"])), "and the head of the other, for its kind")
 	check(main.notebook._notes(child).contains("Its parents are %s and %s" % [one.me.name, mate.me.name]), "and its page records its parents")
 	# Grown, it is still their young, and the room has its limit
 	child.set_needs({"belly": 90.0, "energy": 90.0, "health": 100.0, "age": Cryptlin.GROW_AGE})

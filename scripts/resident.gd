@@ -33,6 +33,10 @@ var parents: Array[int] = []
 var parent_names: Array[String] = []
 var fur := ""
 var nature := -1
+# What else of its looks it has from them: "marks", what is painted on its coat, from the parent
+# whose coat it wears, and "head", how big a head it has for its kind, from the other (see
+# Cryptlin.looks; empty for its own)
+var looks := {}
 # When it last paired off (unix time), and the egg it is to lay as a result: {"due": when,
 # "egg": what the save would hold of that egg}
 var paired := 0.0
@@ -66,6 +70,7 @@ func to_save() -> Dictionary:
 		"parent_names": parent_names,
 		"fur": fur,
 		"nature": nature,
+		"looks": looks,
 		"paired": paired,
 		"expecting": expecting,
 		"at": [spot.x, spot.z] if spot != Vector3.INF else [],
@@ -95,6 +100,8 @@ static func from_save(d: Dictionary) -> Resident:
 			r.parent_names.append(str(parent))
 	r.fur = str(d.get("fur", ""))
 	r.nature = int(d.get("nature", -1))
+	if d.get("looks") is Dictionary:
+		r.looks = d["looks"]
 	r.paired = float(d.get("paired", 0.0))
 	if d.get("expecting") is Dictionary:
 		r.expecting = d["expecting"]
