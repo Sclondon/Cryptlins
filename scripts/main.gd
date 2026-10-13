@@ -141,6 +141,8 @@ var floor_mat: ShaderMaterial
 # Played inside a site with a shop (see _bridge): what has been bought there, item id to how
 # many (-1 for as many as you like). By itself the game has everything.
 var embedded := false
+# The save was written inside the station since eggs there came by post (see _load_game)
+var posted := false
 var stock := {}
 var _on_message: JavaScriptObject
 # Whether the page has put the game in front yet, and whether it is resting out of sight
@@ -2884,6 +2886,10 @@ func _bridge() -> void:
 		rest(true)
 
 
+func _inside_a_page() -> bool:
+	return OS.has_feature("web") and bool(JavaScriptBridge.eval("window.parent !== window", true))
+
+
 func _post(message: Dictionary) -> void:
 	if embedded:
 		JavaScriptBridge.eval("window.parent.postMessage(%s, '*')" % JSON.stringify(message), true)
@@ -2946,6 +2952,7 @@ func save_game() -> void:
 		living.append(r.to_save())
 	file.store_string(JSON.stringify({
 		"v": 3,
+		"post": posted or embedded,
 		"residents": living,
 		"gone": departed.map(func(r: Resident) -> Dictionary: return r.to_save()),
 		"markers": markers_away,
@@ -2971,6 +2978,13 @@ func _load_game() -> void:
 		return
 	var d: Dictionary = data
 	var now := Time.get_unix_time_from_system()
+	# Inside the station nobody is given an egg for nothing any more: theirs comes in the post.
+	# A save from when the room gave one loses who was in it, once; the room is left as it was.
+	posted = bool(d.get("post", false))
+	if _inside_a_page() and not posted:
+		for key: String in ["residents", "gone", "markers"]:
+			d.erase(key)
+		d["v"] = 3
 	if d.get("residents") is Array:
 		for saved: Variant in d["residents"]:
 			if saved is Dictionary and residents.size() < MAX_RESIDENTS:
