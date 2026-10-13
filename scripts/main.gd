@@ -970,6 +970,9 @@ func comfort_of(who: Cryptlin) -> float:
 			c -= 18.0
 		else:
 			others += 1
+	# A yeti cannot bear the heat lamp
+	if who.kind == Cryptlin.Kind.YETI and lamp_mode == Lamp.HEAT:
+		c -= 22.0
 	# A kind that lives in water is never at home without a pool to get into
 	if who.needs_water():
 		c += 14.0 if decor_of(Decor.Kind.POOL) != null else -24.0

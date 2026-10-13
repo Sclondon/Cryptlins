@@ -1,7 +1,8 @@
 class_name Track
 extends Node3D
 ## Something left on the floor for a while: a footprint pressed into it by one of the heavy kinds
-## as it walks, a patch of frost where a wendigo stood, or the tiny toadstools that come up
+## as it walks, a patch of frost where a wendigo stood, snow out of the coat of a yeti, or the
+## tiny toadstools that come up
 ## where a living fungus sat. It fades back into the ground (or shrinks back into it) and is
 ## gone. Only something to look at: it is not kept in the save, is not a mess, and nothing can
 ## be done to it.
@@ -10,7 +11,7 @@ const SHADER: Shader = preload("res://shaders/print.gdshader")
 const FROST: Shader = preload("res://shaders/frost.gdshader")
 # How long a print shows on a soft floor and on a hard one (seconds), and how much darker than
 # the ground it starts on each; the same for a patch of frost, which is paler than the ground;
-# and how long toadstools stand
+# how long toadstools stand; and how long snow lies, and how pale it is
 const LASTS_SOFT := 90.0
 const LASTS_HARD := 40.0
 const DEPTH_SOFT := 0.55
@@ -18,6 +19,8 @@ const DEPTH_HARD := 0.24
 const LASTS_FROST := 24.0
 const DEPTH_FROST := 0.34
 const LASTS_TOADSTOOLS := 45.0
+const LASTS_SNOW := 30.0
+const DEPTH_SNOW := 0.5
 
 var age := 0.0
 var lasts := LASTS_HARD
@@ -29,7 +32,8 @@ var full := 0.0
 
 
 # `shape` is whose foot it was ("sasquatch": a long sole and five toes, the big one inside),
-# "frost" for a ragged patch of it or "toadstools" for a little clump of them; `side` is -1 for
+# "frost" for a ragged patch of it, "snow" for a soft heap of it or "toadstools" for a little
+# clump of them; `side` is -1 for
 # a left foot and 1 for a right, `big` how big next to the usual
 func _init(shape: String, side: float, big: float, soft: bool) -> void:
 	lasts = LASTS_SOFT if soft else LASTS_HARD
@@ -54,6 +58,14 @@ func _init(shape: String, side: float, big: float, soft: bool) -> void:
 				var around := TAU * i / 5.0 + randf_range(-0.4, 0.4)
 				var out := randf_range(0.1, 0.2)
 				_pad(Vector3(cos(around), 0, sin(around)) * out, Vector2(0.035, out), -around + PI * 0.5)
+		"snow":
+			lasts = LASTS_SNOW
+			depth = DEPTH_SNOW
+			mat.shader = FROST
+			mat.set_shader_parameter("tint", Color(0.9, 0.93, 1.0))
+			# A soft heap of it, in two or three round patches
+			for i in 3:
+				_pad(Vector3(randf_range(-0.07, 0.07), 0, randf_range(-0.07, 0.07)), Vector2.ONE * randf_range(0.08, 0.15))
 		"toadstools":
 			lasts = LASTS_TOADSTOOLS
 			full = big

@@ -242,8 +242,6 @@ func _snowball(pet: Cryptlin) -> void:
 # whose knack is in the water) it is one of the things it may take it into its head to do; the
 # turn comes off, and is written in the notebook; and when it is over nothing is left changed
 func _knack(pet: Cryptlin, mate: Cryptlin) -> void:
-	if Knack.NOTES[pet.kind] == "":
-		return
 	check(not pet.me.known.get("knack", false) and main.notebook._notes(pet).contains("Its knack: ?"), "its knack is not written down before it has been seen")
 	var wet := pet.kind in [Cryptlin.Kind.NESSIE, Cryptlin.Kind.KELPIE]
 	if wet:

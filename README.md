@@ -154,6 +154,11 @@ of the notebook ("Its knack", a "?" until then).
 | gnome | Will not be seen to move. Left alone it creeps over to some small thing (a skull, a crystal, the pumpkin, the fern, the dish, the flowerpot, the toy, a bit of food) and shifts it somewhere else; with a finger only just off the screen it stands like an ornament, not blinking, until it has been left a while. |
 | fae | Flits over to one of the others and shakes its dust out over it, and that one has to dance until the dust wears off. About one time in three it leaves a few berries behind, which are nobody's stock. It needs somebody to dust. |
 | living fungus | Sits down and puffs out clouds of spores, and when it has got up and gone tiny toadstools come up where it sat, to stand for three quarters of a minute (a `Track`). |
+| jackalope | Throws its voice: there is a cry and a puff of dust on the far side of the room, the others go off to see what it was, and it bolts the other way in zigzags. |
+| alien | Lifts something in a beam of green light, carries it across the room and sets it down: one of the others (which pedals in the air, and is none the worse), or else the toy, or else a bit of food. |
+| yeti | Its breath shows, always. As a turn it shakes itself and snow comes out of its coat, to lie round it for half a minute. It cannot bear the heat lamp: under it it droops and pants, the room suits it a good deal less (`Den.comfort_of`), and it shakes out no snow. |
+| Cerberus | Stands guard over an egg if there is one in the room, or else over the nest: it plants itself in front of it for a few seconds with its three heads looking three ways and three small faces over them that never agree, and any of the others that comes too close is growled at and sent packing, unhurt. |
+| mole person | Digs straight down, goes along under the floor with the ground stirring over it, and comes up somewhere else, leaving a molehill at each end of the tunnel. |
 
 ## Health, and dying
 
@@ -247,7 +252,7 @@ from `Cryptlin.looks()`, which has a generator of its own.
   `shaders/water.gdshader`, the sheet a little below it: the two have to be changed together. A cryptlin that does
   not live in water is stopped at the edge in `Cryptlin._move()`, and gets itself out (`State.FLOUNDER`) if it is
   ever further in.
-  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint, a patch of frost or a clump of toadstools (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
+  `scripts/mess.gd`: droppings, puddles and dug heaps. `scripts/track.gd`: a footprint, a patch of frost or snow, or a clump of toadstools (`Den.leave_print`), which is neither saved nor a mess. `scripts/scuffle.gd`: the ball of dust two of them fight in. `scripts/snack.gd`, `scripts/ball.gd`: food and toys.
 - `scripts/knack.gd`: the one thing each kind does that no other does (see Knacks above).
 - `scripts/notebook.gd`: the notebook's pages. `scripts/icons.gd`: the symbols on its few buttons.
   `scripts/readout.gd`: the scanner's own lettering, five dots by seven, for its notes. The scanner itself is

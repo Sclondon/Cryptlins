@@ -26,7 +26,11 @@ const NOTES: Array[String] = [
 	"stands as still as an ornament while it is watched, and shifts small things about when it is not",
 	"shakes its dust over one of the others, which has to dance, and now and then leaves a little something to eat",
 	"puffs out spores where it sits, and tiny toadstools come up there",
-	"", "", "", "", "",
+	"throws its voice to send the others off after nothing, and bolts the other way in zigzags",
+	"lifts one of the others, the toy or a bit of food in a beam of light, and sets it down somewhere else",
+	"shakes snow out of its coat (its breath always shows), and suffers under the heat lamp",
+	"stands guard over an egg or the nest, its three heads all of different minds, and sees the others off",
+	"tunnels down and comes up somewhere else, leaving a molehill at each end",
 ]
 # How likely it is to take a turn at it, next to the 34 of wandering off
 const WEIGHT := 7.0
@@ -52,6 +56,15 @@ var stone: ShaderMaterial
 var tongue: MeshInstance3D
 # How long the gnome has stood stock still this turn
 var stiff := 0.0
+# Which way the jackalope is jinking; the beam of the alien, whether it has hold of anything
+# with it and how high that has been lifted; how long before Cerberus will growl again, and
+# the three small faces over its heads
+var zig := 1.0
+var beam: MeshInstance3D
+var carrying := false
+var height := 0.0
+var growl := 0.0
+var minds: Array[MeshInstance3D] = []
 
 
 func _init(whose: Cryptlin) -> void:
@@ -91,8 +104,14 @@ func ready() -> bool:
 			return _trinket() != null
 		Cryptlin.Kind.FAE:
 			return pet._someone() != null
-		Cryptlin.Kind.FUNGUS:
+		Cryptlin.Kind.FUNGUS, Cryptlin.Kind.MOLE:
 			return Den.wade(pet.position) <= 0.0
+		Cryptlin.Kind.JACKALOPE, Cryptlin.Kind.CERBERUS:
+			return true
+		Cryptlin.Kind.ALIEN:
+			return _cargo() != null
+		Cryptlin.Kind.YETI:
+			return world.lamp_mode != Den.Lamp.HEAT and Den.wade(pet.position) <= 0.0
 	return false
 
 
@@ -107,6 +126,8 @@ func weight() -> float:
 # Time passing, whatever it is doing
 func always(delta: float) -> void:
 	again -= delta
+	if pet.kind == Cryptlin.Kind.YETI:
+		_weather(delta)
 	# The room goes strange for as long as a Cthulhu spawn is asleep in it, or dreaming on its feet
 	if pet.kind == Cryptlin.Kind.SPAWN and (pet.state == Cryptlin.State.SLEEP or (pet.state == Cryptlin.State.TRICK and pet.state_time > 0.8)):
 		pet.world.strange = 1.0
@@ -141,6 +162,21 @@ func begin() -> void:
 			stiff = 0.0
 		Cryptlin.Kind.FAE:
 			victim = pet._someone()
+		Cryptlin.Kind.JACKALOPE:
+			# (the voice comes from the far side of the room from where it is)
+			pet.target = pet._footing(Vector3(Den.half.x * (-0.7 if pet.position.x > 0.0 else 0.7), 0, Den.half.y * (-0.5 if pet.position.z > 0.0 else 0.5)), 0.4)
+		Cryptlin.Kind.ALIEN:
+			var cargo := _cargo()
+			height = 0.0
+			if cargo is Cryptlin:
+				victim = cargo as Cryptlin
+			else:
+				mark = cargo
+		Cryptlin.Kind.CERBERUS:
+			mark = _ward()
+			growl = 0.0
+			var post := Vector3(mark.position.x, 0, mark.position.z)
+			pet.target = pet._footing(post + (Vector3(0, 0, 0.6) - post).normalized() * 0.6, 0.4)
 		Cryptlin.Kind.KELPIE:
 			victim = _dupe()
 			if victim != null:
@@ -180,6 +216,16 @@ func tick(delta: float) -> void:
 			_dust(delta)
 		Cryptlin.Kind.FUNGUS:
 			_spore(delta)
+		Cryptlin.Kind.JACKALOPE:
+			_throw(delta)
+		Cryptlin.Kind.ALIEN:
+			_beam(delta)
+		Cryptlin.Kind.YETI:
+			_snow(delta)
+		Cryptlin.Kind.CERBERUS:
+			_guard(delta)
+		Cryptlin.Kind.MOLE:
+			_tunnel(delta)
 		_:
 			finish()
 
@@ -199,20 +245,38 @@ func over() -> void:
 	pet.dive = 0.0
 	for eye in pet.eye_mats:
 		eye.set_shader_parameter("glow", 0.85)
+	if beam != null:
+		beam.queue_free()
+		beam = null
+	if carrying:
+		# (what the beam had hold of is let go where it is)
+		carrying = false
+		if mark is Ball and pet.world.grab != Den.Grab.BALL:
+			mark.held = false
+		elif mark is Snack:
+			_let_fall(mark)
+	height = 0.0
+	for face in minds:
+		face.visible = false
 	if tongue != null:
 		tongue.queue_free()
 		tongue = null
-		# (what was on the end of it is let fall)
-		var food := mark as Snack
-		if is_instance_valid(food) and food.held and pet.world.held_snack != food:
-			food.held = false
-			food.landed = true
-			food.position.y = 0.0
+		if mark is Snack:
+			_let_fall(mark)
 	if stone != null:
 		stone = null
 		pet._unghost()
 	spell = ""
 	caster = null
+
+
+# A bit of food that its knack had hold of drops to the floor where it is, unless a finger has it
+func _let_fall(food: Snack) -> void:
+	if is_instance_valid(food) and food.held and pet.world.held_snack != food:
+		food.held = false
+		food.landed = true
+		food.position.y = 0.0
+
 
 
 # On to the next part of the turn
@@ -264,6 +328,13 @@ func spelled(delta: float) -> void:
 			if not pet.airborne:
 				pet.hop(1.9)
 				pet.fun = minf(pet.fun + 1.0, 100.0)
+		"beamed":
+			# Up in the light of the alien, and carried: it is the alien that moves it
+			pet.eye_goal = 1.3
+			pet.arm_goal = Cryptlin.UP_ARM
+			pet.velocity = Vector3.ZERO
+			if not is_instance_valid(caster) or caster.state != Cryptlin.State.TRICK:
+				pet.state_len = 0.0
 		"lured":
 			# Down the bank and in, as if it were walking in its sleep
 			pet.eye_goal = 0.55
@@ -758,10 +829,12 @@ func _meddle(delta: float) -> void:
 		finish()
 		return
 	var at := Vector3(mark.position.x, 0, mark.position.z)
+	# (as near as it can get to it: a thing that stands in the room is walked round)
+	var reach := 0.3 * pet.grow + ((mark as Decor).radius + 0.05 if mark is Decor else 0.15)
 	pet.gaze = mark.global_position + Vector3(0, 0.1, 0)
 	if pet.step == 0:
 		pet.sit_goal = 0.3
-		if pet._steer(at, Cryptlin.WALK * 0.8, delta, 0.3 * pet.grow + 0.15):
+		if pet._steer(at, Cryptlin.WALK * 0.8, delta, reach):
 			var away := Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU) * randf_range(0.7, 1.1)
 			pet.target = Den.on_dry(at + away, 0.5, 0.4)
 			_next()
@@ -772,7 +845,7 @@ func _meddle(delta: float) -> void:
 	pet.arm_goal = Vector3(-1.3, 0.0, 0.3)
 	var to := at.move_toward(pet.target, delta * 0.45)
 	mark.position = Vector3(to.x, mark.position.y, to.z)
-	pet._steer(to - (pet.target - at).normalized() * (0.3 * pet.grow + 0.12), Cryptlin.WALK * 0.8, delta, 0.05)
+	pet._steer(to - (pet.target - at).normalized() * reach, Cryptlin.WALK * 0.8, delta, 0.05)
 	if to.distance_to(pet.target) < 0.02 or pet.state_time > 5.0:
 		done = true
 		pet._cry("chirp", 0.8, -8.0)
@@ -848,3 +921,285 @@ func _spore(delta: float) -> void:
 	pet.gaze = pet.target + Vector3(0, 0.3, 0)
 	if pet._steer(pet.target, Cryptlin.WALK, delta, 0.2) or pet.state_time > 3.0:
 		finish()
+
+
+# The jackalope throws its voice: there is a cry from the far side of the room, the others go
+# off to see what it was, and it bolts the other way in zigzags
+func _throw(delta: float) -> void:
+	var world := pet.world
+	if pet.step == 0:
+		pet._halt(delta)
+		pet.gaze = pet.target + Vector3(0, 0.4, 0)
+		pet.mouth_goal = 0.7
+		pet.eye_goal = 1.2
+		if pet.state_time > 0.5 and not done:
+			done = true
+			world.sfx.play("chirp", 0.55, -2.0)
+			world.crumbs(pet.target + Vector3(0, 0.3, 0), Den.DUST)
+			for other in world.pets():
+				if other != pet and other.state in Cryptlin.INTERRUPTIBLE:
+					other.call_to(pet.target + Vector3(randf_range(-0.4, 0.4), 0, randf_range(-0.4, 0.4)))
+		if pet.state_time > 1.1:
+			zig = 1.0 if randf() < 0.5 else -1.0
+			pet.yaw = atan2(pet.position.x - pet.target.x, pet.position.z - pet.target.z)
+			_next()
+		return
+	# Off, a few bounds one way and a few the other
+	if _beat(0.4, delta) or pet.state_time < delta * 1.5:
+		zig = -zig
+		var way := Vector3(sin(pet.yaw + zig * 1.0), 0, cos(pet.yaw + zig * 1.0))
+		pet.target = pet._footing(pet.position + way * 1.4, 0.4)
+		if pet.target.distance_to(pet.position) < 0.5:
+			pet.target = pet._footing(-pet.position * 0.6, 0.4)
+		pet.hop(1.6)
+	pet.gaze = pet.target + Vector3(0, 0.3, 0)
+	pet.droop_goal = 0.9
+	pet._steer(pet.target, Cryptlin.RUN * 1.15, delta, 0.1)
+	if pet.state_time > 3.0:
+		finish()
+
+
+# The alien lifts something in a beam of light, carries it across the room and sets it down:
+# one of the others, the toy, or a bit of food
+func _beam(delta: float) -> void:
+	var world := pet.world
+	var cargo: Node3D = victim if victim != null else mark
+	if not is_instance_valid(cargo) or (victim != null and pet.step > 0 and victim.state != Cryptlin.State.SPELL):
+		finish()
+		return
+	if cargo is Ball and world.grab == Den.Grab.BALL or cargo == world.held_snack:
+		finish()
+		return
+	pet._halt(delta)
+	pet._face(cargo.position, delta)
+	pet.gaze = cargo.global_position + Vector3(0, 0.2, 0)
+	pet.arm_goal = Cryptlin.UP_ARM
+	pet.eye_goal = 1.3
+	for eye in pet.eye_mats:
+		eye.set_shader_parameter("glow", 1.6)
+	var rest := 0.0 if victim != null else (Ball.R if cargo is Ball else 0.02)
+	match pet.step:
+		0:
+			if pet.state_time > 0.7:
+				var light := ShaderMaterial.new()
+				light.shader = Track.FROST
+				light.set_shader_parameter("tint", Color(0.4, 1.0, 0.7))
+				light.set_shader_parameter("depth", 0.4)
+				beam = Ps1.part(world, Ps1.drum(8, 0.5), light, cargo.position)
+				beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				world.sfx.play("jingle", 0.5, -6.0)
+				if victim != null:
+					if not victim.knack.bewitch("beamed", pet, 12.0):
+						finish()
+						return
+				elif cargo is Ball:
+					cargo.held = true
+				else:
+					cargo.hold()
+				carrying = true
+				for i in 8:
+					pet.target = Den.on_dry(Vector3(randf_range(-Den.half.x, Den.half.x), 0, randf_range(-Den.half.y, Den.half.y)), 0.5, 0.4)
+					if pet.target.distance_to(cargo.position) > 1.2:
+						break
+				_next()
+		1:
+			# Up
+			height = move_toward(height, 0.9, delta * 0.9)
+			if height >= 0.9:
+				_next()
+		2:
+			# Across
+			var to := Vector3(cargo.position.x, 0, cargo.position.z).move_toward(pet.target, delta * 1.0)
+			cargo.position.x = to.x
+			cargo.position.z = to.z
+			if to.distance_to(pet.target) < 0.02:
+				done = true
+				_next()
+		3:
+			# And down again
+			height = move_toward(height, 0.0, delta * 1.1)
+			if height <= 0.0:
+				pet._cry("chirp", 1.3)
+				finish()
+				return
+	if victim != null:
+		victim.lift = height
+		victim.velocity = Vector3.ZERO
+	else:
+		cargo.position.y = rest + height
+		if cargo is Ball:
+			cargo.vel = Vector3.ZERO
+	if beam != null:
+		beam.position = Vector3(cargo.position.x, 1.7, cargo.position.z)
+		beam.scale = Vector3(0.34, 3.4, 0.34) * Vector3(1.0 + sin(pet.anim_t * 23.0) * 0.06, 1.0, 1.0 + sin(pet.anim_t * 23.0) * 0.06)
+
+
+# Something for the alien to lift: one of the others that is up and at a loose end on dry
+# floor, or else the toy lying still, or else a bit of food
+func _cargo() -> Node3D:
+	var world := pet.world
+	var other := pet._someone()
+	if other != null and Den.wade(other.position) <= 0.0:
+		return other
+	if world.ball != null and not world.ball.held and world.ball.speed() < 0.3:
+		return world.ball
+	for food in world.snacks:
+		if food.landed and not food.held:
+			return food
+	return null
+
+
+# The yeti shakes itself, and snow comes out of its coat and lies round it for a while
+func _snow(delta: float) -> void:
+	var world := pet.world
+	pet._halt(delta)
+	pet.gaze = world.camera.global_position
+	pet.arm_goal = Vector3(-0.3, 0.0, 1.1)
+	pet.wiggle = sin(pet.state_time * 26.0) * 0.14 * clampf(2.6 - pet.state_time, 0.0, 1.0)
+	pet.eye_goal = 0.4
+	if pet.state_time < delta * 1.5:
+		pet._cry("grumble", 1.4)
+	if pet.state_time < 2.6 and _beat(0.25, delta):
+		var around := randf() * TAU
+		var out := randf_range(0.25, 0.75) * pet.grow
+		world.leave_print("snow", pet.position + Vector3(cos(around), 0, sin(around)) * out, around, 1.0, pet.grow * randf_range(0.7, 1.3))
+		world.crumbs(pet.global_position + Vector3(cos(around) * 0.3, pet.top() * 0.7, sin(around) * 0.3), Color(0.92, 0.95, 1.0))
+	if pet.state_time > 1.5:
+		done = true
+	if pet.state_time > 3.4:
+		finish()
+
+
+# What comes of being a yeti in a basement, turn or no turn: its breath shows, and under the
+# heat lamp it droops and pants
+func _weather(delta: float) -> void:
+	var world := pet.world
+	if world.lamp_mode == Den.Lamp.HEAT:
+		if pet.state in [Cryptlin.State.IDLE, Cryptlin.State.STARE, Cryptlin.State.WANDER]:
+			pet.mouth_goal = 0.55 + sin(pet.anim_t * 9.0) * 0.25
+			pet.droop_goal = 0.9
+			pet.eye_goal = 0.6
+	elif pet.state != Cryptlin.State.SLEEP and not pet.xrayed and int(pet.anim_t / 4.0) != int((pet.anim_t - delta) / 4.0):
+		world.crumbs(pet.mouth_node.global_position + Vector3(sin(pet.yaw), 0, cos(pet.yaw)) * 0.1, Color(0.85, 0.9, 1.0))
+
+
+# Cerberus stands guard: over an egg if there is one, or else the nest. It plants itself in
+# front of it, each of its three heads of a different mind about the business, and any of the
+# others that comes too close is seen off (and none the worse for it)
+func _guard(delta: float) -> void:
+	var world := pet.world
+	if not is_instance_valid(mark):
+		finish()
+		return
+	var post := Vector3(mark.position.x, 0, mark.position.z)
+	if pet.step == 0:
+		pet.gaze = post + Vector3(0, 0.2, 0)
+		if pet._steer(pet.target, Cryptlin.WALK * 1.4, delta, 0.2) or pet.state_time > 7.0:
+			_next()
+		return
+	pet._halt(delta)
+	pet._face(pet.position * 2.0 - post, delta)
+	pet.sit_goal = 0.4
+	pet.wag = 1.5
+	pet.eye_goal = 1.15
+	pet.gaze = pet.global_position + Vector3(sin(pet.yaw), 0.2, cos(pet.yaw)) * 3.0
+	# One head looks left and one right, and they do not keep time
+	for i in pet.heads.size():
+		var side := -1.0 if i == 0 else 1.0
+		pet.heads[i].rotation = Vector3(sin(pet.state_time * (1.7 + i) + i) * 0.25, side * (1.0 + sin(pet.state_time * (2.3 - i * 0.6)) * 0.35), -0.2 * side)
+	_three_minds()
+	if pet.state_time > 2.0:
+		done = true
+	growl -= delta
+	for other in world.pets():
+		if other != pet and growl <= 0.0 and other.lift <= 0.05 and not other.state in [Cryptlin.State.SLEEP, Cryptlin.State.HELD, Cryptlin.State.SHOVED, Cryptlin.State.SCUFFLE, Cryptlin.State.SCANNED, Cryptlin.State.DYING, Cryptlin.State.LEAVE] and other.position.distance_to(post) < 0.9:
+			growl = 1.5
+			pet._cry("grumble", 0.8)
+			pet.mouth_goal = 1.0
+			other.cuffed(pet)
+	if pet.state_time > 7.0:
+		finish()
+
+
+# The three small faces over its three heads, which never agree: they change places as it stands
+func _three_minds() -> void:
+	var world := pet.world
+	if minds.is_empty():
+		for i in 3:
+			var face: MeshInstance3D = pet.emote.duplicate()
+			face.material_override = pet.emote.material_override.duplicate()
+			pet.add_child(face)
+			minds.append(face)
+	pet.emote.visible = false
+	pet.emote_again = maxf(pet.emote_again, 2.0)
+	var moods: Array[int] = [Cryptlin.Feeling.GRUMPY, Cryptlin.Feeling.HAPPY, Cryptlin.Feeling.SLEEPY]
+	var cam := world.camera
+	var above := pet.global_position + Vector3(0, pet.top(), 0)
+	var deep := -(cam.global_transform.affine_inverse() * above).z
+	var dot := 2.0 * deep * tan(deg_to_rad(cam.fov) * 0.5) / world.view.size.y
+	for i in 3:
+		var face := minds[i]
+		face.visible = true
+		face.material_override.albedo_texture = pet.faces[moods[(i + int(pet.state_time / 1.3)) % 3]]
+		face.material_override.albedo_color.a = 1.0
+		var at := (cam.unproject_position(above) + Vector2((i - 1) * (Cryptlin.FACE + 1.0), -Cryptlin.FACE * 0.5 - 4.0 - (2.0 if i == 1 else 0.0))).round()
+		face.global_transform = Transform3D(cam.global_basis * Basis.from_scale(Vector3.ONE * dot * Cryptlin.FACE), cam.project_position(at, deep))
+
+
+# Where Cerberus would stand guard: by an egg if there is one in the room, or else by the nest
+func _ward() -> Node3D:
+	for r in pet.world.residents:
+		if r.egg != null and r.egg.landed:
+			return r.egg
+	return pet.world.nest
+
+
+# The mole person digs straight down, goes along under the floor, and comes up somewhere else,
+# with a molehill left at each end of the tunnel
+func _tunnel(delta: float) -> void:
+	var world := pet.world
+	var earth: Color = Den.GROUND_TINTS[world.floor_style]
+	match pet.step:
+		0:
+			pet._halt(delta)
+			pet.nod = 0.6
+			pet.arm_goal = Vector3(-1.0, 0.0, 0.2)
+			pet.arm_wave = 1.0
+			if _beat(0.25, delta):
+				world.crumbs(pet.global_position + Vector3(0, 0.1, 0), earth)
+				world.sfx.play("thud", randf_range(1.2, 1.6), -10.0)
+			if pet.state_time > 1.3:
+				_next()
+		1:
+			# Down
+			pet._halt(delta)
+			pet.dive = move_toward(pet.dive, pet.tall() + 0.1, delta * 1.6)
+			if pet.dive >= pet.tall() + 0.1:
+				world.leave_mess(Mess.Kind.HEAP, pet.position, pet)
+				for i in 8:
+					pet.target = pet._footing(Vector3(randf_range(-Den.half.x, Den.half.x), 0, randf_range(-Den.half.y, Den.half.y)), 0.5)
+					if pet.target.distance_to(pet.position) > 1.3:
+						break
+				_next()
+		2:
+			# Along, with the floor stirring over it
+			pet.velocity = Vector3.ZERO
+			var to := pet.position.move_toward(pet.target, delta * 1.3)
+			pet.position.x = to.x
+			pet.position.z = to.z
+			if _beat(0.35, delta):
+				world.crumbs(Vector3(to.x, 0.05, to.z), earth)
+			if Vector2(to.x - pet.target.x, to.z - pet.target.z).length() < 0.05 or pet.state_time > 5.0:
+				world.leave_mess(Mess.Kind.HEAP, pet.position + Vector3(0.12, 0, -0.1), pet)
+				world.sfx.play("thud", 1.0, -6.0)
+				done = true
+				_next()
+		3:
+			# And up
+			pet._halt(delta)
+			pet.dive = move_toward(pet.dive, 0.0, delta * 1.8)
+			if pet.dive <= 0.0:
+				world.crumbs(pet.global_position + Vector3(0, 0.15, 0), earth)
+				pet.hop(1.6)
+				pet._cry("chirp", 0.7)
+				finish()
