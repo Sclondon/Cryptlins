@@ -40,9 +40,9 @@ const PAIR_AWAY_HOURS := 8.0
 const NAME_HEADS: Array[String] = ["Grub", "Mog", "Snag", "Fizz", "Bork", "Nib", "Skrit", "Womp", "Gloom", "Pim", "Zog", "Murk"]
 const NAME_TAILS: Array[String] = ["nik", "let", "wort", "bo", "gle", "kin", "zle", "by", "mort", "ix"]
 const EGG_SPOT := Vector3(0, 0, 0.3)
-const GROUNDS: Array[String] = ["Flagstones", "Floorboards", "Moss", "Checkers", "Dirt", "Sand", "Gravel"]
+const GROUNDS: Array[String] = ["Flagstones", "Floorboards", "Moss", "Checkers", "Dirt", "Sand", "Gravel", "Snow", "Mud", "Straw", "Carpet"]
 # As in "it is happiest on ..."
-const GROUND_PLAIN: Array[String] = ["flagstones", "floorboards", "moss", "checkered tiles", "dirt", "sand", "gravel"]
+const GROUND_PLAIN: Array[String] = ["flagstones", "floorboards", "moss", "checkered tiles", "dirt", "sand", "gravel", "snow", "mud", "straw", "carpet"]
 const SCAN_SECONDS := 9.0
 # How long after a toy there is no end of has broken before there is another of its kind
 const TOY_AGAIN_HOURS := 12.0
@@ -57,8 +57,12 @@ const KEPT_EVERY := 300.0
 const BROOM_REACH := 0.32
 const SWEEP_SECONDS := 0.7
 const SWEEP_STROKE := 0.24
-# The grounds a foot sinks into (moss, dirt, sand, gravel), and the most footprints there are at once
-const SOFT_GROUNDS: Array[int] = [2, 4, 5, 6]
+# The grounds a foot sinks into (moss, dirt, sand, gravel, snow, mud), the ones loose enough for
+# any of them to dig in (dirt, sand, gravel, snow, mud, straw), the ones that take no footprint
+# at all (carpet), and the most footprints there are at once
+const SOFT_GROUNDS: Array[int] = [2, 4, 5, 6, 7, 8]
+const LOOSE_GROUNDS: Array[int] = [4, 5, 6, 7, 8, 9]
+const PRINTLESS_GROUNDS: Array[int] = [10]
 const MAX_TRACKS := 28
 # How far up off the bottom edge the wheel rides on an upright phone, as parts of the height of
 # the screen: about what a phone's browser draws over the bottom of a page, and no less than
@@ -78,6 +82,7 @@ const SCANNER_SLANT := 0.9
 const GROUND_TINTS: Array[Color] = [
 	Color(0.4, 0.4, 0.42), Color(0.4, 0.28, 0.16), Color(0.2, 0.34, 0.14), Color(0.5, 0.5, 0.5),
 	Color(0.3, 0.2, 0.13), Color(0.62, 0.52, 0.34), Color(0.4, 0.4, 0.42),
+	Color(0.8, 0.84, 0.9), Color(0.2, 0.13, 0.08), Color(0.72, 0.58, 0.24), Color(0.46, 0.1, 0.12),
 ]
 
 # Half the room's width and depth: walls left, right and behind, and you in front. The room is
@@ -2697,9 +2702,10 @@ func crumbs(at: Vector3, colour: Color) -> void:
 
 # A footprint left by one of the heavy kinds (see Track): where its foot came down, facing the
 # way it was going, deeper and longer lasting on a soft floor. There are never more than
-# MAX_TRACKS of them; the oldest goes to make room. Water takes no print.
+# MAX_TRACKS of them; the oldest goes to make room. Water takes no print, and nor does carpet
+# (though frost, snow and toadstools lie on it as on any floor).
 func leave_print(shape: String, at: Vector3, facing: float, side: float, big: float) -> void:
-	if wade(at) > 0.0:
+	if wade(at) > 0.0 or (floor_style in PRINTLESS_GROUNDS and shape == "sasquatch"):
 		return
 	while tracks.size() >= MAX_TRACKS:
 		tracks.pop_front().queue_free()

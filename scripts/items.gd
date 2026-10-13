@@ -43,6 +43,12 @@ const LIST: Array[Dictionary] = [
 	{"id": "crate", "group": "decor", "n": 13, "name": "Crate"},
 	{"id": "pot", "group": "decor", "n": 14, "name": "Flowerpot"},
 	{"id": "trophy", "group": "decor", "n": 16, "name": "Brass cup"},
+	{"id": "lantern", "group": "decor", "n": 17, "name": "Signal lamp"},
+	{"id": "bonepile", "group": "decor", "n": 18, "name": "Pile of bones"},
+	{"id": "ring", "group": "decor", "n": 19, "name": "Toadstool ring"},
+	{"id": "trunk", "group": "decor", "n": 20, "name": "Luggage trunk"},
+	{"id": "perch", "group": "decor", "n": 21, "name": "Perch"},
+	{"id": "leaves", "group": "decor", "n": 22, "name": "Heap of leaves"},
 	{"id": "rosette1", "group": "rosette", "n": 1, "name": "First rosette"},
 	{"id": "rosette2", "group": "rosette", "n": 2, "name": "Second rosette"},
 	{"id": "rosette3", "group": "rosette", "n": 3, "name": "Third rosette"},
@@ -57,6 +63,10 @@ const LIST: Array[Dictionary] = [
 	{"id": "dirt", "group": "ground", "n": 4, "name": "Dirt"},
 	{"id": "sand", "group": "ground", "n": 5, "name": "Sand"},
 	{"id": "gravel", "group": "ground", "n": 6, "name": "Gravel"},
+	{"id": "snow", "group": "ground", "n": 7, "name": "Snow"},
+	{"id": "mud", "group": "ground", "n": 8, "name": "Mud"},
+	{"id": "straw", "group": "ground", "n": 9, "name": "Straw"},
+	{"id": "carpet", "group": "ground", "n": 10, "name": "Carpet"},
 ]
 # What every keeper has without buying it. The rest come from the shop when the game is played
 # inside a site that keeps one (see Den.stock), eggs among them: a room there is never given an

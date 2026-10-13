@@ -3,25 +3,32 @@ extends Node3D
 ## Something stood in the tank to make it a home: a rock, a hollow log, a fern and so on. Each
 ## cryptlin likes having some of them about and cannot stand one. Some are shelters it can get
 ## inside, one is the gravestone left where a cryptlin died, and one is the pool, which is no small
-## thing: half the floor under water (see fill). Also builds the nests.
+## thing: half the floor under water (see fill). Six came later: a signal lamp that is alight, a
+## pile of bones to gnaw, a ring of toadstools to dance in, a luggage trunk, a perch for those
+## that fly, and a heap of leaves to burrow into (see Cryptlin, State.VISIT). Also builds the nests.
 
-enum Kind { ROCK, LOG, FERN, SKULL, CRYSTAL, PUMPKIN, GRAVESTONE, DISH, CAVE, POOL, BARREL, STUMP, TENT, CRATE, POT, MARKER, TROPHY }
+enum Kind { ROCK, LOG, FERN, SKULL, CRYSTAL, PUMPKIN, GRAVESTONE, DISH, CAVE, POOL, BARREL, STUMP, TENT, CRATE, POT, MARKER, TROPHY, LANTERN, BONEPILE, RING, TRUNK, PERCH, LEAVES }
 
 const IDS: Array[String] = [
 	"rock", "log", "fern", "skull", "crystal", "pumpkin", "gravestone", "dish", "cave", "pool",
 	"barrel", "stump", "tent", "crate", "pot", "marker", "trophy",
+	"lantern", "bonepile", "ring", "trunk", "perch", "leaves",
 ]
 const NAMES: Array[String] = [
 	"Rock", "Hollow log", "Fern", "Skull", "Crystal", "Pumpkin", "Gravestone", "Water dish", "Cave", "Pool",
 	"Barrel", "Hollow stump", "Rag tent", "Crate", "Flowerpot", "Gravestone", "Brass cup",
+	"Signal lamp", "Pile of bones", "Toadstool ring", "Luggage trunk", "Perch", "Heap of leaves",
 ]
 # As in "it likes having the ... about"
 const PLAIN: Array[String] = [
 	"rock", "hollow log", "fern", "skull", "crystal", "pumpkin", "gravestone", "water dish", "cave", "pool",
 	"barrel", "hollow stump", "rag tent", "crate", "flowerpot", "gravestone", "brass cup",
+	"signal lamp", "pile of bones", "toadstool ring", "luggage trunk", "perch", "heap of leaves",
 ]
 # How much floor each takes up: the cryptlin walks round it
-const RADII: Array[float] = [0.36, 0.34, 0.22, 0.24, 0.22, 0.28, 0.24, 0.32, 0.85, 0.72, 0.7, 0.74, 0.82, 0.78, 0.76, 0.2, 0.2]
+const RADII: Array[float] = [0.36, 0.34, 0.22, 0.24, 0.22, 0.28, 0.24, 0.32, 0.85, 0.72, 0.7, 0.74, 0.82, 0.78, 0.76, 0.2, 0.2, 0.2, 0.3, 0.42, 0.4, 0.3, 0.42]
+# How brightly the signal lamp burns (a little: it is no match for the lamp overhead)
+const GLOW := 0.7
 const NESTS: Array[String] = ["Rags", "Twigs", "Cushion", "Box"]
 const NEST_IDS: Array[String] = ["rags", "twigs", "cushion", "box"]
 # Where the water in the pool stands (a little below the floor), how deep it gets, and how
@@ -288,6 +295,118 @@ func _init(which: int = Kind.ROCK, colour := Color(0.5, 0.5, 0.52)) -> void:
 			# The shard that came out of it, and what was growing in it
 			Ps1.part(self, Ps1.box(), clay, Vector3(0.74, 0.04, 0.5), Vector3(0.3, 0.05, 0.24), Vector3(0.1, 0.5, 0.15))
 			Ps1.part(self, Ps1.drum(4), Ps1.mat(Color(0.3, 0.26, 0.14)), Vector3(-0.2, 0.36, -0.72), Vector3(0.015, 0.5, 0.015), Vector3(-0.7, 0, 0.3))
+		Kind.LANTERN:
+			# A signal lamp off the line upstairs: rusty, with a red glass at the front and a small
+			# green one at the side, a chimney on top and a wire handle. It is alight, and throws a
+			# little red light of its own over the floor round it, which is most of what there is
+			# to see by when the lamp is low or out.
+			var rust := Ps1.mat(Color(0.42, 0.23, 0.13))
+			var iron := Ps1.mat(Color(0.15, 0.14, 0.15))
+			Ps1.part(self, Ps1.box(), iron, Vector3(0, 0.015, 0), Vector3(0.22, 0.03, 0.22))
+			Ps1.part(self, Ps1.drum(8), rust, Vector3(0, 0.16, 0), Vector3(0.1, 0.26, 0.1))
+			Ps1.part(self, Ps1.drum(8), iron, Vector3(0, 0.17, 0.092), Vector3(0.08, 0.02, 0.08), Vector3(PI * 0.5, 0, 0))
+			Ps1.part(self, Ps1.drum(8), Ps1.mat(Color(1.0, 0.22, 0.08), 1.0), Vector3(0, 0.17, 0.104), Vector3(0.062, 0.012, 0.062), Vector3(PI * 0.5, 0, 0))
+			Ps1.part(self, Ps1.drum(6), Ps1.mat(Color(0.2, 0.9, 0.4), 0.8), Vector3(0.1, 0.17, 0), Vector3(0.035, 0.012, 0.035), Vector3(0, 0, PI * 0.5))
+			Ps1.part(self, Ps1.drum(8, 0.4), iron, Vector3(0, 0.325, 0), Vector3(0.115, 0.07, 0.115))
+			Ps1.part(self, Ps1.drum(6), rust, Vector3(0, 0.385, 0), Vector3(0.045, 0.06, 0.045))
+			Ps1.part(self, Ps1.drum(6, 0.3), iron, Vector3(0, 0.43, 0), Vector3(0.06, 0.03, 0.06))
+			var bail := TorusMesh.new()
+			bail.inner_radius = 0.86
+			bail.outer_radius = 1.0
+			bail.rings = 10
+			bail.ring_segments = 4
+			Ps1.part(self, bail, iron, Vector3(0, 0.4, 0), Vector3(0.12, 0.02, 0.14), Vector3(PI * 0.5, 0, 0))
+			var flame := OmniLight3D.new()
+			flame.light_color = Color(1.0, 0.36, 0.16)
+			flame.light_energy = GLOW
+			flame.omni_range = 2.6
+			flame.light_specular = 0.0
+			flame.position = Vector3(0, 0.3, 0.2)
+			add_child(flame)
+		Kind.BONEPILE:
+			# What somebody did not finish: long bones thrown in a heap every way, and a small
+			# round skull on top of them with no jaw to it
+			var bone := Ps1.mat(Color(0.82, 0.78, 0.66))
+			var old := Ps1.mat(Color(0.66, 0.6, 0.46))
+			for i in 8:
+				var around := rng.randf() * TAU
+				var long := rng.randf_range(0.3, 0.46)
+				var lie := Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, PI * 0.5 + rng.randf_range(-0.35, 0.35))
+				var at := Vector3(rng.randf_range(-0.1, 0.1), 0.04 + i * 0.028, rng.randf_range(-0.1, 0.1))
+				var shaft := Ps1.part(self, Ps1.drum(5), bone if i % 2 == 0 else old, at)
+				shaft.basis = lie * Basis.from_scale(Vector3(0.022, long, 0.022))
+				for end: float in [-0.5, 0.5]:
+					Ps1.part(self, Ps1.ball(), bone if i % 2 == 0 else old, at + lie * Vector3(0, long * end, 0), Vector3(0.045, 0.036, 0.04))
+			Ps1.part(self, Ps1.ball(), bone, Vector3(0.02, 0.34, 0.02), Vector3(0.1, 0.095, 0.11))
+			var hole := Ps1.flat(Color(0.03, 0.02, 0.03))
+			for side: float in [-1.0, 1.0]:
+				Ps1.part(self, Ps1.ball(), hole, Vector3(0.02 + 0.04 * side, 0.34, 0.115), Vector3(0.028, 0.032, 0.016))
+			Ps1.part(self, Ps1.box(), old, Vector3(0.02, 0.265, 0.07), Vector3(0.09, 0.04, 0.07))
+		Kind.RING:
+			# A ring of small toadstools, red caps and brown turn about, come up out of a ring of
+			# darker grass, with room in the middle of it to stand
+			var grass := TorusMesh.new()
+			grass.inner_radius = 0.26
+			grass.outer_radius = 0.44
+			grass.rings = 12
+			grass.ring_segments = 4
+			Ps1.part(self, grass, Ps1.mat(Color(0.12, 0.26, 0.1)), Vector3(0, 0.004, 0), Vector3(1, 0.06, 1))
+			var stalk := Ps1.mat(Color(0.88, 0.84, 0.74))
+			for i in 9:
+				var around := TAU * i / 9.0 + rng.randf_range(-0.12, 0.12)
+				var tall := rng.randf_range(0.08, 0.17)
+				var out := Vector3(sin(around), 0, cos(around)) * rng.randf_range(0.32, 0.38)
+				Ps1.part(self, Ps1.drum(5), stalk, out + Vector3(0, tall * 0.5, 0), Vector3(0.022, tall, 0.022))
+				Ps1.part(self, Ps1.ball(), Ps1.mat(Color(0.74, 0.14, 0.18) if i % 3 != 0 else Color(0.6, 0.4, 0.2)), out + Vector3(0, tall, 0), Vector3(0.07, 0.04, 0.07))
+				if i % 3 != 0:
+					Ps1.part(self, Ps1.ball(), stalk, out + Vector3(0.02, tall + 0.032, 0.01), Vector3(0.018, 0.01, 0.018))
+		Kind.TRUNK:
+			# A cabin trunk left unclaimed upstairs: brown leather over wood, a domed lid, two
+			# straps round it, brass at its corners and its lock, and a label still pasted on it
+			var hide := Ps1.mat(Color(0.36, 0.2, 0.1))
+			var strap := Ps1.mat(Color(0.16, 0.1, 0.06))
+			var brass := Ps1.mat(Color(0.7, 0.54, 0.18), 0.05, 0.3)
+			Ps1.part(self, Ps1.box(), hide, Vector3(0, 0.17, 0), Vector3(0.66, 0.3, 0.38))
+			Ps1.part(self, Ps1.drum(10), hide, Vector3(0, 0.32, 0), Vector3(0.19, 0.66, 0.19), Vector3(0, 0, PI * 0.5))
+			for side: float in [-1.0, 1.0]:
+				Ps1.part(self, Ps1.box(), strap, Vector3(0.17 * side, 0.17, 0), Vector3(0.055, 0.31, 0.39))
+				Ps1.part(self, Ps1.drum(10), strap, Vector3(0.17 * side, 0.32, 0), Vector3(0.196, 0.055, 0.196), Vector3(0, 0, PI * 0.5))
+				Ps1.part(self, Ps1.box(), Ps1.mat(Color(0.22, 0.13, 0.07)), Vector3(0.34 * side, 0.26, 0), Vector3(0.03, 0.04, 0.14))
+				for z: float in [-1.0, 1.0]:
+					Ps1.part(self, Ps1.box(), brass, Vector3(0.315 * side, 0.05, 0.175 * z), Vector3(0.05, 0.07, 0.05))
+			Ps1.part(self, Ps1.box(), brass, Vector3(0, 0.29, 0.194), Vector3(0.07, 0.08, 0.012))
+			Ps1.part(self, Ps1.box(), Ps1.mat(Color(0.82, 0.76, 0.58)), Vector3(-0.05, 0.14, 0.192), Vector3(0.13, 0.085, 0.006), Vector3(0, 0, 0.12))
+			Ps1.part(self, Ps1.box(), Ps1.flat(Color(0.5, 0.12, 0.1)), Vector3(-0.05, 0.155, 0.196), Vector3(0.1, 0.014, 0.004), Vector3(0, 0, 0.12))
+		Kind.PERCH:
+			# A stand for those that fly to sit on: a post on a round foot, a bar across the top of
+			# it, a shorter one lower down, and a tin cup at one end
+			var wood := Ps1.mat(Color(0.4, 0.27, 0.14))
+			var dark := Ps1.mat(Color(0.26, 0.17, 0.09))
+			Ps1.part(self, Ps1.drum(8, 0.8), dark, Vector3(0, 0.03, 0), Vector3(0.2, 0.06, 0.2))
+			Ps1.part(self, Ps1.drum(6), wood, Vector3(0, 0.38, 0), Vector3(0.03, 0.7, 0.03))
+			Ps1.part(self, Ps1.drum(6), dark, Vector3(0, 0.73, 0), Vector3(0.03, 0.56, 0.03), Vector3(0, 0, PI * 0.5))
+			Ps1.part(self, Ps1.drum(6), dark, Vector3(0.08, 0.42, 0), Vector3(0.024, 0.3, 0.024), Vector3(0, 0, PI * 0.5))
+			for side: float in [-1.0, 1.0]:
+				Ps1.part(self, Ps1.ball(), wood, Vector3(0.28 * side, 0.73, 0), Vector3.ONE * 0.04)
+			Ps1.part(self, Ps1.drum(7, 0.8), Ps1.mat(Color(0.5, 0.54, 0.56), 0.0, 0.3), Vector3(-0.22, 0.78, 0.05), Vector3(0.05, 0.06, 0.05), Vector3(PI, 0, 0))
+		Kind.LEAVES:
+			# A heap of dead leaves raked together, brown, rust and yellow, with a few of them
+			# lying loose round it: deep enough to get into
+			var browns: Array[Color] = [Color(0.56, 0.3, 0.1), Color(0.44, 0.18, 0.08), Color(0.72, 0.52, 0.14), Color(0.34, 0.2, 0.1)]
+			var lump := Ps1.ball()
+			lump.radial_segments = 7
+			lump.rings = 3
+			Ps1.part(self, lump, Ps1.mat(browns[0]), Vector3(0, 0.1, 0), Vector3(0.4, 0.2, 0.36))
+			Ps1.part(self, lump, Ps1.mat(browns[1]), Vector3(0.14, 0.12, 0.1), Vector3(0.26, 0.16, 0.24), Vector3(0, 0.8, 0))
+			Ps1.part(self, lump, Ps1.mat(browns[2]), Vector3(-0.16, 0.1, 0.12), Vector3(0.22, 0.13, 0.2), Vector3(0, 2.0, 0))
+			Ps1.part(self, lump, Ps1.mat(browns[3]), Vector3(-0.06, 0.13, -0.16), Vector3(0.26, 0.15, 0.2), Vector3(0, 1.2, 0))
+			var bright: Array[Color] = [Color(0.88, 0.66, 0.14), Color(0.72, 0.2, 0.08), Color(0.42, 0.25, 0.1), Color(0.84, 0.44, 0.1)]
+			Ps1.part(self, Ps1.drum(4), Ps1.mat(Color(0.22, 0.15, 0.09)), Vector3(0.2, 0.2, -0.05), Vector3(0.012, 0.34, 0.012), Vector3(0.3, 0, -0.9))
+			for i in 24:
+				var around := rng.randf() * TAU
+				var out := rng.randf_range(0.05, 0.5)
+				var high := 0.2 * sqrt(maxf(1.0 - out * out / 0.16, 0.0)) + 0.02
+				Ps1.part(self, Ps1.ball(), Ps1.mat(bright[i % 4]), Vector3(sin(around) * out, high, cos(around) * out), Vector3(0.11, 0.012, 0.065), Vector3(rng.randf_range(-0.5, 0.5), rng.randf() * TAU, rng.randf_range(-0.5, 0.5)))
 
 
 # The pool as it lies in the room: water over one part of the floor, from the walls to a

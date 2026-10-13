@@ -981,7 +981,7 @@ func _new_things() -> void:
 			var yuck: int = others[rng.randi() % others.size()]
 			var toy: int = Cryptlin.TOY_LIKES[k][rng.randi() % 2]
 			var was := Cryptlin.profile(k, s, 0)
-			var now := Cryptlin.profile(k, s, Cryptlin.TASTES)
+			var now := Cryptlin.profile(k, s, 1)
 			kept = kept and was["food"] == food and was["yuck"] == yuck and was["toy"] == toy and food < 6 and yuck < 6 and toy < 4
 			for what: String in ["nature", "nature2", "size", "decor", "hates", "ground", "lamp"]:
 				alike = alike and was[what] == now[what]
@@ -1221,6 +1221,243 @@ func _new_things() -> void:
 		main.clear_mess(m)
 	main._sync()
 	pet.ball_cooldown = 0.0
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
+# The things for the room and the grounds that came later (signal lamp, pile of bones, toadstool
+# ring, luggage trunk, perch and heap of leaves; snow, mud, straw and carpet): they are listed and
+# on the wheel; a cryptlin from before them (of either of the two earlier makings) likes, loathes
+# and wants under it exactly what it always did, while one made since may take to them; each
+# thing can be stood in the room, and the ones that are for more than looking at are made use
+# of; each ground can be laid, takes prints and digging as it should; and inside a host page
+# they are there only while the page's stock has them
+func _new_room_things() -> void:
+	var pet := main.who().pet
+	await _until(func() -> bool: return _settled(pet), 600)
+	var things: Array[String] = ["lantern", "bonepile", "ring", "trunk", "perch", "leaves"]
+	var floors: Array[String] = ["snow", "mud", "straw", "carpet"]
+	var listed := Decor.IDS.size() == 23 and Decor.NAMES.size() == 23 and Decor.PLAIN.size() == 23 and Decor.RADII.size() == 23 and Den.GROUNDS.size() == 11 and Den.GROUND_PLAIN.size() == 11 and Den.GROUND_TINTS.size() == 11
+	for id: String in things + floors:
+		var item := Items.find(id)
+		var model := Items.model(id)
+		listed = listed and Items.id_of(item["group"], item["n"]) == id and not id in Items.FREE and not id in Items.PRIZES and not id in Items.KEPT and main.owns(id) and (main.shelf.ids.has(id) or main.in_room_now(id)) and model.get_child_count() > 0
+		model.free()
+	for i in things.size():
+		listed = listed and Decor.IDS[Decor.Kind.LANTERN + i] == things[i] and Items.find(things[i])["n"] == Decor.Kind.LANTERN + i
+	for i in floors.size():
+		listed = listed and Items.find(floors[i])["n"] == 7 + i and Den.GROUND_PLAIN[7 + i] == floors[i]
+	check(listed and Decor.Kind.TROPHY == 16 and Decor.Kind.LANTERN == 17 and Items.find("gravel")["n"] == 6 and Items.find("pot")["n"] == 14, "six more things for the room and four more grounds are on the wheel, numbered after those there were")
+
+	# Tastes: what one from before likes, loathes and wants under it, worked out here as it was
+	# worked out then, is what it is given still, whichever of the two earlier makings it is of
+	var kept := true
+	var alike := true
+	var apart := true
+	var fond := {}
+	var cross := {}
+	var under := {}
+	for k in Cryptlin.KINDS.size():
+		for i in 80:
+			var s := 1 + i * 7 if i < 30 else Cryptlin.OLD_SEEDS + 1 + i * 7919
+			var rng := RandomNumberGenerator.new()
+			rng.seed = s * 7919 + k * 104729 + 17
+			for draw in 4:
+				rng.randi()
+			rng.randf_range(0.8, 1.3)
+			rng.randi()
+			var kin: Array = Cryptlin.DECOR_LIKES[k]
+			var liked: Array = [kin[rng.randi() % kin.size()]]
+			var rest: Array = []
+			for n in 9:
+				if n != liked[0]:
+					rest.append(n)
+			liked.append(rest.pop_at(rng.randi() % rest.size()))
+			var hates: int = rest[rng.randi() % rest.size()]
+			var ground: int = Cryptlin.GROUND_LIKES[k][rng.randi() % 2]
+			var lamp: int = Cryptlin.LAMP_LIKES[k] if rng.randf() < 0.65 else rng.randi() % 3
+			if Cryptlin.KINDS[k].get("dim", false):
+				lamp = Cryptlin.LAMP_LIKES[k]
+			if rng.randf() < 0.45:
+				var one := rng.randi_range(10, 15)
+				if one != 15:
+					liked.append(one)
+				elif not 6 in liked and hates != 6:
+					liked.append(6)
+			var first := Cryptlin.profile(k, s, 0)
+			var second := Cryptlin.profile(k, s, 1)
+			var now := Cryptlin.profile(k, s, Cryptlin.TASTES)
+			for was: Dictionary in [first, second]:
+				kept = kept and Array(was["decor"]) == liked and was["hates"] == hates and was["ground"] == ground and was["lamp"] == lamp and ground < 7 and hates < 9 and liked.all(func(thing: int) -> bool: return thing < 15)
+			for what: String in ["nature", "nature2", "size", "food", "yuck", "toy", "lamp"]:
+				alike = alike and second[what] == now[what]
+			var mine: Array = Array(now["decor"])
+			apart = apart and mine.slice(0, liked.size()) == liked and not now["hates"] in mine and (now["hates"] == hates or (now["hates"] >= Decor.Kind.LANTERN and not now["hates"] in Cryptlin.DECOR_MORE[k])) and (now["ground"] == ground or now["ground"] in Cryptlin.GROUND_MORE[k])
+			apart = apart and (k != Cryptlin.Kind.YETI or now["ground"] == 7) and (k != Cryptlin.Kind.MOLE or now["ground"] == 4)
+			for thing: int in mine:
+				if not fond.has(thing):
+					fond[thing] = {}
+				fond[thing][k] = true
+			for found: Array in [[cross, now["hates"]], [under, now["ground"]]]:
+				if not found[0].has(found[1]):
+					found[0][found[1]] = {}
+				found[0][found[1]][k] = true
+	check(kept, "one from before the new things and grounds likes, loathes and wants under it what it always did, whether it was made before the new foods and toys or after them")
+	check(alike, "and one made since is the same in its natures, its size, its food, its toy and its lamp")
+	var spread := apart and Cryptlin.DECOR_MORE.size() == Cryptlin.KINDS.size() and Cryptlin.GROUND_MORE.size() == Cryptlin.KINDS.size()
+	for thing in range(Decor.Kind.LANTERN, Decor.IDS.size()):
+		spread = spread and fond.get(thing, {}).size() >= 6 and cross.get(thing, {}).size() >= 5
+	for style in range(7, Den.GROUNDS.size()):
+		spread = spread and under.get(style, {}).size() >= 6
+	check(spread, "each new thing is liked by some kinds and loathed by some of the others, each new ground is some kinds' favourite, a yeti's is snow, and what one already liked it likes still")
+	# The one in the room, loaded as each of the three makings
+	var drawn := {}
+	for era: int in [0, 1, Cryptlin.TASTES]:
+		main.save_game()
+		main.queue_free()
+		await _frames(3)
+		var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(save))
+		for saved: Dictionary in data["residents"]:
+			if era == 0:
+				saved.erase("tastes")
+			else:
+				saved["tastes"] = era
+		var f := FileAccess.open(save, FileAccess.WRITE)
+		f.store_string(JSON.stringify(data))
+		f.close()
+		main = _start()
+		await _frames(5)
+		pet = main.who().pet
+		drawn = Cryptlin.profile(pet.kind, pet.look_seed, era)
+		var same: bool = pet.me.tastes == era and pet.like_decor.slice(0, drawn["decor"].size()) == drawn["decor"] and pet.hate_decor == drawn["hates"] and pet.fav_ground == drawn["ground"]
+		if era < 2:
+			check(same and pet.fav_ground < 7 and pet.hate_decor < Decor.Kind.LANTERN and not pet.like_decor.any(func(thing: int) -> bool: return thing >= Decor.Kind.LANTERN), "loaded from a save of making %d, it likes, loathes and wants under it what it did (the %s, not the %s, on %s)" % [era, Decor.PLAIN[pet.like_decor[0]], Decor.PLAIN[pet.hate_decor], Den.GROUND_PLAIN[pet.fav_ground]])
+		else:
+			check(same, "(and is put back as one made now)")
+
+	# Each thing stood in the room, and put away again
+	var needs := pet.get_needs()
+	var loathed := pet.hate_decor
+	var ground := main.floor_style
+	pet.hate_decor = Decor.Kind.DISH
+	var stood := true
+	for i in things.size():
+		var thing := main.place_decor(Decor.Kind.LANTERN + i, Vector3(-1.0, 0, -0.6))
+		stood = stood and thing != null and main.decor_of(Decor.Kind.LANTERN + i) == thing and thing.get_child_count() > 3 and not thing.hollow and not main.shelf.ids.has(things[i]) and is_equal_approx(thing.radius, Decor.RADII[Decor.Kind.LANTERN + i])
+		if i == 0:
+			var lights := thing.find_children("*", "OmniLight3D", false, false)
+			check(lights.size() == 1 and (lights[0] as OmniLight3D).light_energy > 0.0 and (lights[0] as OmniLight3D).light_color.r > (lights[0] as OmniLight3D).light_color.b * 2.0, "the signal lamp is alight, and throws a little red light of its own")
+		main.remove_decor(thing)
+		stood = stood and main.decor_of(Decor.Kind.LANTERN + i) == null and main.shelf.ids.has(things[i])
+	check(stood, "each of the six can be stood in the room, is off the wheel while it is, and goes back on it")
+
+	# The ones that are for more than looking at
+	var go_to := func(thing: Decor) -> bool:
+		pet.set_needs({"belly": 80.0, "fun": 50.0, "energy": 90.0, "bowel": 0.0, "bladder": 0.0})
+		pet.position = Vector3(0.8, 0, 0.8)
+		pet._enter(Cryptlin.State.VISIT)
+		pet.visiting = thing
+		return await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.step >= 1, 600)
+	var bones := main.place_decor(Decor.Kind.BONEPILE, Vector3(-1.0, 0, -0.6))
+	var there: bool = await go_to.call(bones)
+	await _frames(40)
+	check(there and pet.state == Cryptlin.State.VISIT and pet.mouth_goal >= 0.3 and pet.nod >= 0.3 and pet.position.distance_to(bones.position) < bones.radius + 0.6 * pet.grow + 0.3, "it goes to the pile of bones and gnaws at one")
+	main.remove_decor(bones)
+	var ring := main.place_decor(Decor.Kind.RING, Vector3(-1.0, 0, -0.6))
+	there = await go_to.call(ring)
+	var fun := pet.fun
+	await _frames(60)
+	check(there and pet.state == Cryptlin.State.VISIT and Vector2(pet.position.x - ring.position.x, pet.position.z - ring.position.z).length() < 0.2 and pet.arm_goal == Cryptlin.UP_ARM and pet.fun > fun, "it steps into the toadstool ring and dances in the middle of it")
+	main.remove_decor(ring)
+	var heap := main.place_decor(Decor.Kind.LEAVES, Vector3(-1.0, 0, -0.6))
+	there = await go_to.call(heap)
+	await _frames(60)
+	check(there and pet.state == Cryptlin.State.VISIT and Vector2(pet.position.x - heap.position.x, pet.position.z - heap.position.z).length() < 0.2 and pet.dive > 0.2 * pet.grow, "it burrows down into the heap of leaves")
+	check(await _until(func() -> bool: return pet.state != Cryptlin.State.VISIT, 600) and pet.dive == 0.0, "and comes up out of it again")
+	there = await go_to.call(heap)
+	await _frames(60)
+	pet._enter(Cryptlin.State.IDLE, 2.0)
+	await _frames(2)
+	check(there and pet.dive == 0.0, "called away from it, it is up out of the leaves at once")
+	main.remove_decor(heap)
+	var flier: bool = pet.likes.has("fly") or pet.kind == Cryptlin.Kind.MOTHMAN
+	var perch := main.place_decor(Decor.Kind.PERCH, Vector3(-1.0, 0, -0.6))
+	var trunk := main.place_decor(Decor.Kind.TRUNK, Vector3(1.2, 0, -0.9))
+	check((pet._roost(perch) > 0.0) == flier and (pet._roost(trunk) > 0.0) == pet.likes.has("fly") and Cryptlin.ROOSTS[Decor.Kind.PERCH] > Cryptlin.ROOSTS[Decor.Kind.TRUNK], "the perch is for those that fly (and the mothman), and the trunk is one more thing for them to sit on top of: %s" % ("this one does" if flier else "not this one"))
+	there = await go_to.call(perch)
+	await _frames(90)
+	if flier:
+		check(there and pet.state == Cryptlin.State.VISIT and pet.lift > Cryptlin.ROOSTS[Decor.Kind.PERCH] * 0.8 and Vector2(pet.position.x - perch.position.x, pet.position.z - perch.position.z).length() < 0.15, "it goes up and sits on the perch")
+	else:
+		check(there and pet.state == Cryptlin.State.VISIT and pet.lift < 0.05, "it has a sniff at the perch and stays on the floor")
+	pet._enter(Cryptlin.State.IDLE, 2.0)
+	main.remove_decor(perch)
+	main.remove_decor(trunk)
+
+	# The grounds: each can be laid; a foot sinks into snow and mud, marks straw as it does a
+	# hard floor and carpet not at all; and all but carpet are loose enough for anybody to dig
+	var laid := true
+	var prints := true
+	var digs := {}
+	var digger := float(pet.likes.get("dig", 1.0)) > 1.0
+	for style in range(7, Den.GROUNDS.size()):
+		main.set_ground(style)
+		laid = laid and main.floor_style == style and main.floor_mat.get_shader_parameter("style") == style and not main.shelf.ids.has(floors[style - 7]) and main.shelf.ids.has("dirt") and main.tracks.is_empty()
+		main.leave_print("sasquatch", Vector3(0.2, 0, 0.6), 0.0, 1.0, 1.0)
+		if style == 10:
+			prints = prints and main.tracks.is_empty()
+			main.leave_print("frost", Vector3(0.2, 0, 0.6), 0.0, 1.0, 1.0)
+			prints = prints and main.tracks.size() == 1
+		else:
+			var soft := style in Den.SOFT_GROUNDS
+			prints = prints and main.tracks.size() == 1 and main.tracks[0].lasts == (Track.LASTS_SOFT if soft else Track.LASTS_HARD) and soft == (style != 9)
+		digs[style] = 0
+		for i in 240:
+			pet.belly = 90.0
+			pet.fun = 90.0
+			pet.energy = 90.0
+			pet.beg_cooldown = 99.0
+			pet._enter(Cryptlin.State.IDLE, 1.0)
+			pet._decide()
+			if pet.state == Cryptlin.State.DIG:
+				digs[style] += 1
+		pet._enter(Cryptlin.State.IDLE, 1.0)
+		if style == 8:
+			var heap_of := main.leave_mess(Mess.Kind.HEAP, Vector3(0.5, 0, 0.5), pet)
+			laid = laid and heap_of.tint.is_equal_approx(Den.GROUND_TINTS[8])
+			main.clear_mess(heap_of)
+	check(laid, "each of the four grounds can be laid, and is off the wheel while it is the floor")
+	check(prints, "a foot sinks into snow and mud, marks straw no more than a hard floor, and leaves nothing on carpet (though frost lies on it)")
+	check(digs[7] > 0 and digs[8] > 0 and digs[9] > 0 and (digs[10] > 0) == digger, "snow, mud and straw are loose enough to dig in, and carpet is not, but for a born digger (%d, %d, %d and %d times in 240)" % [digs[7], digs[8], digs[9], digs[10]])
+	main.set_ground(ground)
+	pet.beg_cooldown = 0.0
+
+	# Inside a host page they are there only while the page's stock has them, kept and not counted
+	main.set_ground(4)
+	main.embedded = true
+	main.stock = {}
+	main._sync()
+	var said: Array = []
+	var hear := func(message: Dictionary) -> void: said.append(message)
+	main.told.connect(hear)
+	var none := true
+	for id: String in things + floors:
+		none = none and not main.owns(id) and not main.shelf.ids.has(id)
+	main.use("lantern")
+	main.use("snow")
+	check(none and main.decor_of(Decor.Kind.LANTERN) == null and main.floor_style == 4, "inside a host page with none in stock there are none on the wheel, and none to be had")
+	main.stock = {"lantern": -1, "snow": -1}
+	main._sync()
+	check(main.owns("lantern") and main.owns("snow") and main.shelf.ids.has("lantern") and main.shelf.ids.has("snow") and not main.shelf.counts.has("lantern") and not main.shelf.counts.has("snow") and not main.owns("trunk") and not main.owns("mud"), "those the page has in stock are on it, with no number on them")
+	main.use("lantern")
+	main.use("snow")
+	check(main.decor_of(Decor.Kind.LANTERN) != null and main.floor_style == 7 and main.stock.get("lantern") == -1 and main.stock.get("snow") == -1 and said.is_empty(), "and can be stood and laid as often as wanted, with nothing used up and the page not told")
+	main.use("lantern")
+	main.embedded = false
+	main.stock = {}
+	main.set_ground(ground)
+	main._sync()
+	pet.hate_decor = loathed
+	pet.set_needs(needs)
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 
 
@@ -2506,6 +2743,7 @@ func _run() -> void:
 	await _in_and_out(pet)
 	await _toys()
 	await _new_things()
+	await _new_room_things()
 	pet = main.who().pet
 
 	# The notebook

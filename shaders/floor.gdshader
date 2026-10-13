@@ -1,6 +1,7 @@
 shader_type spatial;
 // The floor, laid out from world position so it needs no UVs or textures. `style` picks which:
-// 0 flagstones, 1 floorboards, 2 moss, 3 checkered tiles, 4 dirt, 5 sand, 6 gravel.
+// 0 flagstones, 1 floorboards, 2 moss, 3 checkered tiles, 4 dirt, 5 sand, 6 gravel, 7 snow, 8 mud,
+// 9 straw, 10 carpet.
 // Where the pool lies there is no floor: the water (water.gdshader) is a little below it.
 
 #include "res://shaders/shore.gdshaderinc"
@@ -115,6 +116,56 @@ vec3 gravel(vec2 at) {
 	return mix(stone, vec3(0.05, 0.05, 0.06), smoothstep(0.3, 0.52, best));
 }
 
+vec3 snow(vec2 at) {
+	// Drifts of it, blue in the hollows, with a crust that glints and the dark floor showing
+	// through where it has been trodden away
+	float drift = noise(at * 1.3) * 0.6 + noise(at * 4.0) * 0.4;
+	vec3 white = mix(vec3(0.44, 0.52, 0.66), vec3(0.74, 0.78, 0.82), drift) * (0.92 + 0.12 * noise(at * 26.0));
+	float glint = step(0.955, hash(floor(at * 18.0)));
+	float bare = smoothstep(0.76, 0.82, noise(at * 0.8 + 11.0));
+	return mix(white + glint * 0.14, vec3(0.15, 0.14, 0.17), bare * 0.85);
+}
+
+vec3 mud(vec2 at) {
+	// Dark and wet, churned into ruts, with grey water standing in the hollows
+	float lump = noise(at * 1.7) * 0.6 + noise(at * 5.0) * 0.4;
+	vec3 wet = mix(vec3(0.09, 0.06, 0.035), vec3(0.24, 0.155, 0.085), lump);
+	float rut = smoothstep(0.35, 0.6, abs(sin(at.x * 3.2 + noise(at * 0.8) * 4.0)));
+	wet *= 0.72 + 0.4 * rut;
+	float hollow = noise(at * 1.1 + 5.0);
+	float standing = smoothstep(0.6, 0.65, hollow);
+	float rim = smoothstep(0.54, 0.6, hollow) * (1.0 - standing);
+	wet += rim * vec3(0.1, 0.085, 0.06);
+	return mix(wet, vec3(0.1, 0.14, 0.19) * (0.8 + 0.5 * noise(at * 3.0)), standing);
+}
+
+vec3 straw(vec2 at) {
+	// Stalks lying every way, three layers of them over the dark of the floor
+	float stalks = 0.0;
+	for (int layer = 0; layer < 3; layer++) {
+		float turn = 0.5 + float(layer) * 1.05;
+		vec2 p = vec2(at.x * cos(turn) - at.y * sin(turn), at.x * sin(turn) + at.y * cos(turn));
+		float streak = noise(vec2(p.x * 20.0, p.y * 1.5 + float(layer) * 7.0));
+		stalks = max(stalks, smoothstep(0.5, 0.7, streak) * (0.65 + 0.175 * float(layer)));
+	}
+	vec3 gold = mix(vec3(0.26, 0.18, 0.06), vec3(0.8, 0.64, 0.24), stalks);
+	return gold * (0.75 + 0.35 * noise(at * 2.0));
+}
+
+vec3 carpet(vec2 at) {
+	// The waiting room's old carpet: red, with a gold and blue figure in a lattice, its weave
+	// showing and worn through to the backing in patches
+	vec2 f = fract(at * 1.5 + 0.5) - 0.5;
+	float figure = abs(f.x) + abs(f.y);
+	vec3 pile = vec3(0.5, 0.06, 0.08);
+	pile = mix(pile, vec3(0.66, 0.5, 0.16), step(figure, 0.31) * step(0.2, figure));
+	pile = mix(pile, vec3(0.1, 0.14, 0.34), step(figure, 0.11));
+	pile = mix(pile, vec3(0.24, 0.035, 0.06), step(0.46, max(abs(f.x), abs(f.y))));
+	float weave = 0.86 + 0.14 * mod(floor(at.x * 18.0) + floor(at.y * 18.0), 2.0);
+	float worn = smoothstep(0.7, 0.82, noise(at * 0.9 + 7.3));
+	return mix(pile * weave, vec3(0.34, 0.28, 0.2) * (0.75 + 0.35 * noise(at * 20.0)), worn * 0.85);
+}
+
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
@@ -138,6 +189,14 @@ void fragment() {
 		ALBEDO = sand(at);
 	} else if (style == 6) {
 		ALBEDO = gravel(at);
+	} else if (style == 7) {
+		ALBEDO = snow(at);
+	} else if (style == 8) {
+		ALBEDO = mud(at);
+	} else if (style == 9) {
+		ALBEDO = straw(at);
+	} else if (style == 10) {
+		ALBEDO = carpet(at);
 	} else {
 		ALBEDO = flagstones(at);
 	}

@@ -68,7 +68,7 @@ const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MO
 # What one that flies will perch on top of, and how high up that is (the rest only climb the rock)
 const ROOSTS := {
 	Decor.Kind.ROCK: 0.4, Decor.Kind.LOG: 0.4, Decor.Kind.GRAVESTONE: 0.52, Decor.Kind.CAVE: 1.42,
-	Decor.Kind.BARREL: 1.32, Decor.Kind.CRATE: 1.15,
+	Decor.Kind.BARREL: 1.32, Decor.Kind.CRATE: 1.15, Decor.Kind.TRUNK: 0.5, Decor.Kind.PERCH: 0.75,
 }
 # What a flier is doing when it might take off (see _flit)
 const FLITS: Array[int] = [State.WANDER, State.COME, State.ZOOMIES, State.TAG, State.FLEE, State.FOLLOW, State.CHASE_LIGHT]
@@ -166,8 +166,10 @@ const BOLD := 5
 const ROSETTE_AT := {Kind.BOLTER: [Vector3(0.15, 0.6, 0.02), -1.25]}
 # The foods and toys that came later, and which of them each kind leans towards as well. Only a
 # cryptlin made since there were such things draws on them (Resident.tastes, and see profile()):
-# one from an older save keeps the tastes it has always had.
-const TASTES := 1
+# one from an older save keeps the tastes it has always had. The mark on a resident is how much
+# there was when it was made: 0 for none of it, 1 for those foods and toys, and 2 for the things
+# for the room and the grounds that came later still (DECOR_MORE and GROUND_MORE, below).
+const TASTES := 2
 const FOOD_MORE: Array[Array] = [
 	[Snack.Kind.SAUSAGE, Snack.Kind.CHEESE], [Snack.Kind.TURNIP], [Snack.Kind.WORM],
 	[Snack.Kind.CHEESE], [Snack.Kind.SAUSAGE], [Snack.Kind.WORM],
@@ -227,6 +229,36 @@ const GROUND_LIKES: Array[Array] = [
 	[5, 2],
 	[5, 6],
 	[5, 6],
+]
+# The things for the room and the grounds that came later (the signal lamp, the pile of bones, the
+# toadstool ring, the trunk, the perch and the heap of leaves; snow, mud, straw and carpet), and
+# which of them each kind leans towards. Any of those six that its kind does not lean towards may
+# be the one thing a cryptlin cannot stand. The mole person and the death worm want no ground but
+# the one they have always wanted.
+const DECOR_MORE: Array[Array] = [
+	[Decor.Kind.LANTERN, Decor.Kind.TRUNK], [Decor.Kind.RING, Decor.Kind.LEAVES], [Decor.Kind.TRUNK, Decor.Kind.PERCH],
+	[Decor.Kind.LANTERN, Decor.Kind.PERCH], [Decor.Kind.BONEPILE], [Decor.Kind.RING, Decor.Kind.LEAVES],
+	[Decor.Kind.TRUNK], [Decor.Kind.BONEPILE], [Decor.Kind.BONEPILE],
+	[Decor.Kind.RING, Decor.Kind.LEAVES], [Decor.Kind.RING], [Decor.Kind.BONEPILE],
+	[Decor.Kind.LANTERN, Decor.Kind.RING], [Decor.Kind.LANTERN, Decor.Kind.RING], [Decor.Kind.RING, Decor.Kind.LEAVES],
+	[Decor.Kind.RING, Decor.Kind.LEAVES], [Decor.Kind.LANTERN, Decor.Kind.TRUNK], [Decor.Kind.LEAVES],
+	[Decor.Kind.BONEPILE, Decor.Kind.TRUNK], [Decor.Kind.TRUNK, Decor.Kind.LEAVES],
+	[Decor.Kind.LANTERN, Decor.Kind.TRUNK], [Decor.Kind.TRUNK, Decor.Kind.PERCH], [Decor.Kind.PERCH, Decor.Kind.LEAVES],
+	[Decor.Kind.LANTERN, Decor.Kind.TRUNK], [Decor.Kind.BONEPILE, Decor.Kind.PERCH], [Decor.Kind.BONEPILE, Decor.Kind.LEAVES],
+	[Decor.Kind.BONEPILE, Decor.Kind.LEAVES],
+	[Decor.Kind.LANTERN, Decor.Kind.LEAVES],
+	[Decor.Kind.BONEPILE, Decor.Kind.PERCH],
+	[Decor.Kind.LANTERN],
+]
+const GROUND_MORE: Array[Array] = [
+	[9, 10], [7, 8], [9], [10], [9], [8], [8], [7], [7],
+	[8], [8], [8], [9, 10], [10, 7], [9], [7], [10], [7], [9], [],
+	[10, 7], [9], [8],
+	[10], [9], [],
+	[9, 8],
+	[7],
+	[9],
+	[10],
 ]
 const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2, 1, 1, 0, 2, 1, 1, 2, 1, 1, 2, 1]
 # It lives in real time, like a pet: these are hours of the clock on the wall, and they pass
@@ -813,6 +845,24 @@ static func profile(k: int, s: int, era := TASTES) -> Dictionary:
 		me["food"] = foods[rng.randi() % foods.size()]
 		me["yuck"] = others[rng.randi() % others.size()]
 		me["toy"] = toys[rng.randi() % toys.size()]
+	# And last of all the things for the room and the grounds that came after those: one made
+	# since may well like one of the things its kind leans towards as well as what it likes
+	# already, may have one of the others as the thing it cannot stand in place of the one it
+	# drew, and half the time is happiest on one of the grounds its kind has taken to (a yeti
+	# always: snow)
+	if era >= 2:
+		var more: Array = DECOR_MORE[k]
+		if rng.randf() < 0.6:
+			liked.append(more[rng.randi() % more.size()])
+		if rng.randf() < 0.3:
+			var spare: Array[int] = []
+			for i in range(Decor.Kind.LANTERN, Decor.Kind.LEAVES + 1):
+				if not i in more:
+					spare.append(i)
+			me["hates"] = spare[rng.randi() % spare.size()]
+		var soil: Array = GROUND_MORE[k]
+		if not soil.is_empty() and (rng.randf() < 0.5 or k == Kind.YETI):
+			me["ground"] = soil[rng.randi() % soil.size()]
 	return me
 
 
@@ -4124,6 +4174,9 @@ func _enter(s: int, length := 0.0) -> void:
 	# Whatever its knack, or a spell on it, had changed about it is put back
 	if state in [State.TRICK, State.SPELL]:
 		knack.over()
+	# (and one that was down in the heap of leaves is up out of it)
+	if state == State.VISIT:
+		dive = 0.0
 	waiting = false
 	if state == State.PETTED and s != State.PETTED:
 		world.sfx.purr(false)
@@ -4339,6 +4392,9 @@ func _flit(delta: float) -> void:
 
 # How high up one that flies would perch on a thing in the room (0: it would not, or cannot)
 func _roost(thing: Decor) -> float:
+	# (the mothman, which flies only at its knack, will go up onto the perch all the same)
+	if kind == Kind.MOTHMAN and thing.kind == Decor.Kind.PERCH:
+		return ROOSTS[Decor.Kind.PERCH]
 	return float(ROOSTS.get(thing.kind, 0.0)) if likes.has("fly") else 0.0
 
 
@@ -4371,8 +4427,9 @@ func _decide() -> void:
 	options[State.GAZE] = 4.0 * float(likes["stare"])
 	# Most dig only where the floor is loose; a born digger has a go at anything
 	var digger := float(likes.get("dig", 1.0))
-	if (world.floor_style >= 4 or digger > 1.0) and energy > 30.0:
-		options[State.DIG] = 6.0 * digger * (1.0 if world.floor_style >= 4 else 0.5) * (1.5 if _is(1) or _is(7) else 1.0) * (1.4 if world.floor_style == fav_ground else 1.0)
+	var loose := world.floor_style in Den.LOOSE_GROUNDS
+	if (loose or digger > 1.0) and energy > 30.0:
+		options[State.DIG] = 6.0 * digger * (1.0 if loose else 0.5) * (1.5 if _is(1) or _is(7) else 1.0) * (1.4 if world.floor_style == fav_ground else 1.0)
 	if tail.get_child_count() > 0 and energy > 40.0:
 		options[State.SPIN] = 3.0 * float(likes["zoom"])
 	if knack.ready():
@@ -4639,6 +4696,46 @@ func _think(delta: float) -> void:
 						sit_goal = 1.0
 						gaze = world.camera.global_position
 						_face(gaze, delta)
+					Decor.Kind.BONEPILE:
+						# Gets its teeth into one of the bones and gnaws at it
+						_face(at, delta)
+						nod = 0.4 + sin(state_time * 9.0) * 0.1
+						mouth_goal = 0.3 + 0.5 * absf(sin(state_time * 9.0))
+						wag = 8.0
+						if int(state_time / 0.6) + 1 > step:
+							step = int(state_time / 0.6) + 1
+							_cry("chomp", 0.8, -10.0)
+					Decor.Kind.RING:
+						# Steps into the middle of the ring and dances there
+						var up := 1.0 - exp(-delta * 5.0)
+						position.x = lerpf(position.x, at.x, up)
+						position.z = lerpf(position.z, at.z, up)
+						wiggle = sin(anim_t * 7.0) * 0.18
+						yaw += delta * 2.2
+						arm_goal = UP_ARM
+						wag = 10.0
+						fun = minf(fun + delta * 0.8, 100.0)
+						if not airborne:
+							hop(1.7)
+					Decor.Kind.LEAVES:
+						# Burrows into the heap until only the top of it shows, with the leaves
+						# flying, and comes up out of it with a bound
+						var up := 1.0 - exp(-delta * 5.0)
+						position.x = lerpf(position.x, at.x, up)
+						position.z = lerpf(position.z, at.z, up)
+						dive = lerpf(dive, 0.32 * grow, up)
+						wiggle = sin(anim_t * 12.0) * 0.1
+						eye_goal = 1.2
+						gaze = world.camera.global_position
+						_face(gaze, delta)
+						fun = minf(fun + delta * 0.8, 100.0)
+						if int(state_time / 0.7) + 1 > step:
+							step = int(state_time / 0.7) + 1
+							world.crumbs(at + Vector3(0, 0.25, 0), Color(0.6, 0.34, 0.1))
+							world.sfx.play("sweep", 1.3, -12.0)
+						if state_time > state_len:
+							dive = 0.0
+							hop(2.6)
 					_ when visiting.hollow:
 						# Sits inside, looking out
 						sit_goal = 1.0

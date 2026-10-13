@@ -11,6 +11,7 @@ extends SceneTree
 ## other one is of kind K, to see two kinds side by side).
 ## With --wheel: the wheel of things at both of its stops and part of the way round.
 ## With --toys: the foods and toys that came later, on the wheel and on the floor, and each of those toys being played with.
+## With --room: the things for the room and the grounds that came later: the six things under each lamp, each of the four grounds, and the one in the room making use of the things.
 ## With --walk [--baby]: the kind walking across the room, four moments of it, and going away up it, three (with the squatchling's look back over its shoulder).
 ## With --knack [--step=N] [--at=SECONDS] [--then=SECONDS]: the kind taking a turn at the one thing only it does, with another beside it: two moments of it side by side (so long after it gets to part N of it, and so long after that).
 ## With --pool (and no other of those): four in a room with the pool in it, in each place it fits and under each lamp.
@@ -54,6 +55,7 @@ var pool := false
 var knack := false
 var tidy := false
 var toys := false
+var room := false
 var book := false
 var from_step := 1
 var first_wait := 0.8
@@ -90,6 +92,8 @@ func _initialize() -> void:
 			first_wait = float(arg.trim_prefix("--at="))
 		if arg.begins_with("--then="):
 			second_wait = float(arg.trim_prefix("--then="))
+		if arg == "--room":
+			room = true
 		if arg == "--toys":
 			toys = true
 		if arg == "--tidy":
@@ -164,6 +168,8 @@ func _initialize() -> void:
 	root.add_child(main)
 	if poses or strides:
 		_run_close.call_deferred()
+	elif room:
+		_run_room.call_deferred()
 	elif toys:
 		_run_toys.call_deferred()
 	elif tidy:
@@ -401,6 +407,62 @@ func _run_tidy() -> void:
 	await _wait(0.9)
 	await _snap("t10_broken")
 	await _close_up("t10_broken_close", Vector3(0, 0.2, 1.0))
+	quit()
+
+
+# The things for the room and the grounds that came later: the six things stood about the room
+# under the bright lamp, the low one and none (the signal lamp is alight), each of the four
+# grounds laid under them, some of them on the wheel, and the one in the room at the pile of
+# bones, in the toadstool ring, in the heap of leaves and (if it flies) up on the perch
+func _run_room() -> void:
+	await _wait(1.0)
+	var pet := main.who().pet
+	var rest := func() -> void:
+		pet.set_needs({"belly": 90.0, "fun": 60.0, "energy": 95.0, "love": 55.0, "age": Cryptlin.GROW_AGE, "bowel": 0.0, "bladder": 0.0})
+		pet.beg_cooldown = 9999.0
+		pet.position = Vector3(Den.half.x * 0.36, 0, 0.0)
+		pet._enter(Cryptlin.State.STARE)
+	rest.call()
+	var wide := Den.half.x - 0.75
+	var things: Array[Decor] = []
+	for i in 6:
+		things.append(main.place_decor(Decor.Kind.LANTERN + i, Vector3(lerpf(-wide, wide, (i % 3) / 2.0), 0, -0.9 if i < 3 else 1.0)))
+	rest.call()
+	main.shelf.show_item("flagstones")
+	await _wait(1.0)
+	await _snap("r1_things")
+	await _close_up("r1_things_back", Vector3(0, 0.3, -0.9), Vector2i(700, 220), 2)
+	await _close_up("r1_things_front", Vector3(0, 0.3, 1.0), Vector2i(900, 260), 2)
+	for mode: int in [Den.Lamp.LOW, Den.Lamp.OFF]:
+		main.set_lamp(mode)
+		rest.call()
+		await _wait(1.2)
+		await _snap("r2_lamp_%s" % ("low" if mode == Den.Lamp.LOW else "out"))
+	main.set_lamp(Den.Lamp.BRIGHT)
+	for style in range(7, Den.GROUNDS.size()):
+		main.set_ground(style)
+		rest.call()
+		await _wait(0.8)
+		await _snap("r3_ground_%s" % Den.GROUND_PLAIN[style])
+	for id: String in ["trunk", "snow"]:
+		main.shelf.show_item(id)
+		rest.call()
+		await _wait(1.0)
+		await _snap("r4_wheel_%s" % id)
+	main.set_ground(0)
+	# What it does at each of those that are for more than looking at
+	for which: int in [Decor.Kind.BONEPILE, Decor.Kind.RING, Decor.Kind.LEAVES, Decor.Kind.PERCH, Decor.Kind.TRUNK]:
+		var thing := main.decor_of(which)
+		if which in [Decor.Kind.PERCH, Decor.Kind.TRUNK] and pet._roost(thing) <= 0.0:
+			continue
+		rest.call()
+		pet.position = thing.position + Vector3(0.9 if thing.position.x < 0.0 else -0.9, 0, 0.1)
+		pet._enter(Cryptlin.State.VISIT)
+		pet.visiting = thing
+		await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.step >= 1, 8.0)
+		await _wait(1.6)
+		await _snap("r5_at_%s" % Decor.IDS[which])
+		await _close_up("r5_at_%s_close" % Decor.IDS[which], thing.position + Vector3(0, 0.3, 0))
 	quit()
 
 
