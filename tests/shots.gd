@@ -279,10 +279,7 @@ func _run_ui() -> void:
 	await _snap("u8_notes")
 	main.notebook.turn(1)
 	await _wait(0.2)
-	await _snap("u9_care")
-	main.notebook.open_at(main.notebook.chapters() - 1)
-	await _wait(0.2)
-	await _snap("u10_odds")
+	await _snap("u9_help")
 	main.notebook.close()
 	main.open_namer(main.who())
 	await _wait(0.3)
@@ -619,10 +616,7 @@ func _run_many() -> void:
 		await _snap("m6_page%d" % i)
 	main.notebook.open_at(main.notebook.everyone().size())
 	await _wait(0.3)
-	await _snap("m7_care")
-	main.notebook.open_at(main.notebook.chapters() - 1)
-	await _wait(0.3)
-	await _snap("m8_odds")
+	await _snap("m7_help")
 	quit()
 
 
