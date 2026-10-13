@@ -132,6 +132,8 @@ var sliding := false
 var held_thing: Node3D
 var held_snack: Snack
 var thing_new := false
+# Whether the food being held was picked up off the floor, not pulled new off the row
+var snack_lying := false
 # The cryptlin or the egg a finger came down on
 var held_pet: Cryptlin
 var held_egg: Egg
@@ -574,14 +576,20 @@ func comfort_of(who: Cryptlin) -> float:
 # Whether something is on the shelf: everything when the game is played by itself; inside a
 # site with a shop, what comes free and what has been bought
 func owns(id: String) -> bool:
-	return not embedded or id in Items.FREE or int(stock.get(id, 0)) != 0
+	return _has_all() or id in Items.FREE or int(stock.get(id, 0)) != 0
 
 
 # How many of a thing that gets used up are left, or -1 for no end of them
 func left_of(id: String) -> int:
-	if not embedded or id in Items.FREE:
+	if _has_all() or id in Items.FREE:
 		return -1
 	return int(stock.get(id, 0))
+
+
+# Everything without end: the game played by itself, or the test panel open (inside a page with
+# a shop, too: what is used while it is open is not taken from stock, nor the page told)
+func _has_all() -> bool:
+	return not embedded or (dev != null and dev.visible)
 
 
 func _spend(id: String) -> void:
@@ -1856,7 +1864,7 @@ func _input(event: InputEvent) -> void:
 			Grab.BALL:
 				hold_point = _floor_at(event.position, 0.75, 0.3)
 			Grab.SNACK:
-				hold_point = _floor_at(event.position, 0.9, 0.3)
+				hold_point = _held_at(event.position, 0.75)
 			Grab.PET:
 				if carrying:
 					hold_point = _floor_at(event.position, 0.0, 0.4) + Vector3(0, 0.8, 0)
@@ -1942,6 +1950,9 @@ func _press(e: InputEventScreenTouch) -> void:
 		grab = Grab.EGG if held_egg != null else Grab.PET
 		carrying = false
 		_sync()
+	elif _snack_at(e.position) != null:
+		held_snack = _snack_at(e.position)
+		_hold_snack(e.position, true)
 	else:
 		held_thing = _thing_at(e.position)
 		if held_thing != null:
@@ -1958,6 +1969,40 @@ func _hold_ball(at: Vector2) -> void:
 	hold_vel = Vector3.ZERO
 	hold_point = _floor_at(at, 0.75, 0.3)
 	_notice_ball()
+
+
+# A bit of food on the end of a finger: new off the row of things, or one that was lying in the
+# room (which is nobody's to eat while it is held)
+func _hold_snack(at: Vector2, lying: bool) -> void:
+	grab = Grab.SNACK
+	snack_lying = lying
+	snacks.erase(held_snack)
+	held_snack.hold()
+	hold_point = _held_at(at, 0.75)
+	if not lying:
+		held_snack.position = hold_point
+
+
+# Where a thing on the end of a finger hangs: under the finger, `height` off the floor where the
+# room allows. Against a wall it rides up it, and in front of the room it follows the finger out
+# over the row of things.
+func _held_at(at: Vector2, height: float) -> Vector3:
+	var from := camera.project_ray_origin(_in_view(at))
+	var dir := camera.project_ray_normal(_in_view(at))
+	var t := (height - from.y) / dir.y if dir.y < -0.001 else 60.0
+	if dir.z < -0.001:
+		t = minf(t, (-half.y + 0.3 - from.z) / dir.z)
+	if absf(dir.x) > 0.001:
+		t = minf(t, ((half.x - 0.3) * signf(dir.x) - from.x) / dir.x)
+	return from + dir * t
+
+
+# The bit of food lying in the room under a finger, or null
+func _snack_at(at: Vector2) -> Snack:
+	for s in snacks:
+		if s.landed and _ray_hits(at, s.position + Vector3(0, 0.08, 0), 0.34):
+			return s
+	return null
 
 
 # A finger that came down on the shelf: sideways slides it, upwards pulls the thing off it
@@ -1982,11 +2027,8 @@ func _pull(id: String, at: Vector2) -> void:
 			if pets().is_empty() or snacks.size() >= MAX_SNACKS:
 				return
 			held_snack = Snack.new(n)
-			held_snack.set_process(false)
 			add_child(held_snack)
-			hold_point = _floor_at(at, 0.9, 0.3)
-			held_snack.position = hold_point
-			grab = Grab.SNACK
+			_hold_snack(at, false)
 		"toy":
 			if pets().is_empty():
 				return
@@ -2062,11 +2104,21 @@ func _release() -> void:
 		Grab.SNACK:
 			if held_snack != null:
 				if shelf.has_point(last_at):
+					# Put away again. One taken up off the floor untouched goes back into what is
+					# left of its kind (the page the game is played in is not told).
+					var id := Items.id_of("food", held_snack.kind)
+					if snack_lying and held_snack.bites_left == Snack.BITES and left_of(id) >= 0:
+						stock[id] = left_of(id) + 1
+						_sync()
 					held_snack.queue_free()
 				else:
-					held_snack.set_process(true)
-					held_snack.drop(held_snack.position)
-					_serve(held_snack)
+					# Let go: it comes inside the walls and falls, and is anybody's
+					var from := in_room(held_snack.position, 0.3)
+					held_snack.drop(Vector3(from.x, maxf(from.y, 0.0), from.z))
+					if snack_lying:
+						snacks.append(held_snack)
+					else:
+						_serve(held_snack)
 				held_snack = null
 		Grab.THING:
 			if is_instance_valid(held_thing):

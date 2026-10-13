@@ -1257,7 +1257,7 @@ func _build_jackalope(chub: float, ear_len: float) -> void:
 	neck_y = 0.46
 	head_y = 0.18
 	centre_y = 0.36
-	top_y = 1.3
+	top_y = 1.5
 	ear_splay = 0.45
 	gravity = 9.0
 	var horn := Ps1.mat(Color(0.66, 0.56, 0.4), 0.0, 0.35)
@@ -1291,10 +1291,15 @@ func _build_jackalope(chub: float, ear_len: float) -> void:
 		ears.append(ear)
 		_eye(Vector3(0.13 * side, 0.22, 0.14), 0.07)
 		_part(neck, _sphere(), pale, Vector3(0.15 * side, 0.1, 0.06), Vector3.ONE * 0.07)
-		# Antlers, in front of the ears: a beam and a tine
-		_part(neck, _cone(), horn, Vector3(0.09 * side, 0.45, 0.08), Vector3(0.032, 0.3, 0.032), Vector3(0.25, 0, -0.5 * side))
-		_part(neck, _cone(), horn, Vector3(0.17 * side, 0.47, 0.1), Vector3(0.022, 0.15, 0.022), Vector3(0.3, 0, -1.25 * side))
-		_part(neck, _cone(), horn, Vector3(0.08 * side, 0.46, 0.15), Vector3(0.02, 0.13, 0.02), Vector3(0.95, 0, -0.2 * side))
+		# Antlers, in front of the ears: a proper rack, a beam sweeping up and out with a brow
+		# tine and three more standing off it
+		var root := Vector3(0.08 * side, 0.34, 0.03)
+		var fork := _spike(neck, horn, root, Vector3(0.45 * side, 1.0, -0.1), 0.34, 0.058, _drum(0.7, 1.0, 1.0))
+		var tip := _spike(neck, horn, fork, Vector3(0.8 * side, 0.6, 0.15), 0.32, 0.044)
+		_spike(neck, horn, root.lerp(fork, 0.35), Vector3(-0.05 * side, 0.8, 0.7), 0.2, 0.036)
+		_spike(neck, horn, fork, Vector3(0.05 * side, 1.0, 0.0), 0.28, 0.04)
+		_spike(neck, horn, fork.lerp(tip, 0.4), Vector3(0.25 * side, 1.0, -0.1), 0.23, 0.034)
+		_spike(neck, horn, fork.lerp(tip, 0.75), Vector3(0.3 * side, 1.0, 0.1), 0.15, 0.03)
 	mouth_node = _pivot(neck, Vector3(0, 0.075, 0.2))
 	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.03))
 
@@ -1504,7 +1509,8 @@ func _lathe(shape: Array[Vector2], sides: int) -> ArrayMesh:
 		for j in sides:
 			var a := i * (sides + 1) + j
 			var b := a + sides + 1
-			for index: int in [a, a + 1, b, a + 1, b + 1, b]:
+			# (wound clockwise seen from outside, which is the front of a face)
+			for index: int in [a, b, a + 1, a + 1, b, b + 1]:
 				st.add_index(index)
 	return st.commit()
 
@@ -1517,6 +1523,16 @@ func _cone() -> CylinderMesh:
 	m.radial_segments = 6
 	m.rings = 1
 	return m
+
+
+# A horn, tine or spine standing off `base` the way `dir` points; gives back where its tip is, so
+# that the next can grow from there. A cone unless another mesh a unit tall is given.
+func _spike(parent: Node3D, mat: Material, base: Vector3, dir: Vector3, length: float, thick: float, mesh: Mesh = null) -> Vector3:
+	var up := dir.normalized()
+	var across := up.cross(Vector3.FORWARD if absf(up.z) < 0.9 else Vector3.RIGHT).normalized()
+	var mi := _part(parent, _cone() if mesh == null else mesh, mat, base + up * length * 0.5)
+	mi.basis = Basis(across * thick, up * length, across.cross(up) * thick)
+	return base + up * length
 
 
 func _pivot(parent: Node3D, at: Vector3) -> Node3D:
@@ -2749,7 +2765,7 @@ func _hangs_back() -> bool:
 
 
 func _go_food(delta: float) -> void:
-	if not is_instance_valid(snack):
+	if not is_instance_valid(snack) or snack.held:
 		snack = world.snack_for(self)
 		if snack == null:
 			_enter(State.IDLE, 0.6)
@@ -2769,7 +2785,7 @@ func _go_food(delta: float) -> void:
 
 func _eat(delta: float) -> void:
 	_halt(delta)
-	if not is_instance_valid(snack):
+	if not is_instance_valid(snack) or snack.held:
 		_enter(State.IDLE)
 		return
 	gaze = snack.global_position

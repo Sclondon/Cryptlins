@@ -74,12 +74,12 @@ static func model(id: String) -> Node3D:
 	match item["group"]:
 		"food":
 			var snack := Snack.new(n)
-			snack.set_process(false)
+			snack.hold()
 			snack.scale = Vector3.ONE * 2.0
 			holder.add_child(snack)
 		"toy":
 			var toy := Ball.new(n)
-			toy.set_process(false)
+			toy.held = true
 			toy.position.y = Ball.R * 1.8
 			toy.scale = Vector3.ONE * 1.8
 			holder.add_child(toy)

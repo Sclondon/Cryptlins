@@ -199,6 +199,46 @@ func _run() -> void:
 	check(main.snacks.size() == 1 and main.snacks[0].position.x < -0.5, "dragged up off the shelf, it drops where you let go")
 	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500), "and is eaten too")
 
+	# Food on the end of a finger stays there, and food lying in the room can be picked up again
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet.belly = 100.0
+	pet.position = Vector3(-1.6, 0, -1.2)
+	pet._enter(Cryptlin.State.IDLE, 30.0)
+	var from_row := _on_shelf(food)
+	var above := from_row - Vector2(0, 220)
+	_touch(from_row, true)
+	await _frames(2)
+	for i in 10:
+		_drag(from_row.lerp(above, (i + 1) / 10.0), (above - from_row) / 10.0)
+		await _frames(1)
+	await _frames(20)
+	check(main.held_snack != null and main.held_snack.held and main.snacks.is_empty(), "food dragged up off the row hangs on the finger")
+	var hung := main.held_snack.position
+	await _frames(60)
+	check(main.held_snack.position.distance_to(hung) < 0.02, "held still for a second, it has not sunk")
+	check(_screen(main.held_snack.position).distance_to(above) < 30.0, "and is under the finger")
+	_touch(above, false)
+	await _frames(2)
+	check(main.snacks.size() == 1 and main.held_snack == null, "let go, it drops")
+	await _until(func() -> bool: return main.snacks[0].landed, 300)
+	var lying: Snack = main.snacks[0]
+	var on_it := _screen(lying.position + Vector3(0, 0.08, 0))
+	var over := _screen(Vector3(1.2, 0.75, 0.4))
+	_touch(on_it, true)
+	await _frames(2)
+	check(main.held_snack == lying and main.snacks.is_empty(), "a finger on food lying in the room picks it up, and it is nobody's while it is held")
+	for i in 10:
+		_drag(on_it.lerp(over, (i + 1) / 10.0), (over - on_it) / 10.0)
+		await _frames(1)
+	await _frames(20)
+	check(lying.position.x > 0.8 and lying.position.y > 0.4, "and carries it")
+	_touch(over, false)
+	await _frames(2)
+	check(main.snacks.size() == 1 and main.snacks[0] == lying, "let go, it is anybody's again")
+	pet.belly = 30.0
+	pet._enter(Cryptlin.State.IDLE, 0.2)
+	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500) and pet.belly > 50.0, "and is eaten")
+
 	# The ball
 	pet.fun = 20.0
 	await _until(func() -> bool: return _settled(pet), 600)
@@ -575,6 +615,13 @@ func _run() -> void:
 	check(main.left_of("fish") == 1 and main.shelf.counts.get("fish") == 1, "and food bought gets used up")
 	main.feed(Snack.Kind.BERRIES)
 	check(main.snacks.size() == 1, "and what was not bought cannot be used")
+	main.dev.visible = true
+	main._sync()
+	check(main.shelf.ids.size() == Items.LIST.size() and main.owns("berries") and main.left_of("fish") == -1, "with the test panel open everything is on the row without end, shop or no shop")
+	main.feed(Snack.Kind.FISH)
+	main.dev.visible = false
+	main._sync()
+	check(main.left_of("fish") == 1 and not main.owns("berries"), "and what is used meanwhile is not taken from what was bought")
 	main.embedded = false
 	main._clear_toys()
 	main._sync()

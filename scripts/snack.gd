@@ -15,6 +15,8 @@ const VALUE := 34.0
 var kind: int = Kind.BONE
 var vel := Vector3.ZERO
 var landed := false
+# On the end of a finger: it hangs where it is put and does not fall
+var held := false
 var bites_left := BITES
 var colour := Color.WHITE
 var spin := Vector3.ZERO
@@ -120,7 +122,16 @@ func _add(mesh: Mesh, c: Color, at: Vector3, turn := Vector3.ZERO) -> MeshInstan
 	return mi
 
 
+# Taken hold of by a finger, off the row of things or up off the floor
+func hold() -> void:
+	held = true
+	landed = false
+	vel = Vector3.ZERO
+	spin = Vector3.ZERO
+
+
 func drop(from: Vector3) -> void:
+	held = false
 	position = from
 	vel = Vector3(randf_range(-0.4, 0.4), -1.0, randf_range(-0.4, 0.4))
 	spin = Vector3(randf_range(-6, 6), randf_range(-4, 4), randf_range(-6, 6))
@@ -128,7 +139,7 @@ func drop(from: Vector3) -> void:
 
 
 func _process(delta: float) -> void:
-	if landed:
+	if landed or held:
 		return
 	vel.y -= 14.0 * delta
 	position += vel * delta
