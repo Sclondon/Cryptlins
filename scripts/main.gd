@@ -95,6 +95,10 @@ var floor_mat: ShaderMaterial
 var embedded := false
 var stock := {}
 var _on_message: JavaScriptObject
+# Whether the page has put the game in front yet, and whether it is resting out of sight
+var shown := false
+var resting := false
+var rested_at := 0.0
 
 var clock := 0.0
 var save_timer := 0.0
@@ -1915,6 +1919,8 @@ func _release() -> void:
 # can lift whatever it was covering the load with, and take from it what has been bought.
 #   out: {type: "CRYPTLINS_READY"}, {type: "CRYPTLINS_USED", item: <id>}
 #   in:  {type: "CRYPTLINS_STOCK", items: {<id>: <how many, or -1 for no end of them>}}
+#        {type: "CRYPTLINS_SHOW"} and {type: "CRYPTLINS_HIDE"}: in front, or covered and left
+# The page loads the game out of sight, so it rests (see rest) until it is first shown.
 func _bridge() -> void:
 	if not OS.has_feature("web"):
 		return
@@ -1927,6 +1933,8 @@ func _bridge() -> void:
 	for i in 4:
 		await get_tree().process_frame
 	_post({"type": "CRYPTLINS_READY"})
+	if not shown:
+		rest(true)
 
 
 func _post(message: Dictionary) -> void:
@@ -1936,9 +1944,41 @@ func _post(message: Dictionary) -> void:
 
 func _message(args: Array) -> void:
 	var data: Variant = JSON.parse_string(str(JavaScriptBridge.get_interface("JSON").stringify(args[0].data)))
-	if data is Dictionary and data.get("type") == "CRYPTLINS_STOCK" and data.get("items") is Dictionary:
-		stock = data["items"]
-		_sync()
+	if not data is Dictionary:
+		return
+	match data.get("type"):
+		"CRYPTLINS_STOCK":
+			if data.get("items") is Dictionary:
+				stock = data["items"]
+				_sync()
+		"CRYPTLINS_SHOW":
+			shown = true
+			rest(false)
+		"CRYPTLINS_HIDE":
+			rest(true)
+
+
+# Out of sight (the page has covered the game, or not yet shown it): it saves, stops drawing
+# and goes quiet, keeping its last picture. Back in front, the cryptlin lives through the time
+# that went by, as it does when the game has been shut.
+func rest(on: bool) -> void:
+	if on == resting:
+		return
+	resting = on
+	if on:
+		if finger != -1:
+			_release()
+		save_game()
+		rested_at = Time.get_unix_time_from_system()
+	elif pet != null and not leaving:
+		var gone := Time.get_unix_time_from_system() - rested_at
+		if gone > 30.0:
+			pet.pass_time(gone, not light_on)
+	var draws := SubViewport.UPDATE_DISABLED if on else SubViewport.UPDATE_ALWAYS
+	view.render_target_update_mode = draws
+	shelf.view.render_target_update_mode = draws
+	AudioServer.set_bus_mute(0, on or sfx.muted)
+	get_tree().paused = on
 
 
 # ---------------------------------------------------------------- the save
