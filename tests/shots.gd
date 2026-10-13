@@ -288,6 +288,18 @@ func _run_tidy() -> void:
 	await _wait(0.9)
 	pet._enter(Cryptlin.State.STARE)
 	await _snap("t3_wheel_after")
+	# The same thing carried back down over the wheel, which turns to its place and makes room
+	main.shelf.show_item("bone")
+	main.held_thing = main.decor_of(Decor.Kind.SKULL)
+	main.grab = Den.Grab.THING
+	main._drag_thing(main.shelf.global_position + main.shelf.size * Vector2(0.3, 0.6))
+	await _wait(0.9)
+	await _snap("t3b_putting_away")
+	main._drag_thing(main.screen_of(Vector3(0.9, 0, 0.3)))
+	main.shelf.bring("")
+	main.grab = Den.Grab.NONE
+	main.held_thing = null
+	await _wait(0.3)
 	var dropping := main.leave_mess(Mess.Kind.DROPPING, Vector3(0.1, 0, 1.2), pet)
 	main.leave_mess(Mess.Kind.PUDDLE, Vector3(-0.7, 0, 1.4), pet)
 	main.shelf.show_item("broom")

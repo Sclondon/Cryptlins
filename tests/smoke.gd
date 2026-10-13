@@ -335,8 +335,73 @@ func _in_and_out(pet: Cryptlin) -> void:
 	check(skull != null and not shelf.ids.has("skull") and shelf.ids.size() == before.size() - 1, "a thing dragged up into the room is no longer on the wheel")
 	check(shelf.ids[at - 1] == before[at - 1] and shelf.ids[at] == before[at + 1] and is_equal_approx(shelf.spots[at] - shelf.spots[at - 1], 1.0), "and its neighbours close up where it was")
 	check(await _until(func() -> bool: return shelf.going.is_empty() and shelf.slips.all(func(slip: float) -> bool: return is_zero_approx(slip)), 200) and shelf.rim.get_child_count() == shelf.ids.size(), "its model is gone from the wheel, and the rest have slid round")
-	await _slide(_screen(skull.position + Vector3(0, 0.2, 0)), _on_shelf("bone"))
-	check(main.decor_of(Decor.Kind.SKULL) == null and shelf.ids == before, "dragged back down, it is on the wheel again, in its place")
+	# Carried down over the wheel, it leaves the room and the wheel shows its place; carried back
+	# up, it is in the room again; let go on the floor it has only been moved
+	var grip := _screen(skull.position + Vector3(0, 0.2, 0))
+	var low := _px(Vector2(shelf.global_position.x + shelf.size.x * 0.5, shelf.global_position.y + shelf.size.y * 0.7))
+	_touch(grip, true)
+	await _frames(2)
+	for i in 10:
+		_drag(grip.lerp(low, (i + 1) / 10.0), (low - grip) / 10.0)
+		await _frames(1)
+	check(main.stowing == "skull" and not skull.visible and shelf.ids.has("skull") and shelf.sought == "skull", "a thing carried down over the wheel leaves the room, and the wheel makes room for it")
+	check(await _until(func() -> bool: return shelf.where("skull").distance_to(shelf.global_position + Vector2(shelf.size.x * 0.5, Shelf.CREST * shelf.size.y / Shelf.TALL)) < 3.0, 120), "and turns to show its place")
+	var back_up := _screen(Vector3(-0.4, 0, 0.5))
+	for i in 10:
+		_drag(low.lerp(back_up, (i + 1) / 10.0), (back_up - low) / 10.0)
+		await _frames(1)
+	check(main.stowing == "" and skull.visible and not shelf.ids.has("skull"), "carried back up, it is in the room again and off the wheel")
+	_touch(back_up, false)
+	await _frames(3)
+	check(main.decor_of(Decor.Kind.SKULL) == skull and skull.visible and skull.position.distance_to(Vector3(-0.4, 0, 0.5)) < 0.4 and not shelf.ids.has("skull"), "let go on the floor, it has only been moved")
+	# Put away for good: on a wide screen and an upright one, with a finger and with a mouse, on
+	# the wheel and down in the corner where its rim has sunk out of sight
+	var was := root.size
+	var ways := 0
+	for way in 4:
+		root.size = Vector2i(540, 1170) if way % 2 == 1 else Vector2i(1280, 720)
+		await _frames(5)
+		if main.decor_of(Decor.Kind.SKULL) == null:
+			main.place_decor(Decor.Kind.SKULL, Vector3(0.5, 0, 0.6))
+		skull = main.decor_of(Decor.Kind.SKULL)
+		pet._enter(Cryptlin.State.IDLE, 60.0)
+		pet.position = Vector3(-1.4, 0, -1.4)
+		await _frames(3)
+		var rect := main.get_viewport().get_visible_rect().size
+		var from_it := _screen(skull.position + Vector3(0, 0.2, 0))
+		var to_it := _on_shelf("bone") if way < 2 else _px(Vector2(18.0, rect.y - 12.0))
+		if way == 0 or way == 3:
+			await _slide(from_it, to_it)
+		else:
+			await _mouse_slide(from_it, to_it)
+		if main.decor_of(Decor.Kind.SKULL) == null and shelf.ids.has("skull") and main.stowing == "":
+			ways += 1
+	root.size = was
+	await _frames(5)
+	check(ways == 4 and shelf.ids == before, "dragged down and let go there it is put away, back in its place: wide and upright, by finger and by mouse, on the wheel or in the corner under it (%d ways of 4)" % ways)
+	# One of them tucked into the thing that is put away
+	var cave := main.place_decor(Decor.Kind.CAVE, Vector3(1.0, 0, -0.6))
+	await _until(func() -> bool: return _settled(pet), 900)
+	pet.set_needs({"belly": 80.0, "energy": 90.0, "bowel": 0.0, "bladder": 0.0})
+	pet.position = Vector3(0.2, 0, 0.6)
+	pet._enter(Cryptlin.State.LURK)
+	pet.visiting = cave
+	pet.target = cave.position
+	await _until(func() -> bool: return pet.state == Cryptlin.State.LURK and pet.step == 1, 900)
+	pet.flash_time = 0.0
+	main.remove_decor(cave)
+	check(pet.state == Cryptlin.State.STARTLED and pet.feeling == Cryptlin.Feeling.GRUMPY and pet.visible and main.decor_of(Decor.Kind.CAVE) == null, "one that was tucked into a thing when it is put away is turned out, and is put out about it")
+	await _until(func() -> bool: return _settled(pet), 900)
+	if pet.needs_water():
+		var pond := main.place_decor(Decor.Kind.POOL, Den.middle(Den.Shore.BACK))
+		pet._enter(Cryptlin.State.VISIT)
+		pet.visiting = pond
+		await _until(func() -> bool: return Den.wade(pet.position) > 0.3, 900)
+		pet.flash_time = 0.0
+		main.remove_decor(pond)
+		check(pet.feeling == Cryptlin.Feeling.GRUMPY and Den.shore == Den.Shore.NONE and Den.wade(pet.position) < 0.0, "and so is one that was wading in the pool when that is")
+		await _until(func() -> bool: return _settled(pet), 900)
+	check(shelf.ids == before, "with it all put away, the wheel is as it was")
 	pet._enter(Cryptlin.State.IDLE, 60.0)
 	# The nest and the ground
 	var bed := main.nest_style
@@ -719,6 +784,33 @@ func _slide(from: Vector2, to: Vector2, steps := 8, via := Vector2.INF) -> void:
 		_drag(start.lerp(to, float(i + 1) / steps), (to - start) / steps)
 		await _frames(1)
 	_touch(to, false)
+	await _frames(2)
+
+
+# The same with a mouse: the button down at one place, the pointer moved to another, and let up
+func _mouse_slide(from: Vector2, to: Vector2, steps := 8) -> void:
+	var button := InputEventMouseButton.new()
+	button.button_index = MOUSE_BUTTON_LEFT
+	button.position = from
+	button.global_position = from
+	button.pressed = true
+	button.button_mask = MOUSE_BUTTON_MASK_LEFT
+	Input.parse_input_event(button)
+	await _frames(2)
+	for i in steps:
+		var move := InputEventMouseMotion.new()
+		move.position = from.lerp(to, float(i + 1) / steps)
+		move.global_position = move.position
+		move.relative = (to - from) / steps
+		move.button_mask = MOUSE_BUTTON_MASK_LEFT
+		Input.parse_input_event(move)
+		await _frames(1)
+	var up := InputEventMouseButton.new()
+	up.button_index = MOUSE_BUTTON_LEFT
+	up.position = to
+	up.global_position = to
+	up.pressed = false
+	Input.parse_input_event(up)
 	await _frames(2)
 
 
@@ -1388,6 +1480,11 @@ func _run() -> void:
 		check(pet.beg_for == Cryptlin.Want.WATER, "and asks for water")
 	await _until(func() -> bool: return _settled(pet), 900)
 	pet._enter(Cryptlin.State.IDLE, 3.0)
+	# (the ground that is laid is not on the wheel: if that is the one, another goes down first)
+	if main.floor_style == pet.fav_ground:
+		main.set_ground((pet.fav_ground + 1) % Den.GROUNDS.size())
+		await _until(func() -> bool: return _settled(pet), 900)
+		pet._enter(Cryptlin.State.IDLE, 3.0)
 	await _tap(_on_shelf(Items.id_of("ground", pet.fav_ground)))
 	check(main.floor_style == pet.fav_ground, "a tray of %s changes the floor" % Den.GROUND_PLAIN[pet.fav_ground])
 	check(await _until(func() -> bool: return main.who().known.get("ground", false), 600), "which is the ground it is happiest on")

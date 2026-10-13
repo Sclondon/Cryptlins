@@ -3856,6 +3856,19 @@ func _kick(b: Ball) -> void:
 	world.wear_toy(b, self)
 
 
+# The thing it was sitting on, tucked into or wading in has been taken up from round it and put
+# away: it is left standing where it was, wide awake and a little put out
+func turned_out() -> void:
+	if state in [State.LEAVE, State.HELD, State.DYING, State.SCUFFLE, State.SCANNED, State.SPELL, State.TRICK]:
+		return
+	visiting = null
+	if state == State.SLEEP:
+		energy = maxf(energy, 35.0)
+	_cry("grumble")
+	_enter(State.STARTLED, 1.2)
+	feel(Feeling.GRUMPY, 5.0)
+
+
 # How hard it is on a toy, next to an ordinary grown one: by its kind, its two natures, and less
 # for a baby
 func rough() -> float:

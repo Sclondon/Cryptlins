@@ -49,6 +49,9 @@ var speed := 0.0
 # The thing that asks to be picked up just now ("" for none): it bobs higher than the rest,
 # turns right round, and glints
 var beckon := ""
+# The thing the wheel is turning to show, because a finger is bringing it back to put it away
+# ("" for none): it comes round to the top, and bobs and turns there like one that beckons
+var sought := ""
 var held := false
 var t := 0.0
 
@@ -256,7 +259,15 @@ func has_point(at: Vector2) -> bool:
 	return (at - global_position).distance_to(_hub()) < (_radius() + REACH) * _unit()
 
 
+# Turns, of itself, to bring this item to the top and keep it there ("" to leave off)
+func bring(id: String) -> void:
+	sought = id
+	if id != "":
+		speed = 0.0
+
+
 func grab() -> void:
+	sought = ""
 	held = true
 	speed = 0.0
 
@@ -295,7 +306,7 @@ func _process(delta: float) -> void:
 		else:
 			# Let go, it runs down and comes to rest with a thing at the top
 			speed = 0.0
-			turn = lerpf(turn, spots[_nearest(turn)], 1.0 - exp(-delta * 9.0))
+			turn = lerpf(turn, spots[ids.find(sought) if ids.has(sought) else _nearest(turn)], 1.0 - exp(-delta * 9.0))
 	# The things close up where one has gone, and make room where one has come
 	for i in slips.size():
 		slips[i] = 0.0 if absf(slips[i]) < 0.002 else lerpf(slips[i], 0.0, 1.0 - exp(-delta * 10.0))
@@ -326,7 +337,7 @@ func _place() -> void:
 		var spin: Node3D = stand.get_child(0)
 		spin.position.y = -0.3 + sin(t * 1.3 + i * 2.3) * 0.03
 		spin.rotation.y = 0.35 + a * 0.9 + sin(t * 0.9 + i * 1.7) * 0.35
-		if ids[i] == beckon:
+		if ids[i] == beckon or ids[i] == sought:
 			spin.position.y = -0.3 + absf(sin(t * 3.2)) * 0.12
 			spin.rotation.y = t * 2.4
 	for gone in going:

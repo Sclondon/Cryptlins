@@ -122,6 +122,9 @@ var ball: Ball
 # Toys that were bought, have been out in the room and were put away again, by item id: how worn
 # each is (see Ball.wear). And how worn the one of each kind there is no end of was when it was
 # last put away.
+# The thing or toy on the end of a finger that is held down over the wheel, on its way back
+# there (its item id, or "" for none)
+var stowing := ""
 var toybox := {}
 var scuffs := {}
 # By item id, for a kind of toy there is no end of whose last one broke: when (unix time) there
@@ -1021,6 +1024,9 @@ func comfort_of(who: Cryptlin) -> float:
 # Whether something is on the shelf: everything when the game is played by itself; inside a
 # site with a shop, what comes free and what has been bought
 func owns(id: String) -> bool:
+	# (what is being put away has a place on it, whatever else)
+	if id == stowing and id != "":
+		return true
 	# (a grave marker is never bought: it is on the shelf while one has been put away)
 	if id in Items.KEPT:
 		return not markers_away.is_empty()
@@ -1036,10 +1042,30 @@ func owns(id: String) -> bool:
 	return _has_all() or id in Items.FREE or int(stock.get(id, 0)) != 0
 
 
+# Whether a finger is far enough down the screen to be putting what it holds away: on the wheel,
+# or anywhere in the lower part of the strip the wheel is in (its rim falls away to the corners,
+# and a thing let go there is meant for it all the same)
+func _over_wheel(at: Vector2) -> bool:
+	return shelf.has_point(at) or (shelf.visible and at.y > shelf.global_position.y + shelf.size.y * 0.35)
+
+
+# A thing on the end of a finger has come down over the wheel (or, with "", gone back up): the
+# wheel makes room for it at its place and turns to show where that is
+func _offer(id: String) -> void:
+	if id == stowing:
+		return
+	stowing = id
+	_sync()
+	shelf.bring(id)
+
+
 # Whether a thing is out in the room just now, and so not on the wheel: a thing standing there,
 # the nest and the ground that are in use, the toy on the floor. What gets used up (food, eggs)
 # and the tools are never off the wheel for being in use.
 func in_room_now(id: String) -> bool:
+	# (what is on the end of a finger over the wheel is as good as back on it)
+	if id == stowing:
+		return false
 	var item := Items.find(id)
 	var n: int = item["n"]
 	match item["group"]:
@@ -1359,6 +1385,12 @@ func place_decor(kind: int, at: Vector3) -> Decor:
 
 
 func remove_decor(d: Decor) -> void:
+	# Whoever was on it, in it or (the pool) out in its water is turned out, and does not think
+	# much of it
+	for pet in pets():
+		var there := wade(pet.position) > 0.1 if d.kind == Decor.Kind.POOL else Vector2(pet.position.x - d.position.x, pet.position.z - d.position.z).length() < maxf(d.radius * 0.8, 0.3)
+		if there or (pet.visiting == d and pet.state in [Cryptlin.State.LURK, Cryptlin.State.VISIT] and pet.step >= 1):
+			pet.turned_out()
 	if d.kind == Decor.Kind.POOL:
 		shore = Shore.NONE
 		floor_mat.set_shader_parameter("shore", shore)
@@ -1886,7 +1918,7 @@ func _sync() -> void:
 				# (those bought and not yet out, and those that have been out and were put away)
 				counts[id] = left_of(id) + toybox.get(id, []).size()
 	if have.has("marker"):
-		counts["marker"] = markers_away.size()
+		counts["marker"] = markers_away.size() + (1 if stowing == "marker" else 0)
 	# The marks are what is known of the one in question
 	var pet := who().pet if who() != null else null
 	if pet != null:
@@ -2718,6 +2750,10 @@ func _input(event: InputEvent) -> void:
 		match grab:
 			Grab.BALL:
 				hold_point = _floor_at(event.position, 0.75, 0.3)
+				# Held down over the wheel the toy is on its way back there
+				if ball != null:
+					ball.visible = not _over_wheel(event.position)
+					_offer("" if ball.visible else Items.id_of("toy", ball.kind))
 			Grab.SNACK:
 				hold_point = _held_at(event.position, 0.75)
 			Grab.PET:
@@ -2953,9 +2989,12 @@ func _drag_thing(at: Vector2) -> void:
 		move_nest(_floor_at(at, 0.0, 0.6))
 		return
 	var d := held_thing as Decor
+	# Held down over the wheel it is on its way back there: it is gone from the room, and the
+	# wheel has it at its place
+	d.visible = not _over_wheel(at)
+	_offer("" if d.visible else Decor.IDS[d.kind])
 	if d.kind == Decor.Kind.POOL:
-		# Held over the shelf it is on its way back there: the floor is whole again
-		d.visible = not shelf.has_point(at)
+		# (and the floor is whole again)
 		floor_mat.set_shader_parameter("shore", shore if d.visible else Shore.NONE)
 		# (and it is not moved by a finger on its way down there across the front of the room)
 		var where := shore_near(_floor_at(at, 0.0, 0.0))
@@ -2964,8 +3003,6 @@ func _drag_thing(at: Vector2) -> void:
 			splash(d.position)
 	else:
 		d.position = on_dry(_floor_at(at, 0.0, 0.0), d.radius * 0.6, d.radius)
-		# Held over the shelf it is on its way back there
-		d.scale = Vector3.ONE * (0.6 if shelf.has_point(at) else 1.0)
 
 
 func _release() -> void:
@@ -2986,16 +3023,20 @@ func _release() -> void:
 			if moved < 20.0:
 				tap_lamp()
 		Grab.BALL:
-			if ball != null and shelf.has_point(last_at):
+			stowing = ""
+			shelf.bring("")
+			if ball != null and _over_wheel(last_at):
 				# Let go over the wheel, it is put away
 				_clear_ball()
 				sfx.play("click", 0.8)
 				_sync()
 				save_game()
 			elif ball != null:
+				ball.visible = true
 				ball.held = false
 				ball.vel = hold_vel.limit_length(7.5)
 				_notice_ball()
+				_sync()
 		Grab.SCANNER:
 			scanner.visible = false
 			if not shelf.has_point(last_at):
@@ -3026,8 +3067,10 @@ func _release() -> void:
 					settle_nest()
 				else:
 					var d := held_thing as Decor
-					d.scale = Vector3.ONE
-					if shelf.has_point(last_at):
+					d.visible = true
+					stowing = ""
+					shelf.bring("")
+					if moved >= 14.0 and _over_wheel(last_at):
 						remove_decor(d)
 					elif thing_new:
 						place_decor(d.kind, d.position)
