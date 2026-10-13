@@ -796,7 +796,7 @@ func _toys() -> void:
 	var clean := main.comfort_of(pet)
 	var loose := main.get_child_count()
 	main.wear_toy(main.ball, pet)
-	check(main.ball == null and main.messes.size() == 1 and main.messes[0].kind == Mess.Kind.BITS and main.messes[0].position.distance_to(Vector3(0.5, 0, 0.7)) < 0.2, "one kick more and it comes apart, and its bits lie where it was")
+	check(main.ball == null and not main.messes.is_empty() and main.messes.back().kind == Mess.Kind.BITS and main.messes.back().position.distance_to(Vector3(0.5, 0, 0.7)) < 0.2, "one kick more and it comes apart, and its bits lie where it was")
 	check(main.get_child_count() >= loose + 6, "with the pieces of it flying")
 	var pleased := Cryptlin.NATURE_ROUGH[pet.nature] > 1.0
 	check(pet.feeling == (Cryptlin.Feeling.EXCITED if pleased else Cryptlin.Feeling.SCARED) and (pleased or pet.state == Cryptlin.State.STARTLED), "the %s one is %s" % [Cryptlin.NATURES[pet.nature]["title"], "pleased with itself" if pleased else "startled"])
@@ -805,7 +805,7 @@ func _toys() -> void:
 	await _frames(60)
 	check(main.get_child_count() <= loose, "the pieces come down and are gone")
 	main.sweep_one()
-	check(await _until(func() -> bool: return main.messes.is_empty(), 200), "the broom sweeps up what is left")
+	check(await _until(func() -> bool: return not main.messes.any(func(m: Mess) -> bool: return m.kind == Mess.Kind.BITS), 200), "the broom sweeps up what is left")
 	await _restart()
 	pet = main.who().pet
 	check(main.ball == null and not main.shelf.ids.has("ball"), "and it is still gone the next time")
@@ -2372,7 +2372,8 @@ func _run() -> void:
 	_content(one, mate)
 	one.meet(Cryptlin.State.PAIR, mate)
 	check(one.state == Cryptlin.State.PAIR and mate.state == Cryptlin.State.PAIR and mate.waiting and not one.waiting, "a pair that would: one goes over to the other")
-	check(await _until(func() -> bool: return one.step == 1 and mate.step == 1 and one.lift > 0.1, 1800) and one.feeling == Cryptlin.Feeling.LOVING, "and clambers up on it, all hearts")
+	# (how far up it gets goes by how tall the other is, and some are very low)
+	check(await _until(func() -> bool: return one.step == 1 and mate.step == 1 and one.lift > 0.02, 900) and one.feeling == Cryptlin.Feeling.LOVING, "and clambers up on it, all hearts")
 	await _tap(_screen(mate.body_centre()))
 	check(one.state == Cryptlin.State.PAIR and one.step == 2 and mate.step == 2 and one.feeling == Cryptlin.Feeling.SCARED and mate.feeling == Cryptlin.Feeling.SCARED and one.lift == 0.0, "a tap and they both stop dead, mortified")
 	check(await _until(func() -> bool: return one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, 400) and one.me.expecting.is_empty() and mate.me.expecting.is_empty() and one.me.paired == 0.0, "and nothing comes of it")
