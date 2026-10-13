@@ -370,6 +370,20 @@ func _snowball(pet: Cryptlin) -> void:
 	var tint: Color = pet.fur.get_shader_parameter("tint")
 	var shadow: Color = pet.fur.get_shader_parameter("shadow")
 	check(pet.fur.shader == Ps1.FUR and pet.fur.next_pass != null and maxf(tint.r, maxf(tint.g, tint.b)) < 0.85 and shadow.b > shadow.r, "its coat is long hair, off-white, with blue in its shadows")
+	# It is quiet to look at: the locks of its coat are few and drawn only at its outline, with
+	# next to no streaking; nothing is painted on it but a big patch or a pale belly; its face is
+	# a dark mask with big eyes in it; and its arms are a darker shade than its body
+	var quiet := float(pet.fur.get_shader_parameter("edge")) > 0.0 and float(pet.fur.get_shader_parameter("streak")) < 0.15 and float(pet.fur.get_shader_parameter("locks")) <= 8.0
+	for s in 40:
+		for mark: int in [Cryptlin.looks(pet.kind, s + 1)["marks"][0], Cryptlin.looks(pet.kind, s + 1)["marks"][2]]:
+			quiet = quiet and mark in [Cryptlin.Mark.PLAIN, Cryptlin.Mark.PATCHES, Cryptlin.Mark.BELLY]
+		quiet = quiet and not "whiskers" in Cryptlin.looks(pet.kind, s + 1)["extras"]
+	check(quiet, "its coat is one solid thing, ragged only at its outline, with no spots, stripes or whiskers on any of forty of them")
+	var face: MeshInstance3D = pet.neck.get_child(1)
+	var skin: Color = (face.material_override as ShaderMaterial).get_shader_parameter("tint")
+	var sleeve: Color = ((pet.arms[0].get_child(0) as MeshInstance3D).material_override as ShaderMaterial).get_shader_parameter("tint")
+	var eye: MeshInstance3D = pet.eyes[0].get_child(0)
+	check(skin.v < tint.v * 0.7 and face.scale.x > 0.18 and eye.scale.x >= 0.045 and sleeve.v < tint.v * 0.95, "its face is a big dark mask with big eyes, and its arms a darker shade than its body")
 	var was := pet.get_needs()
 	pet.set_needs({"age": 0.0})
 	pet.grow = pet.size_goal()

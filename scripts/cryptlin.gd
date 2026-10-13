@@ -270,7 +270,7 @@ const SHAPES: Array[Dictionary] = [
 	{"limb": [0.9, 1.15], "crest": [0.66, 1.4]}, {"head": [0.88, 1.16], "limb": [0.8, 1.6]},
 	{"head": [0.85, 1.22], "limb": [0.84, 1.2]}, {"limb": [0.8, 1.22]}, {}, {"head": [0.85, 1.2]},
 	{"crest": [0.6, 1.4]}, {"head": [0.85, 1.25]}, {"crest": [0.75, 1.3]}, {}, {"head": [0.86, 1.2], "crest": [0.85, 1.25]},
-	{}, {"limb": [0.8, 1.25], "eye": [0.75, 1.2]},
+	{"eye": [0.85, 1.25], "marks": [Mark.PATCHES, Mark.BELLY]}, {"limb": [0.8, 1.25], "eye": [0.75, 1.2]},
 	{"head": [0.88, 1.22], "eye": [0.75, 1.15], "limb": [0.85, 1.2], "crest": [0.75, 1.35], "tail": [0.6, 1.5]},
 ]
 # What can be painted on a coat, and how likely each is for most kinds
@@ -290,7 +290,7 @@ const EXTRAS: Array[Array] = [
 	["whiskers", "tooth", "torn", "odd", "split"], ["odd", "split"], ["whiskers", "tooth", "odd", "split"],
 	["tuft", "torn", "odd", "split"], ["tooth", "odd", "split"],
 	["whiskers", "tooth", "torn", "odd", "split", "broken"], ["odd", "split"],
-	["whiskers", "tooth", "odd", "split", "broken"], ["tooth", "torn", "odd", "split"],
+	["tooth", "odd", "split", "broken"], ["tooth", "torn", "odd", "split"],
 	["tuft", "whiskers", "tooth", "odd", "split"],
 ]
 
@@ -2019,9 +2019,11 @@ func _build_alien(chub: float) -> void:
 
 
 # A yeti of the gentle sort: a huge soft pear of thick white fur with no neck and sloping
-# shoulders, a small bare tan face set low on it (a broad flat nose, a wide thick-lipped mouth,
-# small friendly eyes under a heavy brow), big hands on long heavy arms that hang to the ground,
-# and short thick legs. A baby is a ball of fluff with the same little face (see `podge`).
+# shoulders, a dark slate face set low on it (a broad flat nose, a wide thick-lipped mouth, big
+# friendly eyes under a heavy brow), big dark hands on long heavy arms that hang to the ground,
+# and short thick legs. Its coat is one solid thing, paler at the top and bluer below, and ragged
+# only at its outline; its arms and legs are a shade greyer, so that they show against it. A
+# baby is a ball of fluff with the same face (see `podge`).
 func _build_yeti(chub: float, rng: RandomNumberGenerator) -> void:
 	neck_y = 0.64
 	head_y = 0.12
@@ -2032,17 +2034,23 @@ func _build_yeti(chub: float, rng: RandomNumberGenerator) -> void:
 	brain_at = Vector3(0, 0.17, 0.02)
 	crown = Vector3(0, 0.36, 0.0)
 	# Off-white, and blue in the shadows of its coat, so that it is never one flat white under
-	# the bright lamp. The coat on what is lathed or a capsule is measured as it stands; on a
-	# ball, which is drawn a quarter of the size, the same hair is four times as long.
-	var frost := {"shadow": Color(0.74, 0.84, 1.0), "tip_bleach": 0.05, "root_shade": 0.3, "streak": 0.3, "locks": 12.0, "rows": 3.0}
-	fur = _shaggy(fur_colour * 0.8, 3, 0.1, frost)
-	var fluff := _shaggy(fur_colour * 0.8, 3, 0.36, frost.merged({"face": 0.2, "face_from": 0.36, "face_hair": 0.1}))
-	var tan := Ps1.mat(Color(0.56, 0.42, 0.3), 0.0, 0.3)
-	var lip := Ps1.mat(Color(0.4, 0.27, 0.2), 0.0, 0.3)
+	# the bright lamp. The hair is in a few fat locks, drawn only at its outline, and all but one
+	# tone: at this size any more than that is speckle. What is painted on it is a big patch or
+	# two at most, and faint. The coat on what is lathed or a capsule is measured as it stands;
+	# on a ball, which is drawn a quarter of the size, the same hair is four times as long.
+	var frost := {"shadow": Color(0.74, 0.84, 1.0), "tip_bleach": 0.0, "root_shade": 0.1, "streak": 0.06, "locks": 7.0, "rows": 2.0, "edge": 0.5, "shade": 0.32}
+	if marks[0] != Mark.PLAIN or marks[2] != Mark.PLAIN:
+		fur.set_shader_parameter("tex", coat(marks, fur_colour, 0.45))
+	fur = _shaggy(fur_colour * 0.8, 2, 0.1, frost)
+	var fluff := _shaggy(fur_colour * 0.8, 2, 0.36, frost.merged({"shade": 0.1}))
+	var sleeve := _shaggy(fur_colour * Color(0.52, 0.6, 0.73), 2, 0.07, frost.merged({"shade": 0.2}))
+	# Its bare skin is slate, the blue-grey of something that lives in the cold
+	var mask := Ps1.mat(Color(0.25, 0.29, 0.37), 0.0, 0.3)
+	var lip := Ps1.mat(Color(0.15, 0.17, 0.23), 0.0, 0.3)
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.17 * side, 0.2, 0.02))
-		_part(leg, _capsule(0.11, 0.26), fur, Vector3(0, -0.05, 0))
-		_part(leg, _sphere(), tan, Vector3(0, -0.16, 0.08), Vector3(0.12, 0.045, 0.18))
+		_part(leg, _capsule(0.11, 0.26), sleeve, Vector3(0, -0.05, 0))
+		_part(leg, _sphere(), mask, Vector3(0, -0.16, 0.08), Vector3(0.13, 0.05, 0.19))
 		legs.append(leg)
 
 	torso = _pivot(self, Vector3.ZERO)
@@ -2058,26 +2066,26 @@ func _build_yeti(chub: float, rng: RandomNumberGenerator) -> void:
 	baby_sink = 0.2
 	for side: float in [-1.0, 1.0]:
 		var a := _pivot(shoulders, Vector3(0.37 * chub * side, 0.68, 0.07))
-		_part(a, _capsule(0.085, 0.4), fur, Vector3(0.02 * side, -0.16, 0))
-		_part(a, _capsule(0.1, 0.34), fur, Vector3(0.04 * side, -0.4, 0.01))
-		_part(a, _sphere(), tan, Vector3(0.05 * side, -0.57, 0.03), Vector3(0.11, 0.085, 0.12))
+		_part(a, _capsule(0.085, 0.4), sleeve, Vector3(0.02 * side, -0.16, 0))
+		_part(a, _capsule(0.1, 0.34), sleeve, Vector3(0.04 * side, -0.4, 0.01))
+		_part(a, _sphere(), mask, Vector3(0.05 * side, -0.57, 0.03), Vector3(0.12, 0.095, 0.13))
 		arms.append(a)
 
 	neck = _pivot(shoulders, Vector3(0, neck_y, 0.05))
 	_part(neck, _sphere(), fluff, Vector3(0, 0.13, 0), Vector3(0.27, 0.25, 0.26))
-	# The face, low on the front of it
-	_part(neck, _sphere(), tan, Vector3(0, 0.07, 0.15), Vector3(0.16, 0.13, 0.12))
-	_part(neck, _sphere(), fluff, Vector3(0, 0.17, 0.2), Vector3(0.17, 0.05, 0.08))
-	_part(neck, _sphere(), lip, Vector3(0, 0.075, 0.265), Vector3(0.062, 0.03, 0.035))
-	_part(neck, _sphere(), lip, Vector3(0, 0.0, 0.235), Vector3(0.115, 0.04, 0.05))
+	# The face, low on the front of it: a dark mask, so that it is the first thing seen
+	_part(neck, _sphere(), mask, Vector3(0, 0.085, 0.15), Vector3(0.2, 0.165, 0.13))
+	_part(neck, _sphere(), fluff, Vector3(0, 0.235, 0.19), Vector3(0.2, 0.05, 0.08))
+	_part(neck, _sphere(), lip, Vector3(0, 0.06, 0.275), Vector3(0.062, 0.03, 0.035))
+	_part(neck, _sphere(), lip, Vector3(0, -0.02, 0.245), Vector3(0.125, 0.042, 0.05))
 	var knot := neck.get_child_count()
 	for i in 3:
 		_spike(neck, pale, Vector3((i - 1) * 0.06, 0.33, -0.02), Vector3((i - 1) * 0.5 + rng.randf_range(-0.2, 0.2), 1.0, -0.4), rng.randf_range(0.1, 0.16), 0.045)
 	_swell(neck, knot, Vector3(0, 0.33, 0), Vector3.ONE * crest)
 	for side: float in [-1.0, 1.0]:
-		_eye(Vector3(0.068 * side, 0.115, 0.255), 0.032)
-	mouth_node = _pivot(neck, Vector3(0, 0.0, 0.275))
-	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.09, 0.04, 0.03))
+		_eye(Vector3(0.082 * side, 0.135, 0.258), 0.05)
+	mouth_node = _pivot(neck, Vector3(0, -0.02, 0.287))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.095, 0.04, 0.03))
 
 
 # Three heads on one pup, each with a mind of its own and all of them hungry
