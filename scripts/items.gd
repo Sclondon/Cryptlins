@@ -5,7 +5,7 @@ extends RefCounted
 ## group (Snack.Kind, Ball.Kind, Decor.Kind, and so on).
 
 const LIST: Array[Dictionary] = [
-	{"id": "notebook", "group": "tool", "n": 0, "name": "Notebook"},
+	{"id": "notebook", "group": "tool", "n": 0, "name": "Cryptlin Handbook"},
 	{"id": "scanner", "group": "tool", "n": 1, "name": "Scanner"},
 	{"id": "broom", "group": "tool", "n": 2, "name": "Broom"},
 	{"id": "egg", "group": "egg", "n": 0, "name": "Egg"},
@@ -142,18 +142,20 @@ static func model(id: String) -> Node3D:
 	return holder
 
 
-# A small ring-bound notebook with a pencil tucked in it
+# The Cryptlin Handbook: a small ring-bound notebook, shut, with its name on a pasted label on
+# the cover (two lines of it, at the size it is drawn) and a pencil tucked in it
 static func notebook() -> Node3D:
 	var book := Node3D.new()
 	var leaf := Node3D.new()
 	leaf.position = Vector3(0, 0.34, 0)
 	leaf.rotation = Vector3(-0.35, 0, 0.12)
 	book.add_child(leaf)
-	Ps1.part(leaf, Ps1.box(), Ps1.mat(Color(0.34, 0.12, 0.1)), Vector3(0, 0, -0.012), Vector3(0.44, 0.58, 0.03))
-	Ps1.part(leaf, Ps1.box(), Ps1.mat(Color(0.88, 0.84, 0.7)), Vector3(0, -0.01, 0.01), Vector3(0.4, 0.52, 0.03))
-	var ink := Ps1.flat(Color(0.3, 0.32, 0.45))
-	for i in 4:
-		Ps1.part(leaf, Ps1.box(), ink, Vector3(-0.02 * (i % 2), 0.12 - i * 0.09, 0.027), Vector3(0.28 - 0.04 * (i % 2), 0.014, 0.002))
+	Ps1.part(leaf, Ps1.box(), Ps1.mat(Color(0.88, 0.84, 0.7)), Vector3(0.012, -0.012, -0.012), Vector3(0.43, 0.56, 0.03))
+	Ps1.part(leaf, Ps1.box(), Ps1.mat(Color(0.34, 0.12, 0.1)), Vector3(0, 0, 0.008), Vector3(0.44, 0.58, 0.02))
+	Ps1.part(leaf, Ps1.box(), Ps1.mat(Color(0.9, 0.86, 0.72)), Vector3(0, 0.08, 0.02), Vector3(0.32, 0.2, 0.006))
+	var ink := Ps1.flat(Color(0.2, 0.18, 0.24))
+	for i in 2:
+		Ps1.part(leaf, Ps1.box(), ink, Vector3(0, 0.115 - i * 0.075, 0.025), Vector3(0.2 + 0.05 * i, 0.03, 0.002))
 	for i in 5:
 		Ps1.part(leaf, Ps1.box(), Ps1.mat(Color(0.6, 0.6, 0.62)), Vector3(-0.16 + i * 0.08, 0.28, 0.0), Vector3(0.022, 0.07, 0.06))
 	Ps1.part(leaf, Ps1.drum(5), Ps1.mat(Color(0.85, 0.65, 0.15)), Vector3(0.25, 0.0, 0.03), Vector3(0.018, 0.4, 0.018))

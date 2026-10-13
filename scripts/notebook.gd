@@ -15,6 +15,9 @@ const FAINT := Color(0.17, 0.14, 0.2, 0.55)
 const PAPER := Color(0.87, 0.82, 0.68)
 # Special Elite, a worn typewriter (Apache License 2.0: see fonts/SpecialElite-LICENSE.txt)
 const FACE: FontFile = preload("res://fonts/SpecialElite-Regular.ttf")
+# What the notebook is called, on its cover and at the head of every leaf
+const TITLE := "Cryptlin Handbook"
+const TITLE_SIZE := 18
 const HEAD_SIZE := 31
 const BODY_SIZE := 21
 const LINE_GAP := 4
@@ -30,7 +33,7 @@ const FOOT_TALL := 68.0
 # The chapters that come after the one for each of those in the room
 const TITLES: Array[String] = ["Standing orders", "What is on the wheel", "What a hand can do", "Odds and ends"]
 const CARE: Array[String] = [
-	"You have the cellar now, so these are yours. I kept them going between trains. It is not hard work, only regular.",
+	"You have the cellar now, so these are yours, and so is this handbook. I kept them going between trains. It is not hard work, only regular.",
 	"They keep the station clock, whether you are down here or not. Miss a day and they have lived it without you.",
 	"Feed each of them once or twice a day. A full belly lasts most of a day. Food goes to whoever gets to it first, so see the shy ones are not left out.",
 	"Give them a toy when they mope. A hatchling is grown in a day or two.",
@@ -141,6 +144,7 @@ var chapter := 0
 var part := 0
 # Every leaf there is just now, in order: its chapter, which leaf of that it is, and its words
 var leaves: Array[Dictionary] = []
+var title: Label
 var heading: Label
 var leaf: Control
 var body: Label
@@ -165,6 +169,10 @@ func _init(den: Den) -> void:
 	var rows := VBoxContainer.new()
 	rows.add_theme_constant_override("separation", GAP)
 	add_child(rows)
+	# Its name, as it is lettered on the cover, across the top of every leaf
+	title = _line(rows, TITLE_SIZE, FAINT)
+	title.text = TITLE
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading = _line(rows, HEAD_SIZE, INK)
 	heading.clip_text = true
 	heading.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -269,7 +277,7 @@ func resident() -> Resident:
 func _room() -> Vector2:
 	var paper := get_theme_stylebox("panel")
 	var wide := size.x - paper.get_margin(SIDE_LEFT) - paper.get_margin(SIDE_RIGHT)
-	var tall := size.y - paper.get_margin(SIDE_TOP) - paper.get_margin(SIDE_BOTTOM) - heading.get_minimum_size().y - FOOT_TALL - GAP * 2
+	var tall := size.y - paper.get_margin(SIDE_TOP) - paper.get_margin(SIDE_BOTTOM) - title.get_minimum_size().y - heading.get_minimum_size().y - FOOT_TALL - GAP * 3
 	return Vector2(maxf(wide, 40.0), maxf(tall, 40.0))
 
 

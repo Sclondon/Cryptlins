@@ -851,6 +851,7 @@ func _pages() -> void:
 			for what: String in ["food", "yuck", "toy", "ground", "lamp", "water", "knack", "decor-" + Decor.IDS[r.pet.hate_decor]]:
 				r.known[what + "?"] = r.known.get(what, false)
 				r.known[what] = true
+	check(book.title.text == "Cryptlin Handbook" and book.title.is_visible_in_tree() and Items.find("notebook")["name"] == "Cryptlin Handbook", "the notebook is the Cryptlin Handbook, and says so at the head of its leaves")
 	check(book.heading.get_theme_font("font") == Notebook.FACE and book.body.get_theme_font("font") == Notebook.FACE and FileAccess.file_exists("res://fonts/SpecialElite-LICENSE.txt"), "the notebook is set in its own face, whose licence is kept with it")
 	for shape: Vector2i in [Vector2i(1280, 720), Vector2i(540, 1170), Vector2i(720, 720)]:
 		root.size = shape
@@ -865,7 +866,7 @@ func _pages() -> void:
 			await _frames(2)
 			var frame := book.leaf.get_global_rect()
 			var fits := book.body.get_minimum_size().y <= frame.size.y + 0.5 and book.body.get_visible_line_count() == book.body.get_line_count() and book.get_global_rect().grow(1.0).encloses(frame)
-			for part: Control in [book.heading, book.rename, book.sound, book.folio]:
+			for part: Control in [book.title, book.heading, book.rename, book.sound, book.folio]:
 				fits = fits and (not part.is_visible_in_tree() or book.get_global_rect().encloses(part.get_global_rect()))
 			inside = inside and screen.grow(-Notebook.EDGE + 0.5).encloses(book.get_global_rect())
 			if not fits:
