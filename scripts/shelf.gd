@@ -54,6 +54,13 @@ var beckon := ""
 var sought := ""
 var held := false
 var t := 0.0
+# How much of its height, at the bottom, is more room under the wheel and no part of the wheel's
+# own measure (screen units): on an upright phone the wheel rides this far up off the bottom edge,
+# clear of what a phone's browser draws over it there, and its things sink away through this
+var drop := 0.0:
+	set(value):
+		drop = value
+		_fit()
 
 
 func _ready() -> void:
@@ -168,12 +175,16 @@ func _fit() -> void:
 	if view == null:
 		return
 	view.size = Vector2i(maxi(int(size.x / COARSE), 8), maxi(int(size.y / COARSE), 8))
+	# The picture shows the wheel's own height and as much again below it as there is room under it
+	var under := drop / _unit()
+	camera.size = TALL + under
+	camera.position.y = -under * 0.5
 	_limit()
 
 
 # Screen units to one unit of the shelf's own space
 func _unit() -> float:
-	return maxf(size.y, 1.0) / TALL
+	return maxf(size.y - drop, 1.0) / TALL
 
 
 # The wheel's radius: big enough that the rim leaves the screen by its bottom corners
@@ -353,6 +364,7 @@ func _place() -> void:
 func _paint() -> void:
 	var w := overlay.size.x
 	var h := overlay.size.y
+	var tall := h - drop
 	var font := get_theme_default_font()
 	for i in ids.size():
 		if not stands[i].visible or fresh[i] < 0.6:
@@ -371,14 +383,14 @@ func _paint() -> void:
 		if out.get(id, false):
 			overlay.draw_circle(at + Vector2(0, reach * 0.46), 4.0, Icons.AMBER)
 		if marks.has(id):
-			Icons.paint(overlay, marks[id], at + Vector2(reach * 0.3, -reach * 0.3), h * 0.085)
+			Icons.paint(overlay, marks[id], at + Vector2(reach * 0.3, -reach * 0.3), tall * 0.085)
 		if counts.has(id):
 			var corner := at + Vector2(reach * 0.14, reach * 0.42)
 			overlay.draw_string_outline(font, corner, "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0, 0, 0, 0.8))
 			overlay.draw_string(font, corner, "x%d" % counts[id], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Icons.BONE)
 	for way: float in [-1.0, 1.0]:
 		if can_scroll(way):
-			var c := Vector2(w * 0.5 + way * (w * 0.5 - 14.0), h * 0.3)
+			var c := Vector2(w * 0.5 + way * (w * 0.5 - 14.0), tall * 0.3)
 			overlay.draw_colored_polygon(PackedVector2Array([c + Vector2(7 * way, 0), c + Vector2(-5 * way, -10), c + Vector2(-5 * way, 10)]), Color(Icons.AMBER, 0.55))
 
 

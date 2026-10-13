@@ -1,6 +1,6 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..29] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K [--over]] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]|--poses [--baby]|--strides [--baby]]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait|--size=WxH] [--seed=N] [--kind=0..29] [--egg|--ui [--baby]|--scan|--faces|--many|--wheel|--variety [--with=K [--over]] [--per=1..4] [--side|--turn=DEGREES] [--baby] [--dark]|--poses [--baby]|--strides [--baby]]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
 ## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --scan: the
 ## scanner on the wheel, on the finger, and pointed at a grown one, a baby and an egg. With --faces:
@@ -35,6 +35,8 @@ var beside := -1
 var side_on := false
 var dark := false
 # With --with: the other kind stands behind the kind in question, and there is a thing of the room behind the last of them
+# With --size=WxH: the size of the window, where that is not one of the two usual ones
+var window := Vector2i.ZERO
 var over := false
 # With --book: nothing has been found out about any of them yet
 var fresh := false
@@ -86,6 +88,9 @@ func _initialize() -> void:
 			tidy = true
 		if arg == "--fresh":
 			fresh = true
+		if arg.begins_with("--size="):
+			var across := arg.trim_prefix("--size=").split("x")
+			window = Vector2i(int(across[0]), int(across[1]))
 		if arg == "--book":
 			book = true
 		if arg == "--pool":
@@ -120,7 +125,7 @@ func _initialize() -> void:
 			portrait = true
 	DirAccess.make_dir_recursive_absolute(out)
 	save = "user://shots_test_%d%s%s.json" % [kind, "_p" if portrait else "", tag]
-	DisplayServer.window_set_size(Vector2i(540, 1170) if portrait else Vector2i(1280, 720))
+	DisplayServer.window_set_size(window if window != Vector2i.ZERO else (Vector2i(540, 1170) if portrait else Vector2i(1280, 720)))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
 	if variety:
 		_run_variety.call_deferred()

@@ -1091,7 +1091,13 @@ func _outermost(side: float) -> String:
 func _wheel(pet: Cryptlin, shape: String) -> void:
 	var shelf := main.shelf
 	var screen := Rect2(Vector2.ZERO, main.get_viewport().get_visible_rect().size)
-	var top := shelf.global_position + Vector2(shelf.size.x * 0.5, Shelf.CREST * shelf.size.y / Shelf.TALL)
+	var top := shelf.global_position + Vector2(shelf.size.x * 0.5, Shelf.CREST * shelf._unit())
+	# (a thing hangs under its place on the rim, and its count is written under that)
+	var foot := top.y + shelf._unit() * 0.62
+	if shape == "upright":
+		check(shelf.drop > 0.0 and foot < screen.size.y * 0.94 and shelf.get_global_rect().end.y >= screen.size.y - 0.5, "upright: the wheel rides up clear of the bottom of the screen (its top thing ends %d short of it), and its things still sink away off the bottom" % roundi(screen.size.y - foot))
+	else:
+		check(shelf.drop == 0.0, "wide: the wheel is where it was")
 	var first: String = shelf.ids[0]
 	var last: String = shelf.ids[shelf.ids.size() - 1]
 	var lost: Array[String] = []

@@ -54,6 +54,13 @@ const SWEEP_STROKE := 0.24
 # The grounds a foot sinks into (moss, dirt, sand, gravel), and the most footprints there are at once
 const SOFT_GROUNDS: Array[int] = [2, 4, 5, 6]
 const MAX_TRACKS := 28
+# How far up off the bottom edge the wheel rides on an upright phone, as parts of the height of
+# the screen: about what a phone's browser draws over the bottom of a page, and no less than
+# this much on a short screen, where there is less dark under the floor to put it in (that dark
+# is so much of the height, and the wheel wants so many screen units of it)
+const WHEEL_LIFT := 0.08
+const WHEEL_LIFT_LEAST := 0.045
+const WHEEL_SPARE := Vector2(0.175, 110.0)
 # The scanner in use: how far in from the side of the screen and up from the shelf its body is
 # held and how long it is drawn, all as parts of the screen's short side; how far from the eye;
 # and the angle between its barrel and the line of sight to it
@@ -1040,7 +1047,7 @@ func owns(id: String) -> bool:
 # or anywhere in the lower part of the strip the wheel is in (its rim falls away to the corners,
 # and a thing let go there is meant for it all the same)
 func _over_wheel(at: Vector2) -> bool:
-	return shelf.has_point(at) or (shelf.visible and at.y > shelf.global_position.y + shelf.size.y * 0.35)
+	return shelf.has_point(at) or (shelf.visible and at.y > shelf.global_position.y + (shelf.size.y - shelf.drop) * 0.35)
 
 
 # A thing on the end of a finger has come down over the wheel (or, with "", gone back up): the
@@ -2261,8 +2268,13 @@ func _fit() -> void:
 		return
 	# Thumb-sized, and bigger still on an upright phone
 	var deep := 190.0 if tall else 140.0
-	shelf.position = Vector2(0, size.y - deep)
-	shelf.size = Vector2(size.x, deep)
+	# On an upright phone it rides up off the bottom edge, where the browser's own bar and the
+	# bar for gestures are drawn over the page (the game cannot ask how much: it is given the
+	# whole page), and the strip runs on down under it for its things to sink away through
+	var lift := clampf(size.y * WHEEL_SPARE.x - WHEEL_SPARE.y, size.y * WHEEL_LIFT_LEAST, size.y * WHEEL_LIFT) if tall else 0.0
+	shelf.position = Vector2(0, size.y - deep - lift)
+	shelf.size = Vector2(size.x, deep + lift)
+	shelf.drop = lift
 	toast.position.y = 150.0 if tall else 40.0
 	dev.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 12)
 	notebook.fit(size)
