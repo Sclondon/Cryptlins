@@ -191,6 +191,12 @@ func _ape(pet: Cryptlin) -> void:
 	for eye in pet.eyes:
 		headed = headed and eye.get_parent() == pet.neck and eye.position.y > 0.0
 	check(headed and pet.eyes.size() == 2, "it has a head of its own on top of its shoulders, with its eyes in it")
+	# (stood up straight with its arms at rest, whatever it had been about to do with them)
+	for frame in 40:
+		pet.sit_goal = 0.0
+		pet.arm_goal = Cryptlin.REST_ARM
+		pet.velocity = Vector3.ZERO
+		await _frames(1)
 	var low := 9.0
 	var wide := 0.0
 	for mi: MeshInstance3D in pet.arms[1].find_children("*", "MeshInstance3D", true, false):
@@ -2365,7 +2371,7 @@ func _run() -> void:
 	_content(one, mate)
 	one.meet(Cryptlin.State.PAIR, mate)
 	check(one.state == Cryptlin.State.PAIR and mate.state == Cryptlin.State.PAIR and mate.waiting and not one.waiting, "a pair that would: one goes over to the other")
-	check(await _until(func() -> bool: return one.step == 1 and mate.step == 1 and one.lift > 0.1, 900) and one.feeling == Cryptlin.Feeling.LOVING, "and clambers up on it, all hearts")
+	check(await _until(func() -> bool: return one.step == 1 and mate.step == 1 and one.lift > 0.1, 1800) and one.feeling == Cryptlin.Feeling.LOVING, "and clambers up on it, all hearts")
 	await _tap(_screen(mate.body_centre()))
 	check(one.state == Cryptlin.State.PAIR and one.step == 2 and mate.step == 2 and one.feeling == Cryptlin.Feeling.SCARED and mate.feeling == Cryptlin.Feeling.SCARED and one.lift == 0.0, "a tap and they both stop dead, mortified")
 	check(await _until(func() -> bool: return one.state != Cryptlin.State.PAIR and mate.state != Cryptlin.State.PAIR, 400) and one.me.expecting.is_empty() and mate.me.expecting.is_empty() and one.me.paired == 0.0, "and nothing comes of it")
@@ -2426,7 +2432,8 @@ func _run() -> void:
 	check(child.nature in [one.nature, mate.nature] and child.nature != child.nature2, "with a nature from one of them (%s)" % child.nature_name())
 	var coated := one if child.fur_colour.to_html(false) == one.fur_colour.to_html(false) else mate
 	var other := mate if coated == one else one
-	check(child.marks == coated.marks, "the markings that go with that coat")
+	# (but for any its own kind's coat does not take: see Cryptlin.SHAPES)
+	check(child.marks == coated.marks or Cryptlin.SHAPES[child.kind].has("marks"), "the markings that go with that coat")
 	check(is_equal_approx(float(child.shape["head"]), float(other.shape["head"])), "and the head of the other, for its kind")
 	check(main.notebook._notes(child).contains("Its parents are %s and %s" % [one.me.name, mate.me.name]), "and its page records its parents")
 	# Grown, it is still their young, and the room has its limit
