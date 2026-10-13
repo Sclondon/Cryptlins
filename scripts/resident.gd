@@ -46,6 +46,9 @@ var expecting := {}
 # Friday show (1 first, 2 second, 3 third; 0 for none)
 var kept := -1.0
 var rosette := 0
+# How much there was to choose from when it was made, of foods and toys (see Cryptlin.profile):
+# 0 for one from a save from before the later ones, which keeps the tastes it has always had
+var tastes := Cryptlin.TASTES
 
 
 # The thing itself in the room, egg or cryptlin
@@ -80,6 +83,7 @@ func to_save() -> Dictionary:
 		"expecting": expecting,
 		"kept": kept,
 		"rosette": rosette,
+		"tastes": tastes,
 		"at": [spot.x, spot.z] if spot != Vector3.INF else [],
 	}
 
@@ -112,6 +116,7 @@ static func from_save(d: Dictionary) -> Resident:
 	r.paired = float(d.get("paired", 0.0))
 	r.kept = clampf(float(d.get("kept", -1.0)), -1.0, 100.0)
 	r.rosette = clampi(int(d.get("rosette", 0)), 0, 3)
+	r.tastes = int(d.get("tastes", 0))
 	if d.get("expecting") is Dictionary:
 		r.expecting = d["expecting"]
 	if d.get("regard") is Dictionary:

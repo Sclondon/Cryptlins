@@ -383,7 +383,7 @@ func _remembrance(r: Resident) -> Array[String]:
 		"%s.%s" % [_a(Cryptlin.KINDS[r.kind]["title"]), _parents(r, " Its parents were %s and %s.")],
 		"It lived %s, and is gone.%s%s" % [_span(r.lived), _placed(r), _stone(r)],
 	]
-	var was := Cryptlin.profile(r.kind, r.look_seed)
+	var was := Cryptlin.profile(r.kind, r.look_seed, r.tastes)
 	paras.append_array(_found(r.known, false, was["food"], was["yuck"], was["toy"], was["ground"], was["lamp"], was["decor"], was["hates"], Cryptlin.KINDS[r.kind].get("water", false), r.kind, [
 		"Ate gladly", "Would not touch", "Best toy", "Floor it liked", "Lamp it liked", "Liked about the place", "Could not abide", "Wanted water", "Its knack",
 	]))

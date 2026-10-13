@@ -10,6 +10,7 @@ extends SceneTree
 ## them; fewer to a row with --per, for the wide ones; turned any way with --turn; with --with=K every
 ## other one is of kind K, to see two kinds side by side).
 ## With --wheel: the wheel of things at both of its stops and part of the way round.
+## With --toys: the foods and toys that came later, on the wheel and on the floor, and each of those toys being played with.
 ## With --walk [--baby]: the kind walking across the room, four moments of it, and going away up it, three (with the squatchling's look back over its shoulder).
 ## With --knack [--step=N] [--at=SECONDS] [--then=SECONDS]: the kind taking a turn at the one thing only it does, with another beside it: two moments of it side by side (so long after it gets to part N of it, and so long after that).
 ## With --pool (and no other of those): four in a room with the pool in it, in each place it fits and under each lamp.
@@ -52,6 +53,7 @@ var walk := false
 var pool := false
 var knack := false
 var tidy := false
+var toys := false
 var book := false
 var from_step := 1
 var first_wait := 0.8
@@ -88,6 +90,8 @@ func _initialize() -> void:
 			first_wait = float(arg.trim_prefix("--at="))
 		if arg.begins_with("--then="):
 			second_wait = float(arg.trim_prefix("--then="))
+		if arg == "--toys":
+			toys = true
 		if arg == "--tidy":
 			tidy = true
 		if arg == "--fresh":
@@ -160,6 +164,8 @@ func _initialize() -> void:
 	root.add_child(main)
 	if poses or strides:
 		_run_close.call_deferred()
+	elif toys:
+		_run_toys.call_deferred()
 	elif tidy:
 		_run_tidy.call_deferred()
 	elif book:
@@ -395,6 +401,128 @@ func _run_tidy() -> void:
 	await _wait(0.9)
 	await _snap("t10_broken")
 	await _close_up("t10_broken_close", Vector3(0, 0.2, 1.0))
+	quit()
+
+
+# The foods and toys that came later: each on the wheel, the four foods lying on the floor, each
+# of the four toys new, scuffed and far gone, and each being played with in its own way (the
+# mouse run after, the rope pulled between two, the duck pounced on with one that cannot bear
+# the noise near by, and the top watched and then fallen over)
+func _run_toys() -> void:
+	await _wait(1.0)
+	var pet := main.who().pet
+	var beside := main.new_egg((kind + 5) % Cryptlin.KINDS.size())
+	beside.egg.warmth = 100.0
+	await _until(func() -> bool: return main.pets().size() == 2, 20.0)
+	var mate := main.pets()[1]
+	var both: Array[Cryptlin] = [pet, mate]
+	var rest := func() -> void:
+		for one in both:
+			one.set_needs({"belly": 90.0, "fun": 60.0, "energy": 95.0, "love": 55.0, "age": Cryptlin.GROW_AGE, "bowel": 0.0, "bladder": 0.0})
+			one.ball_cooldown = 9999.0
+			one.beg_cooldown = 9999.0
+			one.fight_cooldown = 9999.0
+			one._enter(Cryptlin.State.STARE)
+	rest.call()
+	pet.position = Vector3(-1.9, 0, -0.9)
+	mate.position = Vector3(1.9, 0, -0.9)
+	for id: String in ["turnip", "duck"]:
+		main.shelf.show_item(id)
+		await _wait(1.0)
+		await _snap("y1_wheel_%s" % id)
+	var row: Array[Node3D] = []
+	for i in 4:
+		var food := Snack.new(Snack.Kind.WORM + i)
+		food.hold()
+		food.position = Vector3(-1.3 + i * 1.2, 0, 0.45)
+		food.rotation.y = 0.4
+		main.add_child(food)
+		row.append(food)
+		for worn in 3:
+			var toy := Ball.new(Ball.Kind.MOUSE + i)
+			toy.held = true
+			toy.wear = [0.0, Ball.SCUFFED, Ball.FAR_GONE][worn]
+			toy.show_wear()
+			toy.position = Vector3(-1.8 + i * 1.2, Ball.R, 0.95 + worn * 0.42)
+			toy.rotation.y = 0.5
+			main.add_child(toy)
+			row.append(toy)
+	rest.call()
+	await _wait(0.6)
+	await _snap("y2_foods_and_toys")
+	await _close_up("y2_close", Vector3(0, 0.1, 1.0), Vector2i(640, 300), 2)
+	for thing in row:
+		thing.queue_free()
+	# The mouse, wound and off, with the two of them after it
+	var chase := func() -> void:
+		for one in both:
+			one.ball_cooldown = 0.0
+			one._enter(Cryptlin.State.CHASE_BALL)
+	main.play_ball(Ball.Kind.MOUSE)
+	await _until(func() -> bool: return main.ball.go > 0.0 and main.ball.speed() > 1.2, 4.0)
+	chase.call()
+	await _wait(0.7)
+	await _snap("y3_mouse_running")
+	await _close_up("y3_mouse_close", main.ball.position)
+	await _wait(0.6)
+	await _snap("y3_mouse_running2")
+	# The rope, and the two of them pulling it
+	rest.call()
+	pet.position = Vector3(-1.0, 0, 0.9)
+	mate.position = Vector3(1.0, 0, 0.9)
+	main.play_ball(Ball.Kind.ROPE)
+	main.ball.vel = Vector3.ZERO
+	main.ball.position = Vector3(0.0, Ball.R, 0.9)
+	await _wait(0.3)
+	await _close_up("y4_rope_lying", main.ball.position)
+	chase.call()
+	await _until(func() -> bool: return main.ball != null and main.ball.taken(), 8.0)
+	await _wait(0.5)
+	await _snap("y4_rope_pulled")
+	await _close_up("y4_rope_pulled_close", main.ball.position)
+	await _wait(0.25)
+	await _close_up("y4_rope_pulled_close2", main.ball.position)
+	await _until(func() -> bool: return main.ball == null or main.ball.pullers.is_empty(), 6.0)
+	await _wait(0.4)
+	await _snap("y4_rope_won")
+	# The duck: one of them pounces on it, and the other is a shy one, standing near
+	rest.call()
+	pet.nature = 1
+	pet.nature2 = 5
+	mate.nature = 2
+	mate.nature2 = 4
+	pet.position = Vector3(-0.7, 0, 0.9)
+	mate.position = Vector3(1.1, 0, 0.7)
+	main.play_ball(Ball.Kind.DUCK)
+	main.ball.vel = Vector3.ZERO
+	main.ball.position = Vector3(0.0, Ball.R, 0.9)
+	await _wait(0.3)
+	mate._enter(Cryptlin.State.IDLE, 20.0)
+	mate.flash_time = 0.0
+	pet.ball_cooldown = 0.0
+	pet._enter(Cryptlin.State.CHASE_BALL)
+	await _until(func() -> bool: return main.ball.squeeze > 0.6, 6.0)
+	await _snap("y5_duck_squeaks")
+	await _close_up("y5_duck_squeaks_close", Vector3(0.2, 0.3, 0.9), Vector2i(460, 260), 2)
+	await _wait(0.6)
+	await _snap("y5_duck_after")
+	# The top: set spinning, watched, and run down
+	rest.call()
+	pet.position = Vector3(-1.0, 0, 0.9)
+	mate.position = Vector3(1.4, 0, -0.6)
+	main.play_ball(Ball.Kind.TOP)
+	main.ball.vel = Vector3.ZERO
+	main.ball.position = Vector3(0.0, Ball.R + 0.3, 0.9)
+	await _until(func() -> bool: return main.ball.go > 0.0, 3.0)
+	pet.ball_cooldown = 0.0
+	pet._enter(Cryptlin.State.CHASE_BALL)
+	await _wait(2.2)
+	await _snap("y6_top_spinning")
+	await _close_up("y6_top_spinning_close", main.ball.position)
+	pet._enter(Cryptlin.State.STARE)
+	pet.ball_cooldown = 9999.0
+	await _until(func() -> bool: return main.ball.go <= 0.0 and main.ball.tilt > 1.1, 9.0)
+	await _close_up("y6_top_fallen_close", main.ball.position)
 	quit()
 
 

@@ -164,6 +164,40 @@ const TOY_LIKES: Array[Array] = [
 # wear_rosette), from the middle of its body at the floor
 const BOLD := 5
 const ROSETTE_AT := {Kind.BOLTER: [Vector3(0.15, 0.6, 0.02), -1.25]}
+# The foods and toys that came later, and which of them each kind leans towards as well. Only a
+# cryptlin made since there were such things draws on them (Resident.tastes, and see profile()):
+# one from an older save keeps the tastes it has always had.
+const TASTES := 1
+const FOOD_MORE: Array[Array] = [
+	[Snack.Kind.SAUSAGE, Snack.Kind.CHEESE], [Snack.Kind.TURNIP], [Snack.Kind.WORM],
+	[Snack.Kind.CHEESE], [Snack.Kind.SAUSAGE], [Snack.Kind.WORM],
+	[Snack.Kind.WORM], [Snack.Kind.SAUSAGE, Snack.Kind.TURNIP], [Snack.Kind.SAUSAGE],
+	[Snack.Kind.TURNIP], [Snack.Kind.WORM], [Snack.Kind.WORM, Snack.Kind.CHEESE],
+	[Snack.Kind.TURNIP, Snack.Kind.CHEESE], [Snack.Kind.CHEESE], [Snack.Kind.WORM, Snack.Kind.TURNIP],
+	[Snack.Kind.TURNIP], [Snack.Kind.CHEESE], [Snack.Kind.TURNIP, Snack.Kind.SAUSAGE],
+	[Snack.Kind.SAUSAGE], [Snack.Kind.WORM, Snack.Kind.TURNIP],
+	[Snack.Kind.CHEESE], [Snack.Kind.SAUSAGE, Snack.Kind.CHEESE], [Snack.Kind.TURNIP, Snack.Kind.WORM],
+	[Snack.Kind.CHEESE], [Snack.Kind.SAUSAGE], [Snack.Kind.SAUSAGE, Snack.Kind.CHEESE],
+	[Snack.Kind.TURNIP, Snack.Kind.WORM],
+	[Snack.Kind.TURNIP],
+	[Snack.Kind.WORM, Snack.Kind.SAUSAGE],
+	[Snack.Kind.CHEESE],
+]
+const TOY_MORE: Array[Array] = [
+	[Ball.Kind.MOUSE, Ball.Kind.DUCK], [Ball.Kind.ROPE], [Ball.Kind.MOUSE, Ball.Kind.TOP],
+	[Ball.Kind.MOUSE, Ball.Kind.TOP], [Ball.Kind.MOUSE, Ball.Kind.ROPE], [Ball.Kind.DUCK],
+	[Ball.Kind.DUCK], [Ball.Kind.ROPE], [Ball.Kind.MOUSE],
+	[Ball.Kind.ROPE, Ball.Kind.DUCK], [Ball.Kind.DUCK], [Ball.Kind.DUCK],
+	[Ball.Kind.DUCK, Ball.Kind.TOP], [Ball.Kind.DUCK, Ball.Kind.TOP], [Ball.Kind.TOP],
+	[Ball.Kind.MOUSE], [Ball.Kind.TOP], [Ball.Kind.ROPE],
+	[Ball.Kind.MOUSE, Ball.Kind.ROPE], [Ball.Kind.TOP],
+	[Ball.Kind.TOP], [Ball.Kind.MOUSE, Ball.Kind.DUCK], [Ball.Kind.ROPE],
+	[Ball.Kind.TOP], [Ball.Kind.MOUSE], [Ball.Kind.ROPE],
+	[Ball.Kind.ROPE],
+	[Ball.Kind.ROPE, Ball.Kind.TOP],
+	[Ball.Kind.MOUSE],
+	[Ball.Kind.DUCK, Ball.Kind.TOP],
+]
 # Natures that will not go together (shy and bold, sleepy and restless, cuddly and grumpy)
 const OPPOSED: Array[Array] = [[2, 5], [3, 7], [4, 6]]
 # What each kind leans towards in its room: two things to have about (Decor.Kind), two grounds
@@ -714,14 +748,16 @@ func _ready() -> void:
 # ---------------------------------------------------------------- body
 
 # What a kind and seed make of it besides its looks: its nature, its favourite food and toy, the
-# food it cannot stand, and the size it grows to
-static func profile(k: int, s: int) -> Dictionary:
+# food it cannot stand, and the size it grows to. `era` is how much there was to choose from
+# when it was made (0 for one from a save from before the later foods and toys, which draws on
+# the first six foods and four toys only, as it always did).
+static func profile(k: int, s: int, era := TASTES) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = s * 7919 + k * 104729 + 17
 	var foods: Array = FOOD_LIKES[k]
 	var toys: Array = TOY_LIKES[k]
 	var others: Array[int] = []
-	for i in Snack.NAMES.size():
+	for i in Snack.Kind.WORM:
 		if not i in foods:
 			others.append(i)
 	var me := {
@@ -764,6 +800,19 @@ static func profile(k: int, s: int) -> Dictionary:
 			liked.pop_back()
 			if not Decor.Kind.GRAVESTONE in liked and me["hates"] != Decor.Kind.GRAVESTONE:
 				liked.append(Decor.Kind.GRAVESTONE)
+	# And the foods and toys that came later, after everything else again: one made since draws
+	# its favourite food and toy afresh from what its kind leans towards with those among them,
+	# and the food it cannot stand from all the rest
+	if era >= 1:
+		foods = foods + FOOD_MORE[k]
+		toys = toys + TOY_MORE[k]
+		others.clear()
+		for i in Snack.NAMES.size():
+			if not i in foods:
+				others.append(i)
+		me["food"] = foods[rng.randi() % foods.size()]
+		me["yuck"] = others[rng.randi() % others.size()]
+		me["toy"] = toys[rng.randi() % toys.size()]
 	return me
 
 
@@ -968,7 +1017,7 @@ func _build() -> void:
 	spring = traits["spring"]
 	voice = traits["voice"]
 	likes = traits.duplicate()
-	var drawn := profile(kind, look_seed)
+	var drawn := profile(kind, look_seed, me.tastes if me != null else TASTES)
 	nature = drawn["nature"]
 	fav_food = drawn["food"]
 	yuck_food = drawn["yuck"]
@@ -4263,7 +4312,7 @@ func _interrupt() -> bool:
 		_enter(State.TRICK if knack.fetches() else State.GO_FOOD)
 	elif world.light_dragging and _sees(world.light_point):
 		_enter(State.CHASE_LIGHT)
-	elif world.ball != null and ball_cooldown <= 0.0 and (world.ball.held or world.ball.speed() > 1.5) and _sees(world.ball.position):
+	elif world.ball != null and ball_cooldown <= 0.0 and (world.ball.held or world.ball.speed() > 1.5) and _sees(world.ball.position) and _plays(world.ball):
 		_enter(State.CHASE_BALL)
 	else:
 		return false
@@ -4301,13 +4350,13 @@ func _decide() -> void:
 	if beg_cooldown <= 0.0 and world.light_on and (belly < 25.0 or (fun < 22.0 and world.ball == null) or (dry() and randf() < 0.3)):
 		_enter(State.BEG)
 		return
-	if world.ball != null and fun < 35.0 and energy > 20.0:
+	if world.ball != null and fun < 35.0 and energy > 20.0 and _plays(world.ball):
 		_enter(State.CHASE_BALL)
 		return
 	var options := {State.WANDER: 34.0, State.STARE: 20.0 * float(likes["stare"]), State.IDLE: 8.0}
 	if world.light_on:
 		options[State.LURK] = 11.0 * float(likes["lurk"])
-	if world.ball != null and energy > 30.0:
+	if world.ball != null and energy > 30.0 and _plays(world.ball):
 		options[State.CHASE_BALL] = 30.0 if world.ball.kind == fav_toy else 16.0
 	if world.somewhere_to_go(self) != null:
 		options[State.VISIT] = 18.0
@@ -5041,6 +5090,9 @@ func _chase_ball(delta: float) -> void:
 		return
 	fun = minf(fun + delta * 0.4, 100.0)
 	gaze = b.global_position
+	if not b.pullers.is_empty():
+		_tug(b, delta)
+		return
 	if b.held:
 		# Held over its head: stand under it and jump for it
 		arm_goal = UP_ARM
@@ -5056,8 +5108,93 @@ func _chase_ball(delta: float) -> void:
 			step = 0
 		return
 	arm_goal = REST_ARM
+	if b.kind == Ball.Kind.TOP and b.go > 0.6 and not b.aloft:
+		# A top that is spinning is a thing to sit by and watch, with its head on one side, until
+		# it falls over
+		var room := 0.5 * grow + 0.55
+		if Vector2(b.position.x - position.x, b.position.z - position.z).length() > room + 0.3:
+			_steer(b.position, RUN * 0.8, delta, room)
+		else:
+			_halt(delta)
+			_face(b.position, delta)
+			sit_goal = 1.0
+			roll_goal = 0.3 if fmod(state_time, 3.0) < 1.5 else -0.3
+			fun = minf(fun + delta * (1.6 if b.kind == fav_toy else 0.9), 100.0)
+		return
+	if b.kind == Ball.Kind.TOP:
+		# (and when it has fallen over, up it gets)
+		sit_goal = 0.0
+		roll_goal = 0.0
 	if _steer(b.position + b.vel * 0.2, RUN * 1.05, delta, 0.38) and b.position.y < 0.75:
 		_kick(b)
+
+
+# Whether it will have anything to do with the toy: all of them will with any, but that a shy or
+# a sleepy one cannot bear the duck's squeaking (unless the duck is its favourite)
+func _plays(b: Ball) -> bool:
+	return b.kind != Ball.Kind.DUCK or fav_toy == Ball.Kind.DUCK or not (_is(2) or _is(3))
+
+
+# The duck has squeaked near by. One that cannot bear the noise jumps: frightened, if it is shy,
+# and cross, if it is sleepy. One that is asleep sleeps through it.
+func hear_squeak(at: Vector3) -> void:
+	if world.ball == null or _plays(world.ball) or not state in INTERRUPTIBLE or flash_time > 0.0:
+		return
+	gaze = at
+	ball_cooldown = 8.0
+	_cry("squeak" if _is(2) else "grumble", 1.2)
+	_enter(State.STARTLED, 1.3)
+	feel(Feeling.SCARED if _is(2) else Feeling.GRUMPY, 5.0)
+
+
+# The rope, with two of them at it (see Ball.pull). One of the two goes to its end, takes hold
+# and hauls, braced and shuffling to and fro; any other stands and looks on.
+func _tug(b: Ball, delta: float) -> void:
+	if not b.pullers.has(self):
+		_halt(delta)
+		_face(b.position, delta)
+		return
+	state_time = minf(state_time, 8.0)
+	if not b.taken():
+		if _steer(b.end_of(self), RUN, delta, 0.12):
+			_face(b.position, delta)
+		return
+	var back := Vector3(position.x - b.position.x, 0, position.z - b.position.z).normalized()
+	var side := 1.0 if b.pullers[0] == self else -1.0
+	velocity = velocity.move_toward(back * side * sin(b.pull_time * 11.0) * 0.6, delta * 14.0)
+	_face(b.position, delta)
+	sit_goal = 0.35
+	nod = 0.3
+	mouth_goal = 0.7
+	arm_goal = BELLY_ARM
+	wag = 12.0
+
+
+# The pull is over, and it has the rope or has lost it. Either way it was a game for two: both
+# are the better for it and think a little more of each other, and the rope is a good deal the
+# worse.
+func tug_over(b: Ball, mate: Cryptlin, won: bool) -> void:
+	var loved := b.kind == fav_toy
+	fun = minf(fun + (16.0 if loved else 11.0), 100.0)
+	world.warm(self, mate, 0.8)
+	kicks_total += 1
+	ball_cooldown = 4.0
+	_enter(State.IDLE, 1.6)
+	if won:
+		hop(2.6)
+		arm_goal = UP_ARM
+		wag = 14.0
+		_cry("coo", 1.1)
+	else:
+		hop(1.2)
+		sit_goal = 1.0
+		_cry("squeak", 0.9)
+	if loved:
+		love = minf(love + 1.0, 100.0)
+		feel(Feeling.EXCITED, 4.0)
+		world.learned(self, "toy")
+	for i in 2:
+		world.wear_toy(b, self)
 
 
 func _kick(b: Ball) -> void:
@@ -5068,13 +5205,20 @@ func _kick(b: Ball) -> void:
 			if (b.kind == fav_toy or b.kind == other.fav_toy) and squabble(other, 0.35):
 				return
 			world.warm(self, other, 0.4)
+	# A rope with another of them after it too is for pulling between the two of them
+	if b.kind == Ball.Kind.ROPE and Den.wade(b.position) <= 0.0:
+		for other in world.pets():
+			if other != self and other.state == State.CHASE_BALL and position.distance_to(other.position) < 2.6:
+				b.pull(self, other)
+				world.sfx.play(b.sound, b.pitch)
+				return
 	var dir := Vector3(sin(yaw), 0, cos(yaw))
 	# Fetch it back if it has gone off into the dark
 	var home := -position
 	home.y = 0.0
 	if home.length() > 1.3:
 		dir = (dir + home.normalized() * 1.6).normalized()
-	b.vel = (dir * randf_range(2.4, 4.2) + Vector3.UP * randf_range(2.0, 3.8)) * b.heft
+	b.kicked(dir, self)
 	hop(2.0)
 	world.sfx.play(b.sound, b.pitch * 1.2)
 	kicks += 1
@@ -5085,6 +5229,10 @@ func _kick(b: Ball) -> void:
 		love = minf(love + 1.0, 100.0)
 		feel(Feeling.EXCITED, 4.0)
 		world.learned(self, "toy")
+	elif b.kind == Ball.Kind.DUCK and (_is(1) or _is(5) or _is(7)):
+		# (a playful, a bold or a restless one cannot get enough of the noise)
+		fun = minf(fun + 3.0, 100.0)
+		feel(Feeling.HAPPY, 3.0)
 	if kicks >= kick_limit:
 		ball_cooldown = 4.0
 		_cry("coo")

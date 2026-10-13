@@ -6,11 +6,11 @@ signal thud(strength: float)
 # It has landed in the pool
 signal splashed
 
-enum Kind { BONE, TOADSTOOL, CANDY, FISH, BEETLE, BERRIES }
+enum Kind { BONE, TOADSTOOL, CANDY, FISH, BEETLE, BERRIES, WORM, SAUSAGE, TURNIP, CHEESE }
 
-const NAMES: Array[String] = ["Bone", "Toadstool", "Candy corn", "Fish", "Beetle", "Berries"]
+const NAMES: Array[String] = ["Bone", "Toadstool", "Candy corn", "Fish", "Beetle", "Berries", "Worm", "Sausage", "Turnip", "Cheese"]
 # As in "it loves ..."
-const PLURALS: Array[String] = ["bones", "toadstools", "candy corn", "fish", "beetles", "berries"]
+const PLURALS: Array[String] = ["bones", "toadstools", "candy corn", "fish", "beetles", "berries", "worms", "sausages", "turnips", "cheese"]
 const BITES := 3
 const VALUE := 34.0
 
@@ -104,6 +104,58 @@ func _init(which: int = Kind.BONE) -> void:
 				_add(_ball(0.055), colour if i % 2 == 0 else Color(0.62, 0.12, 0.3), Vector3(cos(a) * out, up, sin(a) * out))
 			var leaf := _add(_ball(1.0), Color(0.2, 0.45, 0.18), Vector3(0.03, 0.18, 0), Vector3(0, 0.6, 0.3))
 			leaf.scale = Vector3(0.07, 0.012, 0.04)
+		Kind.WORM:
+			colour = Color(0.86, 0.5, 0.52)
+			# A fat one, ring on ring in a wriggle, with a pale saddle and its front end up off the floor
+			for i in 11:
+				var u := i / 10.0
+				var ring := colour if i % 2 == 0 else Color(0.72, 0.36, 0.42)
+				_add(_ball(0.05 - 0.014 * absf(u - 0.4)), Color(0.96, 0.8, 0.74) if i == 3 or i == 4 else ring, Vector3(lerpf(-0.16, 0.16, u), 0.045 + 0.09 * maxf(u - 0.7, 0.0) / 0.3, sin(u * TAU * 1.1) * 0.055))
+		Kind.SAUSAGE:
+			colour = Color(0.62, 0.25, 0.15)
+			# Two fat links, tied off with string between them and at the ends
+			var link := CapsuleMesh.new()
+			link.radius = 0.058
+			link.height = 0.21
+			link.radial_segments = 6
+			link.rings = 2
+			for side: float in [-1.0, 1.0]:
+				_add(link, colour if side < 0.0 else Color(0.7, 0.3, 0.17), Vector3(0.1 * side, 0.06, -0.02), Vector3(0, 0.35 * side, PI * 0.5))
+				_add(_ball(0.022), Color(0.9, 0.86, 0.74), Vector3(0.21 * side, 0.06, -0.06))
+			_add(_ball(0.026), Color(0.9, 0.86, 0.74), Vector3(0, 0.06, 0.015))
+		Kind.TURNIP:
+			colour = Color(0.92, 0.9, 0.82)
+			# White below and purple above, on the point of its root, with its leaves still on
+			var bulb := _add(_ball(1.0), colour, Vector3(0, 0.125, 0))
+			bulb.scale = Vector3(0.105, 0.095, 0.105)
+			var crown := _add(_ball(1.0), Color(0.62, 0.24, 0.56), Vector3(0, 0.16, 0))
+			crown.scale = Vector3(0.107, 0.068, 0.107)
+			var point := CylinderMesh.new()
+			point.top_radius = 0.045
+			point.bottom_radius = 0.0
+			point.height = 0.07
+			point.radial_segments = 5
+			_add(point, colour, Vector3(0, 0.035, 0))
+			for i in 3:
+				var a := TAU * i / 3.0 + 0.5
+				var leaf := _add(_ball(1.0), Color(0.24, 0.5, 0.2), Vector3(cos(a) * 0.045, 0.27, sin(a) * 0.045), Vector3(0, -a, -0.5))
+				leaf.scale = Vector3(0.028, 0.075, 0.045)
+		Kind.CHEESE:
+			colour = Color(0.96, 0.78, 0.24)
+			# A wedge of it lying flat, the rind along its back and holes in its top and sides
+			var wedge := PrismMesh.new()
+			wedge.size = Vector3(0.28, 0.24, 0.13)
+			_add(wedge, colour, Vector3(0, 0.065, 0), Vector3(PI * 0.5, 0, 0))
+			var rind := BoxMesh.new()
+			rind.size = Vector3(0.29, 0.135, 0.016)
+			_add(rind, Color(0.82, 0.36, 0.1), Vector3(0, 0.066, -0.124))
+			var holes: Array[Vector3] = [Vector3(-0.05, 0.132, -0.06), Vector3(0.05, 0.132, -0.03), Vector3(0.0, 0.132, 0.05)]
+			for at: Vector3 in holes:
+				var hole := _add(_ball(1.0), Color(0.72, 0.5, 0.1), at)
+				hole.scale = Vector3(0.03, 0.004, 0.03)
+			for side: float in [-1.0, 1.0]:
+				var hole := _add(_ball(1.0), Color(0.72, 0.5, 0.1), Vector3(0.075 * side, 0.07, 0.0), Vector3(0, -0.53 * side, 0))
+				hole.scale = Vector3(0.006, 0.028, 0.028)
 
 
 func _ball(radius: float) -> SphereMesh:

@@ -1005,6 +1005,7 @@ func dev_show(kind: int, as_egg := false, new_look := false) -> void:
 	r.kind = posmod(kind, Cryptlin.KINDS.size())
 	if new_look:
 		r.look_seed = Cryptlin.new_seed()
+		r.tastes = Cryptlin.TASTES
 	r.warmth = 0.0
 	r.at = at
 	if not light_on:

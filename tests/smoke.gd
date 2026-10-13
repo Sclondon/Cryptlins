@@ -940,6 +940,290 @@ func _toys() -> void:
 	pet._enter(Cryptlin.State.IDLE, 1.0)
 
 
+# The foods and toys that came later (worm, sausage, turnip and cheese; tin mouse, rope knot,
+# rubber duck and top): they are listed and on the wheel, and nobody's for nothing; a cryptlin
+# from a save from before them keeps the tastes it always had, while one made since can draw
+# them; each toy is played with in a way of its own, and wears; and inside a host page one of
+# them is taken from stock when it is brought out, is the room's from then on and is gone for
+# good when it breaks, unless the page says there is no end of them
+func _new_things() -> void:
+	var pet := main.who().pet
+	await _until(func() -> bool: return _settled(pet), 600)
+	var listed := true
+	for id: String in ["worm", "sausage", "turnip", "cheese", "mouse", "rope", "duck", "top"]:
+		var item := Items.find(id)
+		var model := Items.model(id)
+		listed = listed and Items.id_of(item["group"], item["n"]) == id and not id in Items.FREE and not Items.GIVEN.has(id) and main.owns(id) and main.shelf.ids.has(id) and model.get_child(0).get_child_count() > 0
+		model.free()
+	check(listed and Snack.NAMES.size() == 10 and Snack.PLURALS.size() == 10 and Ball.NAMES.size() == 8 and Ball.PLAIN.size() == 8 and Ball.WEARS.size() == 8 and Ball.TINTS.size() == 8, "four more foods and four more toys are on the wheel, each with a model, and none of them given for nothing")
+	check(Items.find("bone")["n"] == 0 and Items.find("berries")["n"] == 5 and Items.find("worm")["n"] == 6 and Items.find("ball")["n"] == 0 and Items.find("glow")["n"] == 3 and Items.find("mouse")["n"] == 4, "the older ones are numbered as they were, and the new ones after them")
+
+	# Tastes: what one from before draws is what it always drew (worked out here as it was
+	# then), and nothing else about it is any different for having been made since
+	var kept := true
+	var alike := true
+	var apart := true
+	var loved := {}
+	var loathed := {}
+	var played := {}
+	for k in Cryptlin.KINDS.size():
+		for i in 60:
+			var s := 1 + i * 7 if i < 30 else Cryptlin.OLD_SEEDS + 1 + i * 7919
+			var rng := RandomNumberGenerator.new()
+			rng.seed = s * 7919 + k * 104729 + 17
+			var foods: Array = Cryptlin.FOOD_LIKES[k]
+			var others: Array[int] = []
+			for n in 6:
+				if not n in foods:
+					others.append(n)
+			rng.randi()
+			var food: int = foods[rng.randi() % foods.size()]
+			var yuck: int = others[rng.randi() % others.size()]
+			var toy: int = Cryptlin.TOY_LIKES[k][rng.randi() % 2]
+			var was := Cryptlin.profile(k, s, 0)
+			var now := Cryptlin.profile(k, s, Cryptlin.TASTES)
+			kept = kept and was["food"] == food and was["yuck"] == yuck and was["toy"] == toy and food < 6 and yuck < 6 and toy < 4
+			for what: String in ["nature", "nature2", "size", "decor", "hates", "ground", "lamp"]:
+				alike = alike and was[what] == now[what]
+			apart = apart and now["food"] != now["yuck"] and (now["food"] in foods or now["food"] in Cryptlin.FOOD_MORE[k]) and (now["toy"] in Cryptlin.TOY_LIKES[k] or now["toy"] in Cryptlin.TOY_MORE[k])
+			for found: Array in [[loved, now["food"]], [loathed, now["yuck"]], [played, now["toy"]]]:
+				if not found[0].has(found[1]):
+					found[0][found[1]] = {}
+				found[0][found[1]][k] = true
+	check(kept, "one from a save from before the new foods and toys draws the favourite food, the food it will not eat and the favourite toy it always drew")
+	check(alike, "and one made since is the same in everything else: its natures, its size and what it wants of its room")
+	var spread := apart and Cryptlin.FOOD_MORE.size() == Cryptlin.KINDS.size() and Cryptlin.TOY_MORE.size() == Cryptlin.KINDS.size()
+	var covered := {}
+	for eaten in range(Snack.Kind.WORM, Snack.NAMES.size()):
+		spread = spread and loved.get(eaten, {}).size() >= 8 and loathed.get(eaten, {}).size() >= 8
+		for k: int in loved.get(eaten, {}):
+			covered[k] = true
+	for thing in range(Ball.Kind.MOUSE, Ball.NAMES.size()):
+		spread = spread and played.get(thing, {}).size() >= 8
+	check(spread and covered.size() == Cryptlin.KINDS.size(), "each new food is the favourite of some kinds and refused by others, every kind has one it may love, and each new toy is some kinds' favourite")
+	var fresh := Resident.new()
+	check(fresh.tastes == Cryptlin.TASTES and Resident.from_save(fresh.to_save()).tastes == Cryptlin.TASTES and Resident.from_save({"kind": Cryptlin.KINDS[kind]["title"], "seed": 7}).tastes == 0, "which of the two a resident is, is kept in the save: one made now is marked, one with no mark is from before")
+	# The one in the room, as an older save would have it
+	var drawn := Cryptlin.profile(pet.kind, pet.look_seed, Cryptlin.TASTES)
+	check(pet.me.tastes == Cryptlin.TASTES and pet.fav_food == drawn["food"] and pet.yuck_food == drawn["yuck"] and pet.fav_toy == drawn["toy"], "the one in the room was made since, and has its tastes from all there is")
+	for era: int in [0, Cryptlin.TASTES]:
+		main.save_game()
+		main.queue_free()
+		await _frames(3)
+		var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(save))
+		for saved: Dictionary in data["residents"]:
+			if era == 0:
+				saved.erase("tastes")
+			else:
+				saved["tastes"] = era
+		var f := FileAccess.open(save, FileAccess.WRITE)
+		f.store_string(JSON.stringify(data))
+		f.close()
+		main = _start()
+		await _frames(5)
+		pet = main.who().pet
+		if era == 0:
+			var old := Cryptlin.profile(pet.kind, pet.look_seed, 0)
+			check(pet.me.tastes == 0 and pet.fav_food == old["food"] and pet.yuck_food == old["yuck"] and pet.fav_toy == old["toy"] and pet.fav_food < Snack.Kind.WORM and pet.yuck_food < Snack.Kind.WORM and pet.fav_toy < Ball.Kind.MOUSE, "loaded from a save with no mark on it, it has the tastes it had before there were new things (%s, not %s, the %s)" % [Snack.PLURALS[pet.fav_food], Snack.PLURALS[pet.yuck_food], Ball.PLAIN[pet.fav_toy]])
+			await _restart()
+			pet = main.who().pet
+			check(main.who().tastes == 0 and pet.fav_food == old["food"] and pet.yuck_food == old["yuck"] and pet.fav_toy == old["toy"], "and keeps them however often it is saved again")
+	check(pet.me.tastes == Cryptlin.TASTES and pet.fav_food == drawn["food"] and pet.fav_toy == drawn["toy"], "(and is put back as it was)")
+
+	# The tin mouse: wound when it lands, it runs off by itself, stays in the room and runs down
+	var needs := pet.get_needs()
+	var natures := [pet.nature, pet.nature2, pet.fav_toy]
+	await _until(func() -> bool: return _settled(pet), 600)
+	pet.energy = 90.0
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	pet.ball_cooldown = 9999.0
+	main.scuffs.clear()
+	main.play_ball(Ball.Kind.MOUSE)
+	pet.ball_cooldown = 9999.0
+	var toy := main.ball
+	check(toy != null and toy.kind == Ball.Kind.MOUSE and not toy.bought and toy.mesh.get_child_count() > 0, "the tin mouse comes out")
+	check(await _until(func() -> bool: return toy.go > 0.0 and toy.speed() > 1.2 and toy.position.y < Ball.R + 0.01, 400), "set down, it runs off by itself")
+	var inside := true
+	for i in 300:
+		await _frames(1)
+		inside = inside and absf(toy.position.x) <= Den.half.x and absf(toy.position.z) <= Den.half.y
+		if toy.go <= 0.0 and toy.speed() < 0.3:
+			break
+	check(inside and toy.go <= 0.0 and toy.speed() < 0.3, "keeps inside the walls, and runs down")
+	toy.kicked(Vector3(1, 0, 0), pet)
+	check(await _until(func() -> bool: return toy.go > 0.0 and toy.speed() > 1.2, 200), "pounced on, it is wound again and off")
+	main.wear_toy(toy, pet)
+	check(is_equal_approx(toy.wear, Ball.WEARS[Ball.Kind.MOUSE] * pet.rough()) and Ball.WEARS[Ball.Kind.MOUSE] > Ball.WEARS[Ball.Kind.BALL] and Ball.WEARS[Ball.Kind.ROPE] < Ball.WEARS[Ball.Kind.BALL] and Ball.WEARS[Ball.Kind.ROPE] > Ball.WEARS[Ball.Kind.STONE], "each time wears it, the mouse faster than a ball and the rope slower")
+	toy.wear = Ball.FAR_GONE
+	toy.show_wear()
+	check(toy.stage() == 2 and toy.key != null and toy.bounce < toy.spring and toy.sag.y < 0.9, "far gone it shows it: an ear gone, a dent, and sagging")
+	main._clear_toys()
+	check(is_equal_approx(main.scuffs.get("mouse", 0.0), Ball.FAR_GONE) and main.shelf.ids.has("mouse"), "and put away it is as worn as it was")
+	main.scuffs.clear()
+
+	# The top: it spins where it is set down, and is watched, not kicked, until it falls over
+	pet.position = Vector3(-1.0, 0, 0.9)
+	main.play_ball(Ball.Kind.TOP)
+	pet.ball_cooldown = 9999.0
+	toy = main.ball
+	toy.vel = Vector3.ZERO
+	toy.position = Vector3(0.3, Ball.R + 0.3, 0.9)
+	check(await _until(func() -> bool: return toy.go > 4.0 and toy.tilt < 0.2, 200), "the top, set down, spins on its point")
+	var kicks := pet.kicks_total
+	pet.ball_cooldown = 0.0
+	pet._enter(Cryptlin.State.CHASE_BALL)
+	check(await _until(func() -> bool: return pet.sit_goal == 1.0 and pet.velocity.length() < 0.3, 240) and pet.kicks_total == kicks and toy.go > 0.6, "one of them goes and sits by it and watches, and does not touch it")
+	pet.ball_cooldown = 9999.0
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	check(await _until(func() -> bool: return toy.go <= 0.0 and toy.tilt > 1.1 and toy.speed() < 0.3, 600), "run down, it falls over on its side")
+	pet.ball_cooldown = 0.0
+	pet._enter(Cryptlin.State.CHASE_BALL)
+	check(await _until(func() -> bool: return pet.kicks_total > kicks and toy.go > 0.0, 900), "and then it is set spinning again")
+	pet.ball_cooldown = 9999.0
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+
+	# The duck: it squeaks when it is pounced on, which a shy or a sleepy one cannot bear
+	main.play_ball(Ball.Kind.DUCK)
+	pet.ball_cooldown = 9999.0
+	toy = main.ball
+	toy.vel = Vector3.ZERO
+	toy.position = pet.position + Vector3(0.6, Ball.R, 0)
+	pet.fav_toy = Ball.Kind.BALL
+	pet.nature = 1
+	pet.nature2 = 5
+	toy.kicked(Vector3(1, 0, 0), pet)
+	check(pet._plays(toy) and toy.squeeze == 1.0 and toy.vel.y > 1.0 and pet.state == Cryptlin.State.IDLE, "the duck, pounced on, is squashed flat and squeaks, and goes up like a ball")
+	for shy: bool in [true, false]:
+		pet.nature = 2 if shy else 3
+		pet.nature2 = 4 if shy else 0
+		pet._enter(Cryptlin.State.IDLE, 60.0)
+		pet.flash_time = 0.0
+		toy.vel = Vector3.ZERO
+		toy.position = pet.position + Vector3(0.6, Ball.R, 0)
+		var willing := pet._plays(toy)
+		toy.squeak()
+		check(not willing and pet.state == Cryptlin.State.STARTLED and pet.feeling == (Cryptlin.Feeling.SCARED if shy else Cryptlin.Feeling.GRUMPY), "a %s one will not play with it, and jumps when it squeaks near by" % ("shy" if shy else "sleepy"))
+	check(main.toast.modulate.a == 0.0, "nothing is written on the screen about it")
+	pet.fav_toy = Ball.Kind.DUCK
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	pet.flash_time = 0.0
+	toy.squeak()
+	check(pet._plays(toy) and pet.state == Cryptlin.State.IDLE, "unless the duck is its favourite")
+	pet.nature = natures[0]
+	pet.nature2 = natures[1]
+	pet.fav_toy = natures[2]
+
+	# The rope: two of them after it take an end each and pull, and one of them gets it
+	var other := Resident.new()
+	other.id = main.next_id
+	main.next_id += 1
+	other.kind = (kind + 5) % Cryptlin.KINDS.size()
+	other.look_seed = Cryptlin.new_seed()
+	other.hatched = true
+	other.name = "Tug"
+	other.born = Time.get_unix_time_from_system() - Cryptlin.GROW_AGE
+	other.needs = {"belly": 80.0, "fun": 50.0, "energy": 90.0, "love": 40.0, "age": Cryptlin.GROW_AGE}
+	main.residents.append(other)
+	main._spawn_pet(other, Vector3(1.2, 0, 0.9))
+	await _frames(5)
+	var mate := other.pet
+	main.play_ball(Ball.Kind.ROPE)
+	toy = main.ball
+	var both: Array[Cryptlin] = [pet, mate]
+	var set_to := func() -> void:
+		pet.position = Vector3(-0.7, 0, 0.9)
+		mate.position = Vector3(1.2, 0, 0.9)
+		toy.vel = Vector3.ZERO
+		toy.position = Vector3(0.0, Ball.R, 0.9)
+		for one in both:
+			one.belly = 80.0
+			one.fun = 50.0
+			one.energy = 90.0
+			one.fight_cooldown = 9999.0
+			one.ball_cooldown = 0.0
+			one._enter(Cryptlin.State.CHASE_BALL)
+	set_to.call()
+	check(await _until(func() -> bool: return toy.pullers.size() == 2 and toy.taken(), 900) and toy.pullers.has(pet) and toy.pullers.has(mate) and toy.held, "two of them after the rope take an end of it each")
+	var regard := main.regard(pet, mate)
+	var worn := toy.wear
+	await _frames(40)
+	check(toy.position.y > Ball.R + 0.1 and toy.taut > 0.0 and pet.position.distance_to(mate.position) > 0.8, "and pull it up off the floor between them")
+	check(await _until(func() -> bool: return toy.pullers.is_empty(), 400) and not toy.held and toy.vel.y > 0.0, "after a few seconds one of them has it off the other")
+	check(pet.fun > 55.0 and mate.fun > 55.0 and main.regard(pet, mate) > regard and is_equal_approx(toy.wear, worn + 2.0 * Ball.WEARS[Ball.Kind.ROPE] * (pet.rough() + mate.rough())), "both are the better for it and think more of each other, and the rope is the worse by two for each")
+	check(pet.state != Cryptlin.State.SCUFFLE and main.fighters.is_empty(), "and nobody comes to blows over it")
+	await _frames(90)
+	set_to.call()
+	check(await _until(func() -> bool: return toy.taken(), 900), "they go at it again")
+	mate._enter(Cryptlin.State.IDLE, 5.0)
+	await _frames(2)
+	check(toy.pullers.is_empty() and not toy.held and pet.state == Cryptlin.State.CHASE_BALL, "one of them called away, the rope is let go")
+	main._clear_toys()
+	main._on_left(other)
+	await _frames(3)
+	check(main.residents.size() == 1 and main.pets().size() == 1, "(the other one is taken out again)")
+	pet.set_needs(needs)
+	pet._enter(Cryptlin.State.IDLE, 60.0)
+	pet.ball_cooldown = 9999.0
+	main.scuffs.clear()
+
+	# Inside a host page: one that was bought is counted
+	main.embedded = true
+	main.stock = {"mouse": 1}
+	main._sync()
+	var said: Array = []
+	var hear := func(message: Dictionary) -> void: said.append(message)
+	main.told.connect(hear)
+	check(main.owns("mouse") and main.left_of("mouse") == 1 and main.shelf.counts.get("mouse") == 1 and not main.owns("rope") and not main.shelf.ids.has("rope") and not main.owns("worm") and not main.shelf.ids.has("worm") and not main.shelf.ids.has("cheese"), "inside a host page only what is in stock of them is on the wheel: one mouse, and none of the rest")
+	main.feed(Snack.Kind.CHEESE)
+	main.play_ball(Ball.Kind.DUCK)
+	check(main.snacks.is_empty() and main.ball == null and said.is_empty(), "what is not in stock is not to be had")
+	main.play_ball(Ball.Kind.MOUSE)
+	check(main.ball != null and main.ball.bought and main.stock.get("mouse") == 0 and main.left_of("mouse") == 0 and said.size() == 1 and said[0].get("type") == "CRYPTLINS_USED" and said[0].get("item") == "mouse", "brought out, the mouse is taken from stock and the page is told")
+	main.ball.wear = 45.0
+	main._clear_toys()
+	check(main.toybox.get("mouse", []).size() == 1 and is_equal_approx(float(main.toybox["mouse"][0]), 45.0) and main.owns("mouse") and main.shelf.ids.has("mouse") and main.shelf.counts.get("mouse") == 1 and said.size() == 1, "put away it is kept, and is the one on the wheel")
+	await _restart()
+	main.embedded = true
+	main.stock = {"mouse": 0}
+	main._sync()
+	main.told.connect(hear)
+	pet = main.who().pet
+	pet.ball_cooldown = 9999.0
+	check(main.toybox.get("mouse", []).size() == 1 and is_equal_approx(float(main.toybox["mouse"][0]), 45.0) and main.owns("mouse") and main.shelf.counts.get("mouse") == 1, "it is kept in the save, with none left in stock")
+	main.play_ball(Ball.Kind.MOUSE)
+	check(main.ball != null and main.ball.bought and is_equal_approx(main.ball.wear, 45.0) and main.stock.get("mouse") == 0 and said.size() == 1 and main.toybox.get("mouse", []).is_empty(), "and comes out again as worn as it was, with nothing more taken and the page not told")
+	main.ball.wear = Ball.WORN_OUT
+	main.wear_toy(main.ball, pet)
+	check(main.ball == null and not main.owns("mouse") and not main.shelf.ids.has("mouse") and not main.broken.has("mouse") and main.toybox.get("mouse", []).is_empty() and not main.scuffs.has("mouse"), "broken, it is gone for good")
+	main.play_ball(Ball.Kind.MOUSE)
+	main.use("mouse")
+	check(main.ball == null and main.toast.modulate.a == 0.0, "with no other to be had for the asking")
+	# And when the page says there is no end of them, it is as it is for a game played by itself
+	main.stock = {"mouse": -1}
+	main._sync()
+	check(main.left_of("mouse") == -1 and main.owns("mouse") and main.shelf.ids.has("mouse") and not main.shelf.counts.has("mouse"), "a page that sends -1 for it has no end of them, and no number on the wheel")
+	main.play_ball(Ball.Kind.MOUSE)
+	check(main.ball != null and not main.ball.bought and main.stock.get("mouse") == -1 and said.size() == 1, "one brought out is not counted, nor the page told")
+	main.ball.wear = 20.0
+	main._clear_toys()
+	check(is_equal_approx(main.scuffs.get("mouse", 0.0), 20.0) and main.toybox.get("mouse", []).is_empty(), "put away, its wear is remembered but it is not one of a few")
+	main.play_ball(Ball.Kind.MOUSE)
+	main.ball.wear = Ball.WORN_OUT
+	main.wear_toy(main.ball, pet)
+	check(main.ball == null and main.broken.has("mouse") and not main.owns("mouse") and not main.shelf.ids.has("mouse"), "broken, there is none for some hours")
+	main.broken["mouse"] = Time.get_unix_time_from_system() - 1.0
+	check(main.owns("mouse"), "and then another")
+	main.broken.clear()
+	main.stock = {}
+	main.embedded = false
+	main._clear_toys()
+	for m in main.messes.duplicate():
+		main.clear_mess(m)
+	main._sync()
+	pet.ball_cooldown = 0.0
+	pet._enter(Cryptlin.State.IDLE, 1.0)
+
+
 # The notebook on a wide screen and on an upright phone, with four in the room, long names and
 # everything found out: it keeps inside the screen with a margin all round, every leaf's words
 # fit the leaf with nothing cut off, between them the leaves of a chapter hold every word of it,
@@ -2221,6 +2505,7 @@ func _run() -> void:
 	# What is out in the room is off the wheel, and toys wear out
 	await _in_and_out(pet)
 	await _toys()
+	await _new_things()
 	pet = main.who().pet
 
 	# The notebook
