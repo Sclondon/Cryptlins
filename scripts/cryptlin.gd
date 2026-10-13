@@ -7,7 +7,7 @@ signal left
 
 enum State {
 	IDLE, WANDER, STARE, LURK, COME, GO_FOOD, EAT, CHASE_BALL, CHASE_LIGHT,
-	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED,
+	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED, INSPECT, SCANNED, VISIT, MOVE_NEST,
 }
 # The cryptids they are the young of
 enum Kind { GREMLIN, SQUATCH, COCKATRICE, MOTHMAN, CHUPACABRA, FROGMAN, NESSIE, BOLTER, WENDIGO }
@@ -30,6 +30,12 @@ const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MO
 
 # How it is feeling just now, which shows in its eyes, its ears and how it holds its head
 enum Feeling { CONTENT, HAPPY, EXCITED, LOVING, HUNGRY, BORED, SLEEPY, GRUMPY, SCARED, SAD, DISGUSTED }
+# What goes up over its head when a feeling comes over it (nothing, for content)
+const EMOTES: Array[String] = ["", "^_^", "\\(^o^)/", "<3", ":Q", "-_-", "u_u", ">:(", "D:", "T_T", ":S"]
+const EMOTE_COLOURS: Array[Color] = [
+	Color.WHITE, Color(1.0, 0.95, 0.6), Color(1.0, 0.85, 0.4), Color(1.0, 0.5, 0.65), Color(1.0, 0.75, 0.45), Color(0.75, 0.78, 0.85),
+	Color(0.7, 0.8, 1.0), Color(1.0, 0.45, 0.35), Color(0.7, 0.9, 1.0), Color(0.6, 0.75, 1.0), Color(0.7, 0.95, 0.5),
+]
 const FEELINGS: Array[Dictionary] = [
 	{"title": "content", "eye": 1.0, "droop": 0.0, "hang": 0.0, "shake": 0.0},
 	{"title": "happy", "eye": 1.05, "droop": -0.05, "hang": -0.06, "shake": 0.0},
@@ -43,8 +49,9 @@ const FEELINGS: Array[Dictionary] = [
 	{"title": "sad", "eye": 0.7, "droop": 0.8, "hang": 0.32, "shake": 0.0},
 	{"title": "disgusted", "eye": 0.5, "droop": 0.45, "hang": -0.1, "shake": 0.03},
 ]
-# Each cryptlin has a nature of its own on top of what its kind is like: how that changes its
-# needs and habits, and how it takes being picked up ("carry") or pushed about ("push")
+# Each cryptlin has two natures of its own on top of what its kind is like: how each changes its
+# needs and habits, and how it takes being picked up ("carry") or pushed about ("push"), which
+# goes by the first of the two
 const NATURES: Array[Dictionary] = [
 	{"title": "greedy", "hunger": 1.35, "carry": Feeling.CONTENT, "push": Feeling.GRUMPY},
 	{"title": "playful", "bore": 1.4, "zoom": 1.8, "dance": 1.3, "carry": Feeling.EXCITED, "push": Feeling.EXCITED},
@@ -66,13 +73,32 @@ const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.BALL, Ball.Kind.GLOW], [Ball.Kind.BALL, Ball.Kind.GLOW],
 	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.STONE, Ball.Kind.BELL], [Ball.Kind.GLOW, Ball.Kind.STONE],
 ]
-# It hatches a baby, and is grown after this many seconds awake
-const GROW_AGE := 420.0
+# Natures that will not go together (shy and bold, sleepy and restless, cuddly and grumpy)
+const OPPOSED: Array[Array] = [[2, 5], [3, 7], [4, 6]]
+# What each kind leans towards in its room: two things to have about (Decor.Kind), two grounds
+# (Den.GROUNDS) and a lamp setting (Den.Lamp)
+const DECOR_LIKES: Array[Array] = [
+	[Decor.Kind.SKULL, Decor.Kind.PUMPKIN], [Decor.Kind.LOG, Decor.Kind.FERN], [Decor.Kind.ROCK, Decor.Kind.GRAVESTONE],
+	[Decor.Kind.CRYSTAL, Decor.Kind.PUMPKIN], [Decor.Kind.SKULL, Decor.Kind.ROCK], [Decor.Kind.DISH, Decor.Kind.FERN],
+	[Decor.Kind.DISH, Decor.Kind.ROCK], [Decor.Kind.ROCK, Decor.Kind.CRYSTAL], [Decor.Kind.SKULL, Decor.Kind.GRAVESTONE],
+]
+const GROUND_LIKES: Array[Array] = [[1, 3], [2, 4], [4, 5], [1, 3], [5, 4], [2, 4], [6, 5], [6, 0], [2, 0]]
+const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1]
+# It lives in real time, like a pet: these are hours of the clock on the wall, and they pass
+# whether or not anyone is looking. A full belly lasts most of a day, and a baby is grown in a
+# day and a half.
+const HOUR := 3600.0
+const BELLY_HOURS := 14.0
+const FUN_HOURS := 10.0
+const AWAKE_HOURS := 15.0
+const SLEEP_HOURS := 7.0
+const GROW_AGE := 36.0 * HOUR
+# The longest it is taken to have been left alone, however long it really was
+const LONGEST_AWAY := 14.0 * 24.0 * HOUR
 const BABY_SIZE := 0.55
 
 const WALK := 1.0
 const RUN := 2.6
-const ROOM := 4.6
 const REST_ARM := Vector3(0.0, 0.0, 0.35)
 const UP_ARM := Vector3(-0.3, 0.0, 2.5)
 const BELLY_ARM := Vector3(-0.9, 0.0, -0.35)
@@ -140,11 +166,23 @@ var love := 20.0
 
 # Who it is (see profile()), how old, how big, and how it feels
 var nature := 0
+var nature2 := 1
 var fav_food := 0
 var yuck_food := 0
 var fav_toy := 0
+# What it wants of its room: two things it likes having about and one it cannot stand
+# (Decor.Kind), and the ground and lamp setting it is happiest with
+var like_decor: Array[int] = []
+var hate_decor := 0
+var fav_ground := 0
+var fav_lamp := 0
+# How well its room suits it, 0 to 100 (Den works it out)
+var comfort := 50.0
 var cuddle := 1.0
 var bore := 1.0
+# How fast it gets hungry and tired next to the usual, once kind and natures are counted
+var appetite := 1.0
+var weariness := 1.0
 var age := GROW_AGE
 var adult_size := 1.0
 var grow := 1.0
@@ -155,6 +193,23 @@ var hang := 0.0
 var pokes := 0
 var poke_time := -10.0
 var carry_point := Vector3.ZERO
+# The thing in the room it is making use of (hiding in, sitting on, drinking from), and how long
+# before it next thinks of dragging its nest somewhere else
+var visiting: Decor
+var nest_cooldown := 240.0
+# What it has gone to look over (see look_over)
+var inspect_liking := 0
+var inspect_key := ""
+# Under the scanner: its insides, and what its skin wore before
+var xrayed := false
+var brain_at := Vector3.ZERO
+var insides: Array[Node3D] = []
+var skin := {}
+var stomach: Node3D
+var stomach_fill: MeshInstance3D
+var heart: MeshInstance3D
+var lungs: Array[MeshInstance3D] = []
+var brain: MeshInstance3D
 var lift := 0.0
 var fall_v := 0.0
 
@@ -225,6 +280,10 @@ var bubble_food: Node3D
 var bubble_ball: Node3D
 var hearts: CPUParticles3D
 var zzz: Array[Label3D] = []
+var emote: Label3D # the little face over its head
+var emote_time := 0.0 # seconds it has been up
+var emote_for := -1 # the feeling it was last put up for
+var emote_again := 0.0 # seconds till a feeling that lasts shows again
 
 
 func _ready() -> void:
@@ -246,13 +305,33 @@ static func profile(k: int, s: int) -> Dictionary:
 	for i in Snack.NAMES.size():
 		if not i in foods:
 			others.append(i)
-	return {
+	var me := {
 		"nature": rng.randi() % NATURES.size(),
 		"food": foods[rng.randi() % foods.size()],
 		"yuck": others[rng.randi() % others.size()],
 		"toy": toys[rng.randi() % toys.size()],
 		"size": rng.randf_range(0.8, 1.3),
 	}
+	# A second nature, never the first again nor its opposite
+	var first: int = me["nature"]
+	var second := rng.randi() % NATURES.size()
+	while second == first or [mini(second, first), maxi(second, first)] in OPPOSED:
+		second = (second + 1) % NATURES.size()
+	me["nature2"] = second
+	# One of the two things its kind likes to have about, one more of its own, and one it hates
+	var kin: Array = DECOR_LIKES[k]
+	var liked: Array[int] = [kin[rng.randi() % kin.size()]]
+	var rest: Array[int] = []
+	for i in Decor.IDS.size():
+		if i != liked[0]:
+			rest.append(i)
+	liked.append(rest.pop_at(rng.randi() % rest.size()))
+	me["decor"] = liked
+	me["hates"] = rest[rng.randi() % rest.size()]
+	var grounds: Array = GROUND_LIKES[k]
+	me["ground"] = grounds[rng.randi() % grounds.size()]
+	me["lamp"] = LAMP_LIKES[k] if rng.randf() < 0.65 else rng.randi() % 3
+	return me
 
 
 # The fur and eye colour a kind and seed give (the egg shows the eye before it hatches)
@@ -280,14 +359,23 @@ func _build() -> void:
 	yuck_food = me["yuck"]
 	fav_toy = me["toy"]
 	adult_size = me["size"]
-	var mine: Dictionary = NATURES[nature]
-	hunger *= float(mine.get("hunger", 1.0))
-	tire *= float(mine.get("tire", 1.0))
-	pace *= float(mine.get("pace", 1.0))
-	bore = mine.get("bore", 1.0)
-	cuddle = mine.get("cuddle", 1.0)
-	for habit: String in ["lurk", "zoom", "dance", "stare"]:
-		likes[habit] = float(likes[habit]) * float(mine.get(habit, 1.0))
+	nature2 = me["nature2"]
+	like_decor.assign(me["decor"])
+	hate_decor = me["hates"]
+	fav_ground = me["ground"]
+	fav_lamp = me["lamp"]
+	for mine: Dictionary in [NATURES[nature], NATURES[nature2]]:
+		hunger *= float(mine.get("hunger", 1.0))
+		tire *= float(mine.get("tire", 1.0))
+		pace *= float(mine.get("pace", 1.0))
+		bore *= float(mine.get("bore", 1.0))
+		cuddle *= float(mine.get("cuddle", 1.0))
+		for habit: String in ["lurk", "zoom", "dance", "stare"]:
+			likes[habit] = float(likes[habit]) * float(mine.get(habit, 1.0))
+	# Kinds differ a great deal in appetite; over a whole day that is evened out a good way
+	appetite = lerpf(1.0, hunger, 0.35)
+	weariness = lerpf(1.0, tire, 0.5)
+	bore = lerpf(1.0, bore, 0.5)
 	grow = size_goal()
 	scale = Vector3.ONE * grow
 	var rng := RandomNumberGenerator.new()
@@ -329,6 +417,8 @@ func _build() -> void:
 		_:
 			_build_gremlin(chub, ear_len, horns, odd_eyes)
 
+	if brain_at == Vector3.ZERO:
+		brain_at = Vector3(0, head_y + 0.02, 0)
 	_build_bubble()
 	_build_hearts()
 	for i in 3:
@@ -342,6 +432,15 @@ func _build() -> void:
 		z.visible = false
 		add_child(z)
 		zzz.append(z)
+	emote = Label3D.new()
+	emote.font_size = 96
+	emote.pixel_size = 0.0034
+	emote.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	emote.no_depth_test = true
+	emote.outline_size = 22
+	emote.outline_modulate = Color(0.05, 0.04, 0.03, 0.9)
+	emote.visible = false
+	add_child(emote)
 
 
 func _build_gremlin(chub: float, ear_len: float, horns: bool, odd_eyes: bool) -> void:
@@ -390,6 +489,7 @@ func _build_squatch(chub: float, rng: RandomNumberGenerator) -> void:
 	centre_y = 0.5
 	top_y = 0.95
 	gravity = 15.0
+	brain_at = Vector3(0, 0.4, 0.04)
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.18 * side, 0.24, 0.02))
 		_part(leg, _capsule(0.07, 0.24), dark, Vector3(0, -0.1, 0))
@@ -646,6 +746,7 @@ func _build_bolter(chub: float, rng: RandomNumberGenerator) -> void:
 	centre_y = 0.42
 	top_y = 0.92
 	gravity = 15.0
+	brain_at = Vector3(0, 0.36, 0.22)
 	for side: float in [-1.0, 1.0]:
 		var leg := _pivot(self, Vector3(0.17 * side, 0.15, 0.05))
 		_part(leg, _sphere(), dark, Vector3(0, -0.1, 0.04), Vector3(0.1, 0.05, 0.14))
@@ -869,8 +970,9 @@ func _build_hearts() -> void:
 
 # ---------------------------------------------------------------- needs
 
+# How it is doing all round: mostly its needs, and partly how well its room suits it
 func mood() -> float:
-	return (belly + fun + energy) / 3.0
+	return (belly + fun + energy) / 3.0 * 0.75 + comfort * 0.25
 
 
 func get_needs() -> Dictionary:
@@ -889,30 +991,54 @@ func set_needs(d: Dictionary) -> void:
 
 
 func _tick_needs(delta: float) -> void:
-	var asleep := state == State.SLEEP
-	var speed := velocity.length()
-	belly -= delta * hunger / (16.0 if asleep else 7.0)
-	fun -= delta * bore / (30.0 if asleep else 5.5)
+	var was_baby := is_baby()
+	_wear(delta, state == State.SLEEP, 1.0 + velocity.length() * 0.5, not world.light_on)
+	comfort = move_toward(comfort, world.comfort_of(self), delta * 4.0)
+	if was_baby and not is_baby():
+		hop(3.0)
+		_cry("coo", 0.8)
+		hearts.emitting = true
+		feel(Feeling.HAPPY, 6.0)
+		world.grew_up()
+
+
+# Time passing, for `seconds` of the clock on the wall: it gets hungrier, more bored and more
+# tired (or more rested, asleep), and older. `effort` is how hard it is working.
+func _wear(seconds: float, asleep: bool, effort: float, dark: bool) -> void:
+	belly -= seconds * appetite * (0.5 if asleep else 1.0) * 100.0 / (BELLY_HOURS * HOUR)
+	fun -= seconds * bore * (0.3 if asleep else 1.0) * 100.0 / (FUN_HOURS * HOUR)
 	if asleep:
-		energy += delta * 3.2
+		energy += seconds * 100.0 / (SLEEP_HOURS * HOUR)
 	else:
-		energy -= delta * tire * (0.1 + speed * 0.12) * (1.0 if world.light_on else 1.8)
+		energy -= seconds * weariness * effort * (1.5 if dark else 1.0) * 100.0 / (AWAKE_HOURS * HOUR)
+	# The bond wears away over a couple of days of going hungry, and grows over a few good ones
 	if belly < 15.0:
-		love -= delta / 40.0
+		love -= seconds * 100.0 / (48.0 * HOUR)
 	elif mood() > 60.0:
-		love += delta / 45.0
-	if not asleep and is_baby():
-		age += delta
-		if not is_baby():
-			hop(3.0)
-			_cry("coo", 0.8)
-			hearts.emitting = true
-			feel(Feeling.HAPPY, 6.0)
-			world.grew_up()
+		love += seconds * 100.0 / (96.0 * HOUR)
+	age += seconds
 	belly = clampf(belly, 0.0, 100.0)
 	fun = clampf(fun, 0.0, 100.0)
 	energy = clampf(energy, 0.0, 100.0)
 	love = clampf(love, 0.0, 100.0)
+
+
+# The time nobody was looking, lived through in five-minute steps: it sleeps when it is worn out
+# (or left in the dark) and wakes when it is rested. True if it is asleep at the end of it.
+func pass_time(seconds: float, dark: bool) -> bool:
+	var left := minf(seconds, LONGEST_AWAY)
+	var asleep := false
+	while left > 0.0:
+		var chunk := minf(left, 300.0)
+		left -= chunk
+		_wear(chunk, asleep, 1.1, dark)
+		if asleep:
+			asleep = energy < 98.0
+		else:
+			asleep = energy < 12.0 or (dark and energy < 70.0)
+	grow = size_goal()
+	scale = Vector3.ONE * grow
+	return asleep
 
 
 # ---------------------------------------------------------------- what you can do to it
@@ -929,8 +1055,14 @@ func size_goal() -> float:
 	return BABY_SIZE if is_baby() else adult_size
 
 
+# Both of its natures, as in "a shy, greedy gremlin"
 func nature_name() -> String:
-	return NATURES[nature]["title"]
+	return "%s, %s" % [NATURES[nature]["title"], NATURES[nature2]["title"]]
+
+
+# How long until it is grown, in seconds (0 once it is)
+func growing_left() -> float:
+	return maxf(GROW_AGE - age, 0.0)
 
 
 func feeling_name() -> String:
@@ -944,7 +1076,36 @@ func feel(how: int, seconds: float) -> void:
 	flash_time = seconds
 
 
+# The face over its head: up with a little bounce whenever its feeling changes, gone after a
+# moment; a feeling that goes on (hungry, bored, sad) comes up again every so often. Never
+# while it sleeps (it has its z's).
+func _show_emote(delta: float) -> void:
+	emote_again -= delta
+	if feeling != emote_for or (emote_again <= 0.0 and not emote.visible and feeling in [Feeling.HUNGRY, Feeling.BORED, Feeling.SAD, Feeling.GRUMPY]):
+		emote_for = feeling
+		emote_again = randf_range(9.0, 14.0)
+		if EMOTES[feeling] != "" and state != State.SLEEP:
+			emote.text = EMOTES[feeling]
+			emote.modulate = EMOTE_COLOURS[feeling]
+			emote.visible = true
+			emote_time = 0.0
+		else:
+			emote.visible = false
+	if not emote.visible:
+		return
+	emote_time += delta
+	var up := 1.0 - exp(-emote_time * 9.0) * cos(emote_time * 16.0) # (pops up and settles)
+	var fade := 1.0 - smoothstep(2.2, 2.8, emote_time)
+	emote.global_position = global_position + Vector3(0.0, (top_y + 0.28) * grow + 0.12 * up, 0.0)
+	emote.scale = Vector3.ONE * maxf(up, 0.01) * (0.8 + 0.2 * grow)
+	emote.modulate.a = fade
+	emote.outline_modulate.a = fade * 0.9
+	if emote_time > 2.8 or state == State.SLEEP:
+		emote.visible = false
+
+
 func _feel(delta: float) -> void:
+	_show_emote(delta)
 	flash_time -= delta
 	if flash_time > 0.0:
 		feeling = flash_feeling
@@ -1051,10 +1212,28 @@ func stroke() -> void:
 
 
 func call_to(point: Vector3) -> void:
-	if state in [State.SLEEP, State.GO_SLEEP, State.EAT, State.PETTED, State.STARTLED, State.LEAVE, State.HELD, State.SHOVED]:
+	if state in [State.SLEEP, State.GO_SLEEP, State.EAT, State.PETTED, State.STARTLED, State.LEAVE, State.HELD, State.SHOVED, State.SCANNED]:
 		return
-	target = point
+	target = Den.in_room(point, 0.35)
 	_enter(State.COME)
+
+
+# Something in its room has changed (a thing put in at `point`, new ground, the lamp):
+# it goes over to see, and shows what it makes of it. `liking` is 1 if this is what it
+# wants, -1 if it cannot stand it and 0 if it does not mind; `key` is what Den.learned() is told.
+func look_over(point: Vector3, liking: int, key: String) -> void:
+	if not state in INTERRUPTIBLE:
+		return
+	inspect_liking = liking
+	inspect_key = key
+	target = Den.in_room(point, 0.35)
+	_enter(State.INSPECT)
+
+
+# The scanner is on it: it holds still and looks at you while it is
+func hold_still() -> void:
+	if state in INTERRUPTIBLE or state in [State.STARTLED, State.INSPECT]:
+		_enter(State.SCANNED)
 
 
 # The player threw the ball: worth chasing even if it had just lost interest
@@ -1104,6 +1283,7 @@ func _process(delta: float) -> void:
 	ball_cooldown -= delta
 	beg_cooldown -= delta
 	pounce_cooldown -= delta
+	nest_cooldown -= delta
 	glance_time -= delta
 	_tick_needs(delta)
 	_feel(delta)
@@ -1155,8 +1335,8 @@ func _enter(s: int, length := 0.0) -> void:
 			roll_goal = randf_range(0.2, 0.35) * (1.0 if randf() < 0.5 else -1.0)
 			wag = 5.0
 		State.LURK:
-			var a := randf_range(PI * 0.95, PI * 2.05)
-			target = world.light_point + Vector3(cos(a), 0, sin(a)) * randf_range(3.3, 3.9)
+			visiting = world.cave()
+			target = world.hiding_place(self)
 		State.COME:
 			_cry("chirp")
 		State.GO_FOOD:
@@ -1170,9 +1350,9 @@ func _enter(s: int, length := 0.0) -> void:
 			wag = 9.0
 		State.BEG:
 			state_len = 5.5
-			beg_cooldown = 16.0
+			beg_cooldown = 30.0
 			beg_for_ball = belly >= 25.0
-			target = world.light_point + Vector3(randf_range(-0.6, 0.6), 0, 1.5)
+			target = Den.in_room(world.light_point + Vector3(randf_range(-0.6, 0.6), 0, 1.5), 0.4)
 		State.ZOOMIES:
 			state_len = randf_range(0.0, TAU)
 			_cry("chirp", 1.2)
@@ -1203,11 +1383,23 @@ func _enter(s: int, length := 0.0) -> void:
 		State.SHOVED:
 			eye_goal = 1.25
 			arm_goal = UP_ARM
+		State.INSPECT:
+			wag = 6.0
+		State.VISIT:
+			visiting = world.somewhere_to_go(self)
+			wag = 5.0
+		State.MOVE_NEST:
+			nest_cooldown = randf_range(400.0, 900.0)
+			wag = 6.0
+		State.SCANNED:
+			eye_goal = 1.15
+			roll_goal = 0.2
 		State.LEAVE:
 			_cry("coo", 0.85)
 			arm_goal = UP_ARM
 			arm_wave = 0.5
-			target = Vector3(4.4 if position.x > 0.0 else -4.4, 0, -0.6)
+			# Out over the front of the tank, the one side with no wall
+			target = Vector3(position.x * 0.5, 0, 4.6)
 		State.SLEEP:
 			curl_goal = 1.0
 			eye_goal = 0.0
@@ -1246,6 +1438,10 @@ func _decide() -> void:
 		options[State.LURK] = 11.0 * float(likes["lurk"])
 	if world.ball != null and energy > 30.0:
 		options[State.CHASE_BALL] = 30.0 if world.ball.kind == fav_toy else 16.0
+	if world.somewhere_to_go(self) != null:
+		options[State.VISIT] = 18.0
+	if nest_cooldown <= 0.0 and world.light_on and energy > 30.0:
+		options[State.MOVE_NEST] = 4.0
 	if fun > 65.0 and energy > 45.0:
 		options[State.ZOOMIES] = 8.0 * float(likes["zoom"])
 	if mood() > 62.0:
@@ -1259,7 +1455,7 @@ func _decide() -> void:
 		if roll <= 0.0:
 			if s == State.WANDER:
 				var a := randf() * TAU
-				target = world.light_point + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * 2.1
+				target = Den.in_room(Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * 2.3, 0.4)
 			_enter(s)
 			return
 	_enter(State.IDLE)
@@ -1300,11 +1496,15 @@ func _think(delta: float) -> void:
 					state_time = 0.0
 					state_len = randf_range(3.0, 5.0)
 					eye_goal = 1.2
+					if is_instance_valid(visiting):
+						# Tucked into the cave, looking out
+						state_len += 3.0
+						sit_goal = 1.0
 			else:
 				_halt(delta)
 				_face(gaze, delta)
 				if state_time > state_len:
-					target = world.light_point + Vector3(randf_range(-1.2, 1.2), 0, randf_range(-0.8, 1.2))
+					target = Den.in_room(Vector3(randf_range(-1.2, 1.2), 0, randf_range(-0.8, 1.2)), 0.4)
 					_enter(State.WANDER)
 		State.COME:
 			if _steer(target, RUN, delta, 0.25) or state_time > 6.0:
@@ -1321,12 +1521,12 @@ func _think(delta: float) -> void:
 			if not world.light_dragging:
 				_enter(State.IDLE, 0.8)
 				return
-			fun = minf(fun + delta * 2.5, 100.0)
+			fun = minf(fun + delta * 0.6, 100.0)
 			gaze = world.light_goal
 			if _steer(world.light_goal, RUN, delta, 0.3) and pounce_cooldown <= 0.0:
 				pounce_cooldown = 0.9
 				hop(2.3)
-				fun = minf(fun + 3.0, 100.0)
+				fun = minf(fun + 2.0, 100.0)
 				_cry("chirp", 1.1)
 		State.BEG:
 			gaze = world.camera.global_position
@@ -1349,9 +1549,8 @@ func _think(delta: float) -> void:
 				if state_time > state_len:
 					_enter(State.IDLE)
 		State.ZOOMIES:
-			fun = minf(fun + delta * 3.0, 100.0)
 			var a := state_len + step * 1.9
-			var point := world.light_point + Vector3(cos(a), 0, sin(a)) * 1.9
+			var point := Den.in_room(Vector3(cos(a), 0, sin(a)) * 1.6, 0.4)
 			gaze = point + Vector3(0, 0.3, 0)
 			mouth_goal = 0.7
 			if _steer(point, RUN * 1.45, delta, 0.55):
@@ -1363,7 +1562,6 @@ func _think(delta: float) -> void:
 					mouth_goal = 0.7
 		State.DANCE:
 			_halt(delta)
-			fun = minf(fun + delta * 2.0, 100.0)
 			wiggle = sin(anim_t * 7.0) * 0.18
 			yaw += delta * 2.2
 			if not airborne:
@@ -1378,8 +1576,8 @@ func _think(delta: float) -> void:
 			gaze = world.camera.global_position
 			_face(gaze, delta)
 			wiggle = sin(anim_t * 10.0) * 0.07
-			love = minf(love + delta * 5.0 * cuddle, 100.0)
-			fun = minf(fun + delta * 3.0, 100.0)
+			love = minf(love + delta * 0.5 * cuddle, 100.0)
+			fun = minf(fun + delta * 0.6, 100.0)
 			if anim_t - last_stroke > 0.7:
 				_cry("coo")
 				hop(2.0)
@@ -1412,6 +1610,117 @@ func _think(delta: float) -> void:
 			wiggle = sin(state_time * 22.0) * 0.2 * (1.0 - state_time / state_len)
 			if state_time > state_len:
 				_enter(State.IDLE, 1.0)
+		State.INSPECT:
+			gaze = target + Vector3(0, 0.3, 0)
+			if step == 0:
+				if _steer(target, WALK * 1.5, delta, 0.6) or state_time > 6.0:
+					step = 1
+					state_time = 0.0
+					_halt(delta)
+					if inspect_liking > 0:
+						hop(2.4)
+						_cry("coo")
+						hearts.emitting = true
+						feel(Feeling.LOVING, 6.0)
+					elif inspect_liking < 0:
+						_cry("grumble", 1.2)
+						roll_goal = 0.35
+						feel(Feeling.DISGUSTED, 6.0)
+					else:
+						_cry("chirp", 0.9)
+					if inspect_liking != 0:
+						world.learned(inspect_key)
+			else:
+				_halt(delta)
+				if inspect_liking > 0:
+					wiggle = sin(anim_t * 9.0) * 0.1
+				if state_time > 1.8:
+					_enter(State.IDLE, 1.0)
+		State.VISIT:
+			if not is_instance_valid(visiting) or visiting.is_queued_for_deletion():
+				_enter(State.IDLE, 0.6)
+				return
+			var at := visiting.position
+			gaze = at + Vector3(0, 0.3, 0)
+			if step == 0:
+				var near := 0.2 if visiting.hollow else visiting.radius + 0.28 * grow
+				if _steer(at, WALK * 1.2, delta, near) or state_time > 7.0:
+					step = 1
+					state_time = 0.0
+					state_len = randf_range(4.0, 7.5)
+					if visiting.kind == Decor.Kind.ROCK:
+						hop(2.6)
+			else:
+				_halt(delta)
+				match visiting.kind:
+					Decor.Kind.DISH:
+						# Drinks
+						_face(at, delta)
+						nod = 0.5 + sin(state_time * 7.0) * 0.12
+						mouth_goal = 0.5
+						if int(state_time / 0.8) + 1 > step:
+							step = int(state_time / 0.8) + 1
+							_cry("chomp", 1.7, -14.0)
+					Decor.Kind.ROCK:
+						# Climbs up and sits on top of it, lord of the room
+						var up := 1.0 - exp(-delta * 6.0)
+						position.x = lerpf(position.x, at.x, up)
+						position.z = lerpf(position.z, at.z, up)
+						lift = lerpf(lift, 0.4, up)
+						sit_goal = 1.0
+						gaze = world.camera.global_position
+						_face(gaze, delta)
+					Decor.Kind.CAVE:
+						# Sits inside, looking out
+						sit_goal = 1.0
+						eye_goal = 1.2
+						gaze = world.camera.global_position
+						_face(gaze, delta)
+					_:
+						# Has a sniff at it, then settles down beside it
+						_face(at, delta)
+						if state_time < 1.6:
+							nod = 0.3 + sin(state_time * 11.0) * 0.08
+						else:
+							nod = 0.0
+							sit_goal = 1.0
+							gaze = world.camera.global_position
+				if state_time > state_len:
+					fun = minf(fun + 1.5, 100.0)
+					if visiting.kind in like_decor:
+						love = minf(love + 0.3, 100.0)
+					_enter(State.IDLE, 1.0)
+		State.MOVE_NEST:
+			if step == 0:
+				gaze = world.nest_pos + Vector3(0, 0.1, 0)
+				if _steer(world.nest_pos, WALK, delta, 0.5) or state_time > 8.0:
+					step = 1
+					state_time = 0.0
+					target = world.nest_spot(self)
+					arm_goal = BELLY_ARM
+					_cry("chirp", 0.8)
+			elif step == 1:
+				# Drags it along behind to wherever it has decided it ought to be
+				gaze = target + Vector3(0, 0.2, 0)
+				var there := _steer(target, WALK * 0.7, delta, 0.3)
+				world.move_nest(position - Vector3(sin(yaw), 0, cos(yaw)) * 0.5 * grow)
+				if there or state_time > 9.0:
+					step = 2
+					state_time = 0.0
+					world.settle_nest()
+					hop(1.8)
+					_cry("coo")
+			else:
+				_halt(delta)
+				gaze = world.nest_pos
+				if state_time > 1.2:
+					_enter(State.IDLE, 1.0)
+		State.SCANNED:
+			_halt(delta)
+			gaze = world.camera.global_position
+			_face(gaze, delta)
+			if not world.scanning or state_time > 30.0:
+				_enter(State.IDLE, 0.8)
 		State.GO_SLEEP:
 			mouth_goal = 1.0 if state_time < 0.9 else 0.12
 			gaze = target + Vector3(0, 0.2, 0)
@@ -1431,7 +1740,7 @@ func _think(delta: float) -> void:
 					arm_wave = 0.0
 			else:
 				gaze = target + Vector3(0, 0.3, 0)
-				if _steer(target, WALK * 1.6, delta, 0.3) or state_time > 9.0:
+				if _steer(target, WALK * 1.8, delta, 0.3) or state_time > 7.0:
 					set_process(false)
 					left.emit()
 		State.SLEEP:
@@ -1516,7 +1825,7 @@ func _chase_ball(delta: float) -> void:
 	if b == null or energy < 12.0 or state_time > 16.0:
 		_enter(State.IDLE)
 		return
-	fun = minf(fun + delta * 1.5, 100.0)
+	fun = minf(fun + delta * 0.4, 100.0)
 	gaze = b.global_position
 	if b.held:
 		# Held over its head: stand under it and jump for it
@@ -1540,9 +1849,9 @@ func _chase_ball(delta: float) -> void:
 func _kick(b: Ball) -> void:
 	var dir := Vector3(sin(yaw), 0, cos(yaw))
 	# Fetch it back if it has gone off into the dark
-	var home := world.light_point - position
+	var home := -position
 	home.y = 0.0
-	if home.length() > 1.5:
+	if home.length() > 1.3:
 		dir = (dir + home.normalized() * 1.6).normalized()
 	b.vel = (dir * randf_range(2.4, 4.2) + Vector3.UP * randf_range(2.0, 3.8)) * b.heft
 	hop(2.0)
@@ -1550,7 +1859,7 @@ func _kick(b: Ball) -> void:
 	kicks += 1
 	kicks_total += 1
 	var loved := b.kind == fav_toy
-	fun = minf(fun + (16.0 if loved else 10.0), 100.0)
+	fun = minf(fun + (9.0 if loved else 6.0), 100.0)
 	if loved:
 		love = minf(love + 1.0, 100.0)
 		feel(Feeling.EXCITED, 4.0)
@@ -1595,11 +1904,24 @@ func _steer(point: Vector3, speed: float, delta: float, arrive := 0.18) -> bool:
 func _move(delta: float) -> void:
 	position.x += velocity.x * delta
 	position.z += velocity.z * delta
-	var flat := Vector2(position.x, position.z)
-	if flat.length() > ROOM:
-		flat = flat.normalized() * ROOM
-	position.x = flat.x
-	position.z = flat.y
+	if state != State.LEAVE:
+		# It walks round the things in its tank, and stays inside the walls
+		if lift <= 0.05:
+			for thing in world.decors:
+				var off := Vector2(position.x - thing.position.x, position.z - thing.position.z)
+				var room := thing.radius + 0.2 * grow
+				# Not the cave it is tucked into, nor the rock it is sat on
+				if (thing.hollow and state in [State.SLEEP, State.GO_SLEEP, State.MOVE_NEST]) or (thing == visiting and state in [State.LURK, State.VISIT]):
+					continue
+				if off.length() < room:
+					# Eased out of the way, not snapped: it slides round things
+					off = (off.normalized() if off.length() > 0.001 else Vector2.RIGHT) * room
+					var clear := Vector2(position.x, position.z).move_toward(Vector2(thing.position.x, thing.position.z) + off, delta * 4.0)
+					position.x = clear.x
+					position.z = clear.y
+		var kept := Den.in_room(position, 0.3)
+		position.x = kept.x
+		position.z = kept.z
 	if airborne:
 		jump_v -= gravity * delta
 		jump_y += jump_v * delta
@@ -1700,6 +2022,8 @@ func _animate(delta: float) -> void:
 	tail.rotation.x = sin(anim_t * 1.3) * 0.12 - curl * 0.4 - hover * minf(speed, 2.0) * 1.2
 	tail.rotation.z = sin(anim_t * wag * 0.5) * hover
 
+	if xrayed:
+		_show_insides()
 	if bubble.visible:
 		bubble.global_basis = world.camera.global_basis
 		bubble.position.y = top_y + 0.35 + sin(anim_t * 2.0) * 0.03
@@ -1709,3 +2033,96 @@ func _animate(delta: float) -> void:
 			var u := fmod(anim_t * 0.4 + i / 3.0, 1.0)
 			zzz[i].global_position = global_position + Vector3(0, (top_y - 0.4) * grow + u * 0.9, 0) + cam_right * (0.3 + sin(u * 5.0) * 0.12)
 			zzz[i].modulate.a = sin(u * PI) * 0.9
+
+
+# ---------------------------------------------------------------- under the scanner
+
+# Turns it to a ghost of its outline with its insides showing, or back again
+func xray(on: bool) -> void:
+	if on == xrayed:
+		return
+	xrayed = on
+	if insides.is_empty():
+		_build_insides()
+	for part in insides:
+		part.visible = on
+	if on:
+		_ghost(self, Ps1.xray(Color(0.35, 0.85, 1.0)))
+	else:
+		for mi: MeshInstance3D in skin:
+			if is_instance_valid(mi):
+				mi.material_override = skin[mi]
+		skin.clear()
+
+
+func _ghost(node: Node, ghost: Material) -> void:
+	if node == bubble or node in insides:
+		return
+	if node is MeshInstance3D:
+		skin[node] = node.material_override
+		node.material_override = ghost
+	for child in node.get_children():
+		_ghost(child, ghost)
+
+
+# Where the scanner's notes point: "stomach", "heart", "lungs" or "brain", in the room
+func inside_at(what: String) -> Vector3:
+	if insides.is_empty():
+		_build_insides()
+	match what:
+		"stomach": return stomach.global_position
+		"heart": return heart.global_position
+		"lungs": return lungs[0].global_position
+		"brain": return brain.global_position
+	return body_centre()
+
+
+# A spine and ribs, a bone in each limb, and the four things worth knowing: a stomach that
+# fills as it eats, a heart for the bond, lungs for how rested it is and a brain for how amused
+func _build_insides() -> void:
+	var white := Ps1.organ(Color(0.75, 0.85, 0.9))
+	var chest := _pivot(torso, Vector3.ZERO)
+	insides.append(chest)
+	var top: float = neck_y + brain_at.y * 0.5
+	_part(chest, _capsule(0.014, maxf(top - centre_y + 0.22, 0.1)), white, Vector3(0, (top + centre_y - 0.22) * 0.5, -0.06))
+	var hoop := TorusMesh.new()
+	hoop.inner_radius = 0.82
+	hoop.outer_radius = 1.0
+	hoop.rings = 8
+	hoop.ring_segments = 3
+	for i in 3:
+		_part(chest, hoop, white, Vector3(0, centre_y + 0.14 - i * 0.07, 0), Vector3(0.14 - i * 0.012, 0.02, 0.11))
+	for limb in legs + arms:
+		insides.append(_part(limb, _capsule(0.012, 0.16), white, Vector3(0, -0.09, 0)))
+
+	stomach = _pivot(chest, Vector3(0, centre_y - 0.11, 0.03))
+	_part(stomach, _sphere(), Ps1.organ(Color(0.32, 0.2, 0.1)), Vector3.ZERO, Vector3(0.125, 0.105, 0.1))
+	stomach_fill = _part(stomach, _sphere(), Ps1.organ(Color(1.0, 0.72, 0.2)), Vector3.ZERO, Vector3(0.11, 0.09, 0.085))
+	stomach_fill.material_override.render_priority = 3
+	heart = _part(chest, _sphere(), Ps1.organ(Color(1.0, 0.25, 0.35)), Vector3(0.06, centre_y + 0.08, 0.06), Vector3.ONE * 0.04)
+	heart.material_override.render_priority = 3
+	for side: float in [-1.0, 1.0]:
+		lungs.append(_part(chest, _sphere(), Ps1.organ(Color(0.3, 0.6, 0.9)), Vector3(0.075 * side - 0.02, centre_y + 0.1, -0.005), Vector3(0.045, 0.07, 0.04)))
+	var head := _pivot(neck, brain_at)
+	insides.append(head)
+	brain = _part(head, _sphere(), Ps1.organ(Color(0.9, 0.6, 0.75)), Vector3.ZERO, Vector3(0.075, 0.06, 0.07))
+	for part in insides:
+		part.visible = false
+
+
+func _show_insides() -> void:
+	# The stomach fills from the bottom
+	var full := belly / 100.0
+	stomach_fill.scale = Vector3(0.11 * lerpf(0.5, 1.0, full), 0.09 * maxf(full, 0.04), 0.085 * lerpf(0.5, 1.0, full))
+	stomach_fill.position.y = -0.09 * (1.0 - full)
+	# The heart is bigger and quicker the fonder it is
+	var beat := maxf(sin(anim_t * lerpf(4.0, 9.0, love / 100.0)), 0.0)
+	heart.scale = Vector3.ONE * lerpf(0.035, 0.068, love / 100.0) * (1.0 + beat * 0.25)
+	# Lungs bright when it is rested, dull when it is worn out; they fill as it breathes
+	var breath := 1.0 + sin(anim_t * (1.3 if curl > 0.5 else 2.6)) * 0.12
+	for lung in lungs:
+		lung.scale = Vector3(0.045, 0.07, 0.04) * breath
+		lung.material_override.set_shader_parameter("tint", Color(0.08, 0.14, 0.24).lerp(Color(0.4, 0.85, 1.0), energy / 100.0))
+	# The brain grey when it is bored, and lit up and flickering when it is having fun
+	var spark := 0.85 + 0.15 * sin(anim_t * 23.0) * sin(anim_t * 7.0)
+	brain.material_override.set_shader_parameter("tint", Color(0.3, 0.3, 0.34).lerp(Color(1.0, 0.65, 0.85) * spark, fun / 100.0))

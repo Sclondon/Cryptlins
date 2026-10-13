@@ -126,6 +126,13 @@ static func paint(ci: CanvasItem, symbol: String, c: Vector2, r: float, tint := 
 		"left", "right":
 			var way := -1.0 if symbol == "left" else 1.0
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0.7 * way, 0) * r, c + Vector2(-0.5 * way, -0.75) * r, c + Vector2(-0.5 * way, 0.75) * r]), bone)
+		"dice":
+			ci.draw_rect(Rect2(c - Vector2(0.8, 0.8) * r, Vector2(1.6, 1.6) * r), bone)
+			for pip: Vector2 in [Vector2(-0.42, -0.42), Vector2(0.42, 0.42), Vector2(0, 0), Vector2(-0.42, 0.42), Vector2(0.42, -0.42)]:
+				ci.draw_circle(c + pip * r, r * 0.15, dark)
+		"pencil":
+			ci.draw_line(c + Vector2(-0.55, 0.55) * r, c + Vector2(0.65, -0.65) * r, amber, r * 0.34)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.95, 0.95) * r, c + Vector2(-0.72, 0.42) * r, c + Vector2(-0.42, 0.72) * r]), bone)
 		"moon":
 			var shape := PackedVector2Array()
 			for i in 13:

@@ -249,8 +249,8 @@ func _process(delta: float) -> void:
 		if t - last_rub < 0.25:
 			warmth += delta * 9.0
 		var away := Vector2(position.x - world.light_point.x, position.z - world.light_point.z).length()
-		if world.light_on and away < 1.5:
-			warmth += delta * 1.1
+		if away < 1.8:
+			warmth += delta * 1.1 * world.lamp_warmth()
 		warmth = minf(warmth, 100.0)
 		if warmth >= 100.0:
 			hatching = 0.0

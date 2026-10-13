@@ -1,38 +1,57 @@
 class_name Den
 extends Node
-## Cryptlins: a spotlight in a dark room and the little monster that lives in it.
-## This builds the room, the lamp and the few buttons, reads the touches and keeps the save.
+## Cryptlins: a bare bulb in a brick basement and the little monster that lives under it.
+## This builds the room, the lamp and the shelf of things, reads the touches and keeps the save.
 ## A cryptlin starts as an egg (scripts/egg.gd); `pet` is null until it hatches.
+## Nothing is written on the screen to say how any of it works: that is all in the notebook.
 
-enum Grab { NONE, FLOOR, PET, BALL, EGG }
+enum Grab { NONE, FLOOR, PET, BALL, EGG, SHELF, THING, SNACK, LAMP }
+enum Lamp { BRIGHT, LOW, HEAT, OFF }
 
-const LAMP := Vector3(0, 6.2, 2.2)
-const LIGHT_REACH := 2.3
+# How far below where its cord is fixed the lamp's bulb hangs
+const LAMP_DROP := 0.6
+const LIGHT_REACH := 1.2
+const LAMPS: Array[Dictionary] = [
+	{"title": "bright", "energy": 3.0, "angle": 48.0, "colour": Color(1.0, 0.93, 0.78), "warmth": 1.0},
+	{"title": "low", "energy": 1.1, "angle": 40.0, "colour": Color(0.95, 0.8, 0.58), "warmth": 0.5},
+	{"title": "heat", "energy": 2.3, "angle": 44.0, "colour": Color(1.0, 0.4, 0.2), "warmth": 2.5},
+	{"title": "off", "energy": 0.0, "angle": 40.0, "colour": Color(0.2, 0.17, 0.15), "warmth": 0.0},
+]
 const MAX_SNACKS := 3
 const NAME_HEADS: Array[String] = ["Grub", "Mog", "Snag", "Fizz", "Bork", "Nib", "Skrit", "Womp", "Gloom", "Pim", "Zog", "Murk"]
-const EGG_SPOT := Vector3(0, 0, 0.3)
-const PET_HINT := "Tap the floor to call it, hold and drag to swing the lamp
-Rub it to pet it, tap it to poke it
-Hold a finger on it to pick it up, flick it to push it
-Drag a toy to throw it"
-const EGG_HINT := "Keep the egg in the lamplight
-Rub it to warm it up faster
-Tap it and it knocks back"
-const FOOD_ICONS: Array[String] = ["bone", "toadstool", "candy", "fish", "beetle", "berries"]
-const TOY_ICONS: Array[String] = ["ball", "stone", "bell", "glow"]
-const FLOORS: Array[String] = ["Flagstones", "Floorboards", "Moss", "Checkers"]
-const NESTS: Array[String] = ["Rags", "Twigs", "Cushion", "Box"]
 const NAME_TAILS: Array[String] = ["nik", "let", "wort", "bo", "gle", "kin", "zle", "by", "mort", "ix"]
+const EGG_SPOT := Vector3(0, 0, 0.3)
+const GROUNDS: Array[String] = ["Flagstones", "Floorboards", "Moss", "Checkers", "Dirt", "Sand", "Gravel"]
+# As in "it is happiest on ..."
+const GROUND_PLAIN: Array[String] = ["flagstones", "floorboards", "moss", "checkered tiles", "dirt", "sand", "gravel"]
+const SCAN_SECONDS := 9.0
+
+# Half the room's width and depth: walls left, right and behind, and you in front. The room is
+# cut to the screen (see _fit): wide and low on a wide one, narrow, deep and tall on an upright
+# phone, so that the lamp hangs near the top of the screen and the floor runs down to the shelf.
+static var half := Vector2(2.4, 2.1)
+# Where the lamp's cord is fixed
+static var lamp_at := Vector3(0, 2.85, 0.1)
 
 var save_path := "user://cryptlin.json"
 # Set before it is added to the tree to choose what a new game's egg holds (tests); -1 for any
 var first_kind := -1
+# Tests turn this off: the card that asks for a name would be in the way of their fingers
+var ask_names := true
 
 var view: SubViewport
+# The floor, walls, vent and pipe: built again whenever the room changes shape
+var shell: Node3D
+var cord: MeshInstance3D
+var tall_room := false
+var eye := Vector3(0, 3.4, 7.0)
+var eye_on := Vector3(0, 0.9, 0)
 var screen: TextureRect
 var camera: Camera3D
 var spot: SpotLight3D
 var beam: ShaderMaterial
+var lamp_head: Node3D
+var bulb: MeshInstance3D
 var bounce: OmniLight3D
 var motes: CPUParticles3D
 var crumb_puff: CPUParticles3D
@@ -43,28 +62,45 @@ var egg: Egg
 var leaving := false
 var ball: Ball
 var snacks: Array[Snack] = []
-var nest_pos := Vector3(-1.7, 0, -1.05)
+var decors: Array[Decor] = []
+var nest: Node3D
+var nest_pos := Vector3(-1.6, 0, -1.2)
 
 var pet_name := ""
 var pet_seed := 1
 var pet_kind := 0
 var hatched := false
+var born := 0.0
 var saved_warmth := 0.0
 var saved_needs := {}
-# The room as it has been chosen, and what has been found out about the cryptlin's tastes
-var floor_style := 0
+var saved_decor: Array = []
+# How long the game was shut, for the cryptlin to live through when it is put back in the room
+var away := 0.0
+var _muted_at_start := false
+# The room as it has been done up, and what has been found out about the cryptlin's tastes
+var floor_style := 4
 var nest_style := 0
 var known := {}
 var floor_mat: ShaderMaterial
-var nest: Node3D
+# Played inside a site with a shop (see _bridge): what has been bought there, item id to how
+# many (-1 for as many as you like). By itself the game has everything.
+var embedded := false
+var stock := {}
+var _on_message: JavaScriptObject
 
 var clock := 0.0
 var save_timer := 0.0
-var light_on := true
+var lamp_mode: int = Lamp.BRIGHT
+var light_on: bool:
+	get:
+		return lamp_mode != Lamp.OFF
 var light_level := 1.0
+var lamp_energy := 3.0
+var lamp_angle := 48.0
 var light_point := Vector3.ZERO
 var light_goal := Vector3.ZERO
 var light_dragging := false
+var light_dragging_was := false
 var hover_point := Vector3.ZERO
 var hover_time := -100.0
 
@@ -79,34 +115,35 @@ var hold_vel := Vector3.ZERO
 var carrying := false
 var press_at := Vector2.ZERO
 var last_at := Vector2.ZERO
+# What a finger on the shelf is doing: which item it came down on, and whether it has started
+# to slide the shelf along
+var shelf_item := ""
+var sliding := false
+# The thing from the room (a Decor or the nest) or the bit of food that a finger has hold of
+var held_thing: Node3D
+var held_snack: Snack
+var thing_new := false
 
-var needs_panel: Control
-var buttons: HBoxContainer
-var sound_button: IconButton
-var help_button: Button
-var egg_button: Button
-var feed_button: Button
-var ball_button: Button
+var scanning := false
+var scan_time := 0.0
+var scanner: Node3D
+var sweep: MeshInstance3D
+
+var shelf: Shelf
+var scan_notes: Control
+var notebook: Notebook
 var ask: PanelContainer
 var ask_text: Label
-var corner: HBoxContainer
-var hint: Label
-var hint_tween: Tween
-var lamp_button: IconButton
-var menu_button: Button
-var menu: PanelContainer
-var menu_text: Label
-var floor_label: Label
-var nest_label: Label
-var tray: GridContainer
-var tray_food := true
+var namer: PanelContainer
+var name_edit: LineEdit
+var toast: Label
+var card: StyleBoxFlat
 # The test panel (see dev_toggle)
 var dev: VBoxContainer
 var dev_label: Label
 var dev_egg: Button
 var dev_taps := 0
 var dev_tap_time := -10.0
-var toast: Label
 
 
 func _ready() -> void:
@@ -116,18 +153,26 @@ func _ready() -> void:
 	_build_lamp()
 	sfx = Sfx.new()
 	add_child(sfx)
+	sfx.muted = _muted_at_start
 	_build_hud()
+	for d: Variant in saved_decor:
+		if d is Dictionary and int(d.get("k", -1)) >= 0 and int(d["k"]) < Decor.IDS.size():
+			_stand(int(d["k"]), Vector3(float(d.get("x", 0.0)), 0, float(d.get("z", 0.0))), float(d.get("r", 0.0)))
 	get_viewport().size_changed.connect(_fit)
 	_fit()
 	if OS.has_feature("web") and str(JavaScriptBridge.eval("window.location.search", true)).contains("dev"):
 		dev_toggle()
 	if hatched:
 		_spawn_pet(Vector3(randf_range(-1.0, 1.0), 0, randf_range(-0.6, 0.8)))
-		_say("%s missed you" % pet_name)
 	else:
 		_lay_egg(fresh)
 		_say("An egg!" if fresh else "Still an egg")
-		show_help()
+	_bridge()
+
+
+# Keeps a point on the floor inside the walls, `margin` clear of them
+static func in_room(p: Vector3, margin := 0.0) -> Vector3:
+	return Vector3(clampf(p.x, -half.x + margin, half.x - margin), p.y, clampf(p.z, -half.y + margin, half.y - margin))
 
 
 # ---------------------------------------------------------------- egg and hatchling
@@ -144,7 +189,7 @@ func _lay_egg(from_above: bool) -> void:
 		egg.drop(EGG_SPOT + Vector3(0, 5.5, 0))
 	egg.cracked.connect(_on_cracked)
 	egg.hatched.connect(_on_hatched)
-	_sync_hud()
+	_sync()
 
 
 func _on_cracked(_stage: int) -> void:
@@ -155,20 +200,23 @@ func _on_cracked(_stage: int) -> void:
 func _on_hatched() -> void:
 	var at := egg.position
 	crumbs(egg.centre(), Egg.SHELLS[egg.kind])
+	stop_scan()
 	egg.burst()
 	egg = null
 	hatched = true
+	born = Time.get_unix_time_from_system()
 	saved_needs = {"belly": 55.0, "fun": 50.0, "energy": 85.0, "love": 10.0, "age": 0.0}
 	known = {}
-	pet_name = NAME_HEADS.pick_random() + NAME_TAILS.pick_random()
+	pet_name = roll_name()
 	_spawn_pet(at)
 	pet.boop()
 	pet.hearts.emitting = true
 	sfx.play("crack", 0.7)
 	Input.vibrate_handheld(60)
-	_say("%s hatched! It's a baby %s." % [pet_name, pet.kind_name()])
-	# Once it has had its moment, what a finger can do with it
-	get_tree().create_timer(4.5).timeout.connect(show_help)
+	_say("It hatched!") # (what it is, is for the notebook)
+	# Once it has had its moment, it wants a name
+	if ask_names:
+		get_tree().create_timer(3.5).timeout.connect(open_namer)
 	save_game()
 
 
@@ -180,21 +228,66 @@ func _spawn_pet(at: Vector3) -> void:
 	pet.set_needs(saved_needs)
 	add_child(pet)
 	pet.position = at
+	pet.comfort = comfort_of(pet)
 	pet.left.connect(_on_left)
-	_sync_hud()
+	if away > 0.0:
+		# It has been living its life while the game was shut
+		var was_baby := pet.is_baby()
+		var asleep := pet.pass_time(away, not light_on)
+		if asleep:
+			pet.position = nest_pos
+			pet._enter(Cryptlin.State.SLEEP)
+		if was_baby and not pet.is_baby():
+			_say("%s grew up while you were away!" % pet_name)
+		away = 0.0 # (asleep, hungry, glad to see you: it shows that itself)
+	_sync()
 
 
-# The "New egg" button: asks first, since it sends the cryptlin away for good
+func roll_name() -> String:
+	return NAME_HEADS.pick_random() + NAME_TAILS.pick_random()
+
+
+# The card that asks what it is to be called. It has a name already (made up when it hatched),
+# so shutting the card without typing keeps that one.
+func open_namer() -> void:
+	if pet == null or leaving or ask.visible:
+		return
+	if finger != -1:
+		_release()
+	stop_scan()
+	notebook.visible = false
+	name_edit.text = pet_name
+	namer.visible = true
+	sfx.play("click")
+
+
+func _name_roll() -> void:
+	name_edit.text = roll_name()
+	sfx.play("click", 1.2)
+
+
+func _name_done(_typed := "") -> void:
+	if not namer.visible:
+		return
+	namer.visible = false
+	name_edit.release_focus()
+	var typed := name_edit.text.strip_edges().left(14)
+	if typed != "" and pet != null:
+		pet_name = typed
+	sfx.play("click", 0.8)
+	_say("This is %s" % pet_name)
+	_sync()
+	save_game()
+
+
+# "New egg" in the notebook: asks first, since it sends the cryptlin away for good
 func ask_new_egg() -> void:
 	if pet == null or leaving:
 		return
 	if finger != -1:
 		_release()
-	menu.visible = false
-	tray.visible = false
-	if hint_tween != null:
-		hint_tween.kill()
-	hint.modulate.a = 0.0
+	stop_scan()
+	notebook.visible = false
 	ask_text.text = "Let %s go off into the dark,
 and hatch a new egg?" % pet_name
 	ask.visible = true
@@ -208,7 +301,7 @@ func _answer(yes: bool) -> void:
 		leaving = true
 		pet.leave()
 		_say("Goodbye, %s" % pet_name)
-		_sync_hud()
+		_sync()
 
 
 func _on_left() -> void:
@@ -224,20 +317,19 @@ func _on_left() -> void:
 	pet_name = ""
 	known = {}
 	if not light_on:
-		toggle_lamp()
+		set_lamp(Lamp.BRIGHT)
 	_lay_egg(true)
 	_say("An egg!")
-	show_help()
 	save_game()
 
 
 # ---------------------------------------------------------------- test panel
 
-# A panel for trying every kind without waiting on eggs. Opened by five quick taps on the name in
-# the corner, the ` key, or ?dev on the address of the web build.
+# A panel for trying every kind without waiting on eggs. Opened by five quick taps in the top
+# left corner, the ` key, or ?dev on the address of the web build.
 func dev_toggle() -> void:
 	dev.visible = not dev.visible
-	_sync_hud()
+	_sync()
 	_say("Test panel on" if dev.visible else "Test panel off")
 
 
@@ -245,7 +337,9 @@ func dev_toggle() -> void:
 func dev_show(kind: int, as_egg := false, new_look := false) -> void:
 	if finger != -1:
 		_release()
+	stop_scan()
 	ask.visible = false
+	namer.visible = false
 	if pet != null:
 		pet.queue_free()
 		pet = null
@@ -262,14 +356,15 @@ func dev_show(kind: int, as_egg := false, new_look := false) -> void:
 	hatched = not as_egg
 	saved_warmth = 0.0
 	if not light_on:
-		toggle_lamp()
+		set_lamp(Lamp.BRIGHT)
 	if as_egg:
 		pet_name = ""
 		_lay_egg(true)
 	else:
-		saved_needs = {"belly": 60.0, "fun": 55.0, "energy": 85.0, "love": 40.0}
+		saved_needs = {"belly": 60.0, "fun": 55.0, "energy": 85.0, "love": 40.0, "age": Cryptlin.GROW_AGE}
+		born = Time.get_unix_time_from_system() - Cryptlin.GROW_AGE
 		if pet_name == "":
-			pet_name = NAME_HEADS.pick_random() + NAME_TAILS.pick_random()
+			pet_name = roll_name()
 		_spawn_pet(EGG_SPOT)
 	save_game()
 
@@ -294,7 +389,19 @@ func _dev_egg() -> void:
 func _dev_age() -> void:
 	if pet != null:
 		pet.age = 0.0 if not pet.is_baby() else Cryptlin.GROW_AGE
-		_sync_hud()
+		_sync()
+
+
+# A day goes by, as if the game had been shut for it
+func _dev_day() -> void:
+	if pet != null and not leaving:
+		var asleep := pet.pass_time(86400.0, not light_on)
+		pet._enter(Cryptlin.State.SLEEP if asleep else Cryptlin.State.IDLE)
+		if asleep:
+			pet.position = nest_pos
+		born -= 86400.0
+		_say("A day later")
+		_sync()
 
 
 func _clear_toys() -> void:
@@ -306,204 +413,484 @@ func _clear_toys() -> void:
 
 # ---------------------------------------------------------------- what the cryptlin lets on
 
-# It has shown a taste for the first time: "food" (its favourite), "yuck" or "toy"
+# It has shown a taste for the first time: "food" (its favourite), "yuck", "toy", "ground",
+# "lamp", or a thing in its room it likes ("decor+rock") or cannot stand ("decor-rock")
 func learned(what: String) -> void:
 	if pet == null or known.get(what, false):
 		return
+	# (nothing is said about it on the screen: how it took it shows over its head, and what was
+	# learned is written in the notebook for whoever looks)
 	known[what] = true
-	match what:
-		"food":
-			_say("%s loves %s!" % [pet_name, Snack.PLURALS[pet.fav_food]])
-		"yuck":
-			_say("%s can't stand %s" % [pet_name, Snack.PLURALS[pet.yuck_food]])
-		"toy":
-			_say("The %s is %s's favourite!" % [Ball.PLAIN[pet.fav_toy], pet_name])
-	_sync_hud()
+	_sync()
 	save_game()
 
 
 func fed_up() -> void:
-	_say("%s has had enough of being poked" % pet_name)
+	pass # (it shows it: nothing is written up)
 
 
 func grew_up() -> void:
 	_say("%s is all grown up!" % pet_name)
 	sfx.play("coo", 0.7)
 	Input.vibrate_handheld(60)
+	_sync()
 	save_game()
 
 
-# ---------------------------------------------------------------- food, toys and the room
+# How well the room suits a cryptlin, 0 to 100: the ground and the lamp it wants, the things
+# it likes to have about (and not the one it hates), and not being left with bare floor
+func comfort_of(who: Cryptlin) -> float:
+	var c := 35.0
+	if floor_style == who.fav_ground:
+		c += 18.0
+	if lamp_mode == who.fav_lamp:
+		c += 12.0
+	var others := 0
+	for d in decors:
+		if d.kind in who.like_decor:
+			c += 14.0
+		elif d.kind == who.hate_decor:
+			c -= 18.0
+		else:
+			others += 1
+	return clampf(c + mini(others, 3) * 4.0, 0.0, 100.0)
 
-# The buttons above the Feed and Toys buttons: one for each food, or each toy
-func open_tray(food: bool) -> void:
+
+# ---------------------------------------------------------------- the room's things
+
+# Whether something is on the shelf: everything when the game is played by itself; inside a
+# site with a shop, what comes free and what has been bought
+func owns(id: String) -> bool:
+	return not embedded or id in Items.FREE or int(stock.get(id, 0)) != 0
+
+
+# How many of a thing that gets used up are left, or -1 for no end of them
+func left_of(id: String) -> int:
+	if not embedded or id in Items.FREE:
+		return -1
+	return int(stock.get(id, 0))
+
+
+func _spend(id: String) -> void:
+	if left_of(id) > 0:
+		stock[id] = left_of(id) - 1
+		_post({"type": "CRYPTLINS_USED", "item": id})
+		_sync()
+
+
+# A tap on something on the shelf (or its key): the quick way to use it
+func use(id: String) -> void:
+	var item := Items.find(id)
+	if item.is_empty() or not owns(id) or _modal():
+		return
+	var n: int = item["n"]
+	match item["group"]:
+		"tool":
+			if id == "notebook":
+				notebook.open()
+			elif scanning:
+				stop_scan()
+			else:
+				start_scan()
+		"food":
+			feed(n)
+		"toy":
+			play_ball(n)
+		"decor":
+			# In if it is out, out if it is in
+			var there := decor_of(n)
+			if there != null:
+				remove_decor(there)
+			else:
+				place_decor(n, _free_spot(Decor.RADII[n]))
+		"nest":
+			set_nest(n)
+		"ground":
+			set_ground(n)
+
+
+# Drops something to eat into the light: a given food, or any
+func feed(which := -1, at := Vector3.INF) -> void:
+	if pet == null or leaving:
+		sfx.play("click", 0.7)
+		return
+	var kind := which if which >= 0 else randi() % Snack.NAMES.size()
+	var id := Items.id_of("food", kind)
+	if snacks.size() >= MAX_SNACKS or not owns(id):
+		sfx.play("click", 0.7)
+		return
+	if at == Vector3.INF:
+		var a := randf() * TAU
+		at = in_room(light_point + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * 1.3, 0.3) + Vector3(0, 4.5, 0)
+	var snack := Snack.new(kind)
+	add_child(snack)
+	snack.drop(at)
+	_serve(snack)
+	sfx.play("click")
+
+
+# A bit of food let go of in the room: it is the cryptlin's now
+func _serve(snack: Snack) -> void:
+	snack.thud.connect(func(strength: float) -> void: sfx.play("thud", 1.3, clampf(strength * 2.0 - 16.0, -24.0, -4.0)))
+	snacks.append(snack)
+	_spend(Items.id_of("food", snack.kind))
+
+
+# Throws a toy in: a given one, or whichever is out already (the ball, if none is)
+func play_ball(which := -1) -> void:
+	if pet == null or leaving:
+		sfx.play("click", 0.7)
+		return
+	if ball != null and which >= 0 and which != ball.kind:
+		_clear_ball()
+	if ball == null:
+		_new_ball(maxi(which, 0))
+		ball.position = Vector3(randf_range(-1.0, 1.0), 1.5, half.y - 0.2)
+		ball.vel = Vector3(randf_range(-0.8, 0.8), 2.4, -3.6) * ball.heft
+	else:
+		var a := randf() * TAU
+		ball.vel += Vector3(cos(a) * 2.5, 4.2, sin(a) * 2.5) * ball.heft
+	pet.notice_ball()
+	sfx.play("click")
+	_sync()
+
+
+func _new_ball(which: int) -> void:
+	var toy := Ball.new(which)
+	ball = toy
+	add_child(ball)
+	ball.bounced.connect(func(strength: float) -> void: sfx.play(toy.sound, toy.pitch, clampf(strength * 3.0 - 16.0, -24.0, -3.0)))
+
+
+func _clear_ball() -> void:
+	if ball != null:
+		ball.queue_free()
+		ball = null
+	if grab == Grab.BALL:
+		grab = Grab.NONE
+		finger = -1
+
+
+func decor_of(kind: int) -> Decor:
+	for d in decors:
+		if d.kind == kind:
+			return d
+	return null
+
+
+func _stand(kind: int, at: Vector3, turn := 0.0) -> Decor:
+	var d := Decor.new(kind)
+	add_child(d)
+	d.position = in_room(at, d.radius * 0.6)
+	d.rotation.y = turn
+	decors.append(d)
+	return d
+
+
+# Stands a thing in the room (or moves the one of its kind already there), and lets the
+# cryptlin come and see what it thinks of it
+func place_decor(kind: int, at: Vector3) -> Decor:
+	var d := decor_of(kind)
+	if d == null:
+		d = _stand(kind, at, randf_range(-0.4, 0.4))
+		crumbs(d.position + Vector3(0, 0.1, 0), Color(0.3, 0.25, 0.2))
+		sfx.play("thud", 1.1, -6.0)
+	else:
+		d.position = in_room(at, d.radius * 0.6)
+	_judge(d)
+	_sync()
+	save_game()
+	return d
+
+
+func remove_decor(d: Decor) -> void:
+	decors.erase(d)
+	d.queue_free()
+	sfx.play("click", 0.8)
+	_sync()
+	save_game()
+
+
+# The cryptlin goes over to a thing to show whether it likes it
+func _judge(d: Decor) -> void:
 	if pet == null or leaving:
 		return
-	sfx.play("click")
-	if tray.visible and tray_food == food:
-		tray.visible = false
-		return
-	tray_food = food
-	for old in tray.get_children():
-		tray.remove_child(old)
-		old.queue_free()
-	var names := Snack.NAMES if food else Ball.NAMES
-	tray.columns = 3 if food else 2
-	for i in names.size():
-		var b := _icon(tray, FOOD_ICONS[i] if food else TOY_ICONS[i], _pick.bind(food, i), names[i])
-		b.custom_minimum_size = Vector2(150, 130)
-		# Once you know what it thinks of something, the button shows it
-		var loved: bool = (known.get("food", false) and i == pet.fav_food) if food else (known.get("toy", false) and i == pet.fav_toy)
-		if loved:
-			b.mark = "heart"
-		elif food and known.get("yuck", false) and i == pet.yuck_food:
-			b.mark = "cross"
-	tray.visible = true
-	tray.reset_size()
-	var size := get_viewport().get_visible_rect().size
-	tray.position = Vector2((size.x - tray.size.x) * 0.5, buttons.position.y - tray.size.y - 14.0)
-
-
-func _pick(food: bool, which: int) -> void:
-	tray.visible = false
-	if food:
-		feed(which)
+	var id: String = Decor.IDS[d.kind]
+	var near := d.position + Vector3(0, 0, d.radius + 0.35)
+	if d.kind in pet.like_decor:
+		pet.look_over(near, 1, "decor+" + id)
+	elif d.kind == pet.hate_decor:
+		pet.look_over(near, -1, "decor-" + id)
 	else:
-		play_ball(which)
+		pet.look_over(near, 0, "")
 
 
-func open_menu() -> void:
-	if finger != -1:
-		_release()
-	tray.visible = false
-	if hint_tween != null:
-		hint_tween.kill()
-	hint.modulate.a = 0.0
-	_sync_hud()
-	menu.visible = true
-	sfx.play("click")
+# Somewhere on the floor with nothing standing on it
+func _free_spot(radius: float) -> Vector3:
+	var best := Vector3.ZERO
+	var best_room := -1.0
+	for i in 24:
+		var p := Vector3(randf_range(-half.x + radius + 0.2, half.x - radius - 0.2), 0, randf_range(-half.y + radius + 0.1, half.y - radius - 0.7))
+		var room := p.distance_to(nest_pos) - 0.6
+		for d in decors:
+			room = minf(room, p.distance_to(d.position) - d.radius)
+		if pet != null:
+			room = minf(room, p.distance_to(pet.position) - 0.4)
+		if room > best_room:
+			best_room = room
+			best = p
+	return best
 
 
-func close_menu() -> void:
-	menu.visible = false
-	sfx.play("click", 0.8)
-
-
-func _floor_step(by: int) -> void:
-	floor_style = posmod(floor_style + by, FLOORS.size())
+func set_ground(style: int) -> void:
+	floor_style = clampi(style, 0, GROUNDS.size() - 1)
 	floor_mat.set_shader_parameter("style", floor_style)
-	sfx.play("click")
-	_sync_hud()
+	sfx.play("thud", 0.7, -8.0)
+	if pet != null and not leaving:
+		pet.look_over(pet.position, 1 if floor_style == pet.fav_ground else 0, "ground")
+	_sync()
 	save_game()
 
 
-func _nest_step(by: int) -> void:
-	nest_style = posmod(nest_style + by, NESTS.size())
+func set_nest(style: int) -> void:
+	nest_style = clampi(style, 0, Decor.NESTS.size() - 1)
 	_build_nest()
 	sfx.play("click")
-	_sync_hud()
+	_sync()
 	save_game()
 
 
-# Where it sleeps, in whichever style has been chosen
 func _build_nest() -> void:
 	if nest != null:
 		nest.queue_free()
-	nest = Node3D.new()
+	nest = Decor.nest(nest_style)
 	nest.position = nest_pos
 	add_child(nest)
-	match nest_style:
-		1:
-			# A bird's nest of twigs, lined with straw
-			var ring := TorusMesh.new()
-			ring.inner_radius = 0.36
-			ring.outer_radius = 0.6
-			ring.rings = 10
-			ring.ring_segments = 5
-			_nest_part(ring, Color(0.26, 0.18, 0.1), Vector3(0, 0.08, 0), Vector3(1, 0.7, 1))
-			var twig := BoxMesh.new()
-			twig.size = Vector3(0.03, 0.03, 0.5)
-			var rng := RandomNumberGenerator.new()
-			rng.seed = 7
-			for i in 16:
-				var a := TAU * i / 16.0
-				var at := Vector3(cos(a) * 0.5, rng.randf_range(0.06, 0.2), sin(a) * 0.5)
-				_nest_part(twig, Color(0.34, 0.24, 0.13) if i % 2 == 0 else Color(0.2, 0.14, 0.09), at, Vector3.ONE, Vector3(rng.randf_range(-0.4, 0.4), -a + rng.randf_range(-0.5, 0.5), 0))
-			var straw := CylinderMesh.new()
-			straw.top_radius = 0.4
-			straw.bottom_radius = 0.4
-			straw.height = 0.05
-			straw.radial_segments = 10
-			_nest_part(straw, Color(0.5, 0.42, 0.2), Vector3(0, 0.03, 0))
-		2:
-			# A fat cushion with a button in the middle and a tassel at each corner
-			_nest_part(Ps1.ball(), Color(0.38, 0.14, 0.3), Vector3(0, 0.09, 0), Vector3(0.6, 0.13, 0.52))
-			_nest_part(Ps1.ball(), Color(0.6, 0.48, 0.18), Vector3(0, 0.2, 0), Vector3(0.05, 0.03, 0.05))
-			for x: float in [-1.0, 1.0]:
-				for z: float in [-1.0, 1.0]:
-					_nest_part(Ps1.ball(), Color(0.6, 0.48, 0.18), Vector3(0.44 * x, 0.06, 0.38 * z), Vector3.ONE * 0.055)
-		3:
-			# A cardboard box with its flaps open
-			var card := Color(0.44, 0.33, 0.2)
-			var side := BoxMesh.new()
-			_nest_part(side, card * 0.8, Vector3(0, 0.015, 0), Vector3(1.0, 0.03, 0.84))
-			for z: float in [-1.0, 1.0]:
-				_nest_part(side, card, Vector3(0, 0.15, 0.42 * z), Vector3(1.0, 0.3, 0.03))
-				_nest_part(side, card * 0.9, Vector3(0, 0.33, 0.52 * z), Vector3(1.0, 0.03, 0.24), Vector3(-0.5 * z, 0, 0))
-			for x: float in [-1.0, 1.0]:
-				_nest_part(side, card * 0.9, Vector3(0.5 * x, 0.15, 0), Vector3(0.03, 0.3, 0.84))
-			_nest_part(Ps1.ball(), Color(0.3, 0.32, 0.4), Vector3(0, 0.05, 0), Vector3(0.44, 0.05, 0.36))
-		_:
-			# A ring of rags
-			var ring := TorusMesh.new()
-			ring.inner_radius = 0.34
-			ring.outer_radius = 0.62
-			ring.rings = 10
-			ring.ring_segments = 6
-			_nest_part(ring, Color(0.2, 0.14, 0.12), Vector3(0, 0.06, 0), Vector3(1, 0.5, 1))
-			var pad := CylinderMesh.new()
-			pad.top_radius = 0.4
-			pad.bottom_radius = 0.4
-			pad.height = 0.04
-			pad.radial_segments = 10
-			_nest_part(pad, Color(0.14, 0.1, 0.13), Vector3(0, 0.02, 0))
 
 
-func _nest_part(mesh: Mesh, colour: Color, at: Vector3, size := Vector3.ONE, turn := Vector3.ZERO) -> void:
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = Ps1.mat(colour)
-	mi.position = at
-	mi.scale = size
-	mi.rotation = turn
-	nest.add_child(mi)
+# The nest pushed or dragged to a new place (by a finger, or by the cryptlin itself)
+func move_nest(to: Vector3) -> void:
+	nest_pos = in_room(Vector3(to.x, 0, to.z), 0.6)
+	nest.position = nest_pos
 
 
-# The corner panel and the buttons follow whether there is an egg, a cryptlin, or one on its way out
-func _sync_hud() -> void:
-	needs_panel.set("pet", pet)
-	needs_panel.set("egg", egg)
-	needs_panel.set("title", pet_name if pet != null else (egg.title() if egg != null else ""))
-	var busy := pet == null or leaving
-	feed_button.disabled = busy
-	ball_button.disabled = busy
-	egg_button.disabled = busy
-	hint.text = PET_HINT if pet != null else EGG_HINT
-	floor_label.text = "Floor: %s" % FLOORS[floor_style]
-	nest_label.text = "Nest: %s" % NESTS[nest_style]
+func settle_nest() -> void:
+	save_game()
+
+
+# Where a cryptlin would sooner have its nest: in the cave if there is one, by something it
+# likes, or tucked into a back corner
+func nest_spot(who: Cryptlin) -> Vector3:
+	var spots: Array[Vector3] = [Vector3(-1.7, 0, -1.4), Vector3(1.7, 0, -1.4)]
+	for d in decors:
+		if d.hollow:
+			spots.append(d.position)
+			spots.append(d.position)
+		elif d.kind in who.like_decor:
+			spots.append(d.position + Vector3(d.radius + 0.6, 0, 0.1))
+	var far: Array[Vector3] = []
+	for s in spots:
+		if in_room(s, 0.6).distance_to(nest_pos) > 0.8:
+			far.append(in_room(s, 0.6))
+	return far.pick_random() if not far.is_empty() else in_room(Vector3(randf_range(-1.5, 1.5), 0, -1.2), 0.6)
+
+
+func cave() -> Decor:
+	for d in decors:
+		if d.hollow:
+			return d
+	return null
+
+
+# Where a cryptlin goes to watch from: inside the cave, behind something it likes, or a back corner
+func hiding_place(who: Cryptlin) -> Vector3:
+	var hole := cave()
+	if hole != null:
+		return hole.position + Vector3(0, 0, 0.05)
+	for d in decors:
+		if d.kind in who.like_decor:
+			return in_room(d.position + Vector3(0, 0, -d.radius - 0.4), 0.35)
+	return Vector3(1.8 if randf() < 0.5 else -1.8, 0, -1.6)
+
+
+# A thing in the room for a cryptlin to go and make use of (never the one it hates), or null
+func somewhere_to_go(who: Cryptlin) -> Decor:
+	var fine: Array[Decor] = []
+	for d in decors:
+		if d.kind != who.hate_decor and d != held_thing:
+			fine.append(d)
+			if d.kind in who.like_decor:
+				fine.append(d)
+	return fine.pick_random() if not fine.is_empty() else null
+
+
+# ---------------------------------------------------------------- the lamp
+
+func set_lamp(mode: int) -> void:
+	lamp_mode = mode
+	light_dragging = false
+	sfx.play("click", 0.8 if light_on else 0.6)
+	if pet != null and not leaving and light_on:
+		pet.look_over(pet.position, 1 if lamp_mode == pet.fav_lamp else 0, "lamp")
+	_sync()
+	save_game()
+
+
+# A tap on the lamp: bright, low, heat, off, and round again
+func tap_lamp() -> void:
+	set_lamp((lamp_mode + 1) % LAMPS.size())
+
+
+# Kept for the L key and the tests: out, or back to bright
+func toggle_lamp() -> void:
+	set_lamp(Lamp.BRIGHT if not light_on else Lamp.OFF)
+
+
+# How fast the lamp warms an egg under it, next to the usual
+func lamp_warmth() -> float:
+	return LAMPS[lamp_mode]["warmth"]
+
+
+func toggle_sound() -> void:
+	sfx.muted = not sfx.muted
+	_sync()
+	save_game()
+
+
+# ---------------------------------------------------------------- the scanner
+
+# Holds the scanner up to the cryptlin (or its egg) for a few seconds: its outline, its bones,
+# and how full, rested, amused and fond it is
+func start_scan() -> void:
+	if (pet == null and egg == null) or leaving or scanning:
+		sfx.play("click", 0.7)
+		return
+	scanning = true
+	scan_time = 0.0
+	scanner.visible = true
 	if pet != null:
-		# The test panel gives away what would otherwise have to be found out
-		var open := dev.visible
-		menu_text.text = "%s, a %s %s%s\nLoves to eat: %s\nWon't eat: %s\nFavourite toy: %s" % [
-			pet_name, pet.nature_name(), "baby " if pet.is_baby() else "", pet.kind_name(),
-			Snack.PLURALS[pet.fav_food] if open or known.get("food", false) else "?",
-			Snack.PLURALS[pet.yuck_food] if open or known.get("yuck", false) else "?",
-			Ball.PLAIN[pet.fav_toy] if open or known.get("toy", false) else "?",
-		]
-	else:
-		menu_text.text = "%s.\nWho knows what is inside?" % (egg.title() if egg != null else "Nothing here")
+		pet.xray(true)
+		pet.hold_still()
+	sfx.play("jingle", 0.6, -8.0)
+	_sync()
+
+
+func stop_scan() -> void:
+	if not scanning:
+		return
+	scanning = false
+	scanner.visible = false
+	if pet != null:
+		pet.xray(false)
+	scan_notes.queue_redraw()
+	_sync()
+
+
+func _aim_scanner() -> void:
+	var middle := egg.centre() if pet == null else pet.global_position + Vector3(0, pet.top_y * pet.grow * 0.5, 0)
+	var tall := 0.9 if pet == null else pet.top_y * pet.grow
+	var size := maxf(tall, 0.5) / 0.6
+	var toward := (camera.global_position - middle).normalized()
+	scanner.scale = Vector3.ONE * size
+	scanner.global_position = middle + toward * 0.75 - Vector3(0, 0.62 * size, 0)
+	scanner.rotation = Vector3(0, atan2(toward.x, toward.z), 0)
+	sweep.position.y = 0.62 + sin(scan_time * 3.0) * 0.3
+
+
+func _word(value: float, words: Array[String]) -> String:
+	return words[clampi(int(value / 100.0 * words.size()), 0, words.size() - 1)]
+
+
+# The scanner's notes, drawn sharp over the picture with a line to what each is about
+func _paint_notes() -> void:
+	if not scanning:
+		return
+	var screen_size := get_viewport().get_visible_rect().size
+	if pet == null:
+		if egg != null:
+			var warm: Array[String] = ["stone cold", "lukewarm", "warm", "about to hatch"]
+			_note(screen_of(egg.centre()), Vector2(170, -90), "Egg", _word(egg.warmth, warm), egg.warmth, Color(1.0, 0.6, 0.25), screen_size)
+		return
+	var belly: Array[String] = ["empty", "peckish", "half full", "full", "stuffed"]
+	var rest: Array[String] = ["worn out", "tired", "fresh", "wide awake"]
+	var mind: Array[String] = ["bored stiff", "restless", "amused", "delighted"]
+	var bond: Array[String] = ["wary of you", "getting used to you", "fond of you", "devoted"]
+	var home: Array[String] = ["hates it here", "not at home", "settling in", "cosy", "loves it here"]
+	_note(screen_of(pet.inside_at("brain")), Vector2(190, -110), "Mind", _word(pet.fun, mind), pet.fun, Color(1.0, 0.65, 0.85), screen_size)
+	_note(screen_of(pet.inside_at("lungs")), Vector2(-200, -70), "Rest", _word(pet.energy, rest), pet.energy, Color(0.45, 0.85, 1.0), screen_size)
+	_note(screen_of(pet.inside_at("heart")), Vector2(200, 10), "Heart", _word(pet.love, bond), pet.love, Color(1.0, 0.35, 0.45), screen_size)
+	_note(screen_of(pet.inside_at("stomach")), Vector2(-200, 50), "Stomach", _word(pet.belly, belly), pet.belly, Color(1.0, 0.72, 0.2), screen_size)
+	var feet := screen_of(pet.global_position)
+	_note(feet, Vector2(0, 64), "Home", _word(pet.comfort, home), pet.comfort, Color(0.6, 0.9, 0.5), screen_size)
+
+
+func _note(from: Vector2, offset: Vector2, title: String, word: String, value: float, colour: Color, screen_size: Vector2) -> void:
+	var font := scan_notes.get_theme_default_font()
+	var wide := maxf(font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x, 120.0)
+	var at := from + offset
+	# Kept on the screen, and clear of the shelf
+	at.x = clampf(at.x, wide * 0.5 + 12.0, screen_size.x - wide * 0.5 - 12.0)
+	at.y = clampf(at.y, 40.0, shelf.position.y - 60.0)
+	var left := at.x - wide * 0.5
+	scan_notes.draw_line(from, Vector2(clampf(from.x, left, left + wide), at.y + 8.0), Color(colour, 0.7), 2.0)
+	scan_notes.draw_circle(from, 4.0, colour)
+	scan_notes.draw_string_outline(font, Vector2(left, at.y), title.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 6, Color(0, 0, 0, 0.85))
+	scan_notes.draw_string(font, Vector2(left, at.y), title.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, colour)
+	# How much, in five pips
+	for i in 5:
+		var pip := Rect2(left + i * 18.0, at.y + 7.0, 14.0, 7.0)
+		scan_notes.draw_rect(pip.grow(1.5), Color(0, 0, 0, 0.7))
+		scan_notes.draw_rect(pip, colour if value >= i * 20.0 + 10.0 else Color(colour, 0.22))
+	scan_notes.draw_string_outline(font, Vector2(left, at.y + 36.0), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 6, Color(0, 0, 0, 0.85))
+	scan_notes.draw_string(font, Vector2(left, at.y + 36.0), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Icons.BONE)
+
+
+# ---------------------------------------------------------------- keeping the shelf and the pages up to date
+
+func _sync() -> void:
+	if shelf == null:
+		return
+	var have: Array[String] = []
+	var marks := {}
+	var counts := {}
+	var out := {}
+	for item in Items.LIST:
+		var id: String = item["id"]
+		if not owns(id):
+			continue
+		have.append(id)
+		if item["group"] in Items.SPENT and left_of(id) >= 0:
+			counts[id] = left_of(id)
+	if pet != null:
+		if known.get("food", false):
+			marks[Items.id_of("food", pet.fav_food)] = "heart"
+		if known.get("yuck", false):
+			marks[Items.id_of("food", pet.yuck_food)] = "cross"
+		if known.get("toy", false):
+			marks[Items.id_of("toy", pet.fav_toy)] = "heart"
+		if known.get("ground", false):
+			marks[Items.id_of("ground", pet.fav_ground)] = "heart"
+		for id: String in Decor.IDS:
+			if known.get("decor+" + id, false):
+				marks[id] = "heart"
+			elif known.get("decor-" + id, false):
+				marks[id] = "cross"
+	out[Items.id_of("ground", floor_style)] = true
+	out[Items.id_of("nest", nest_style)] = true
+	for d in decors:
+		out[Decor.IDS[d.kind]] = true
+	if ball != null:
+		out[Items.id_of("toy", ball.kind)] = true
+	if scanning:
+		out["scanner"] = true
+	shelf.marks = marks
+	shelf.counts = counts
+	shelf.out = out
+	shelf.stock(have)
 	dev_label.text = "%d/%d\n%s" % [pet_kind + 1, Cryptlin.KINDS.size(), Cryptlin.KINDS[pet_kind]["title"]]
 	dev_egg.text = "Hatch" if egg != null else "Egg"
+	if notebook.visible:
+		notebook.refresh()
 
 
 # ---------------------------------------------------------------- the room
@@ -514,22 +901,21 @@ func _build_room() -> void:
 	env.background_color = Color.BLACK
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.3, 0.36, 0.55)
-	env.ambient_light_energy = 0.05
+	env.ambient_light_energy = 0.16
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
-	# The room is drawn small into its own picture and blown up with hard pixels (the buttons
-	# and words on top stay sharp, so they can be read on a phone)
+	# The room is drawn small into its own picture and blown up with hard pixels (the shelf's
+	# marks and the words on top stay sharp, so they can be read on a phone)
 	view = SubViewport.new()
 	view.size = Vector2i(320, 240)
 	view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(view)
 	camera = Camera3D.new()
 	camera.environment = env
-	camera.position = Vector3(0, 3.0, 5.7)
 	view.add_child(camera)
-	camera.look_at(Vector3(0, 0.5, 0))
+	_aim_camera()
 	var back := CanvasLayer.new()
 	back.layer = -1
 	add_child(back)
@@ -548,16 +934,14 @@ func _build_room() -> void:
 	floor_mat = ShaderMaterial.new()
 	floor_mat.shader = load("res://shaders/floor.gdshader")
 	floor_mat.set_shader_parameter("style", floor_style)
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(40, 40)
-	var floor_mesh := MeshInstance3D.new()
-	floor_mesh.mesh = plane
-	floor_mesh.material_override = floor_mat
-	# On its own layer, so the fill light can leave the floor outside the beam black
-	floor_mesh.layers = 2
-	add_child(floor_mesh)
+	_build_shell()
 
 	_build_nest()
+
+	scanner = Items.scanner()
+	sweep = Ps1.part(scanner, Ps1.box(), Ps1.mat(Color(0.3, 1.0, 0.5), 1.0), Vector3(0, 0.62, 0), Vector3(0.66, 0.015, 0.02))
+	scanner.visible = false
+	add_child(scanner)
 
 	# A ring that spreads where you tap to call it
 	var ripple_mat := StandardMaterial3D.new()
@@ -593,6 +977,72 @@ func _build_room() -> void:
 	add_child(crumb_puff)
 
 
+# The room itself, to the size it is just now: floor, three brick walls, a vent and a pipe
+func _build_shell() -> void:
+	if shell != null:
+		shell.queue_free()
+	shell = Node3D.new()
+	add_child(shell)
+	# The floor runs on out under your feet; the cryptlin keeps to the far end of it
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(half.x * 2.0 + 0.2, 8.0)
+	var floor_mesh := Ps1.part(shell, plane, floor_mat, Vector3(0, 0, 4.0 - half.y - 0.1))
+	# On its own layer, so the fill light can leave the floor outside the beam dark
+	floor_mesh.layers = 2
+
+	# Brick walls left, right and behind, the same brick as the station upstairs
+	for wall: Array in [
+		[Vector3(0, 6.0, -half.y - 0.1), Vector3(half.x * 2.0 + 0.4, 12.0, 0.2), Vector3.RIGHT],
+		[Vector3(-half.x - 0.1, 6.0, 4.0 - half.y - 0.1), Vector3(0.2, 12.0, 8.0), Vector3.BACK],
+		[Vector3(half.x + 0.1, 6.0, 4.0 - half.y - 0.1), Vector3(0.2, 12.0, 8.0), Vector3.BACK],
+	]:
+		var bricks := ShaderMaterial.new()
+		bricks.shader = load("res://shaders/brick.gdshader")
+		bricks.set_shader_parameter("across", wall[2])
+		Ps1.part(shell, Ps1.box(), bricks, wall[0], wall[1])
+
+	# A vent high on the back wall, and a pipe running along under the ceiling
+	var iron := Ps1.mat(Color(0.2, 0.2, 0.22))
+	var vent := Node3D.new()
+	vent.position = Vector3(half.x - 1.0, lamp_at.y - 0.9, -half.y + 0.02)
+	shell.add_child(vent)
+	Ps1.part(vent, Ps1.box(), Ps1.flat(Color(0.015, 0.012, 0.012)), Vector3.ZERO, Vector3(0.82, 0.5, 0.02))
+	for side: float in [-1.0, 1.0]:
+		Ps1.part(vent, Ps1.box(), iron, Vector3(0.43 * side, 0, 0.02), Vector3(0.07, 0.62, 0.06))
+		Ps1.part(vent, Ps1.box(), iron, Vector3(0, 0.28 * side, 0.02), Vector3(0.93, 0.07, 0.06))
+	for i in 5:
+		Ps1.part(vent, Ps1.box(), iron, Vector3(0, -0.18 + i * 0.09, 0.03), Vector3(0.8, 0.035, 0.07), Vector3(0.6, 0, 0))
+	var pipe := Ps1.mat(Color(0.3, 0.2, 0.14))
+	var pipe_y := lamp_at.y + 0.5
+	Ps1.part(shell, Ps1.drum(6), pipe, Vector3(0, pipe_y, -half.y + 0.16), Vector3(0.07, half.x * 2.0, 0.07), Vector3(0, 0, PI * 0.5))
+	Ps1.part(shell, Ps1.drum(6), pipe, Vector3(-half.x + 0.9, pipe_y + 3.0, -half.y + 0.16), Vector3(0.07, 6.0, 0.07))
+	for x: float in [-half.x + 0.9, 0.3, half.x - 0.5]:
+		Ps1.part(shell, Ps1.box(), iron, Vector3(x, pipe_y, -half.y + 0.1), Vector3(0.05, 0.2, 0.22))
+
+
+# The room takes a new shape (the screen was turned, or is a different one from last time):
+# the walls move, the lamp goes up or down with the ceiling, and everything in the room is
+# brought back inside
+func _reshape(room: Vector2, lamp: Vector3) -> void:
+	half = room
+	lamp_at = lamp
+	if floor_mat == null:
+		return
+	_build_shell()
+	if lamp_head != null:
+		lamp_head.position = lamp_at
+		cord.position = lamp_at + Vector3(0, 4.0, 0)
+	move_nest(nest_pos)
+	for d in decors:
+		d.position = in_room(d.position, d.radius * 0.6)
+	if ball != null:
+		ball.position = in_room(ball.position, Ball.R)
+	for s in snacks:
+		s.position = in_room(s.position, 0.2)
+	if egg != null:
+		egg.position = in_room(egg.position, 0.4)
+
+
 func _mesh(mesh: Mesh, mat: Material, at: Vector3) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
@@ -602,39 +1052,60 @@ func _mesh(mesh: Mesh, mat: Material, at: Vector3) -> MeshInstance3D:
 	return mi
 
 
+# A bare bulb under a tin shade, on a cord from the ceiling. It swings to point where it is
+# dragged, and a tap on it changes how it burns.
 func _build_lamp() -> void:
+	var tin := Ps1.mat(Color(0.24, 0.42, 0.34), 0.22)
+	cord = Ps1.part(self, Ps1.box(), Ps1.mat(Color(0.05, 0.05, 0.05)), lamp_at + Vector3(0, 4.0, 0), Vector3(0.025, 8.0, 0.025))
+	lamp_head = Node3D.new()
+	lamp_head.position = lamp_at
+	add_child(lamp_head)
+	Ps1.part(lamp_head, Ps1.box(), Ps1.mat(Color(0.05, 0.05, 0.05)), Vector3(0, -0.15, 0), Vector3(0.025, 0.3, 0.025))
+	var shade := CylinderMesh.new()
+	shade.top_radius = 0.08
+	shade.bottom_radius = 0.5
+	shade.height = 0.3
+	shade.radial_segments = 8
+	shade.rings = 1
+	shade.cap_bottom = false
+	var hood := Ps1.part(lamp_head, shade, tin, Vector3(0, -0.42, 0))
+	hood.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	Ps1.part(lamp_head, Ps1.drum(6), tin, Vector3(0, -0.27, 0), Vector3(0.06, 0.08, 0.06))
+	bulb = Ps1.part(lamp_head, Ps1.ball(), Ps1.mat(Color(1.0, 0.93, 0.78), 1.0), Vector3(0, -LAMP_DROP, 0), Vector3.ONE * 0.13)
+	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
 	spot = SpotLight3D.new()
-	spot.position = LAMP
-	spot.spot_range = 16.0
-	spot.spot_angle = 22.0
-	spot.spot_angle_attenuation = 0.5
-	spot.spot_attenuation = 0.35
+	spot.position = Vector3(0, -LAMP_DROP, 0)
+	spot.rotation.x = -PI * 0.5
+	spot.spot_range = 9.0
+	spot.spot_angle = 48.0
+	spot.spot_angle_attenuation = 0.6
+	spot.spot_attenuation = 0.5
 	spot.light_color = Color(1.0, 0.93, 0.78)
-	spot.light_energy = 2.8
+	spot.light_energy = 3.0
 	spot.shadow_enabled = true
 	spot.shadow_blur = 1.5
-	spot.shadow_bias = 0.12
-	spot.shadow_normal_bias = 2.5
-	add_child(spot)
-	spot.look_at(Vector3.ZERO, Vector3.FORWARD)
+	spot.shadow_bias = 0.08
+	spot.shadow_normal_bias = 2.0
+	lamp_head.add_child(spot)
 
+	var reach := 6.2
 	beam = ShaderMaterial.new()
 	beam.shader = load("res://shaders/beam.gdshader")
-	beam.set_shader_parameter("reach", LAMP.length())
-	beam.set_shader_parameter("spread", tan(deg_to_rad(21.0)))
+	beam.set_shader_parameter("reach", reach)
 	var cone := CylinderMesh.new()
 	cone.top_radius = 0.1
-	cone.bottom_radius = LAMP.length() * tan(deg_to_rad(21.0))
-	cone.height = LAMP.length()
+	cone.bottom_radius = reach * tan(deg_to_rad(50.0))
+	cone.height = reach
 	cone.cap_top = false
 	cone.cap_bottom = false
-	cone.radial_segments = 48
+	cone.radial_segments = 32
 	var haze := MeshInstance3D.new()
 	haze.mesh = cone
 	haze.material_override = beam
 	haze.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	haze.rotation.x = PI * 0.5
-	haze.position = Vector3(0, 0, -LAMP.length() * 0.5)
+	haze.position = Vector3(0, 0, -reach * 0.5)
 	spot.add_child(haze)
 
 	# Light thrown back off the floor, so what stands in the beam is not black underneath
@@ -657,86 +1128,73 @@ func _build_lamp() -> void:
 	speck.material = mote_mat
 	motes = CPUParticles3D.new()
 	motes.mesh = speck
-	motes.amount = 45
+	motes.amount = 40
 	motes.lifetime = 9.0
 	motes.preprocess = 9.0
 	motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	motes.emission_sphere_radius = 1.35
+	motes.emission_sphere_radius = 1.1
 	motes.spread = 180.0
 	motes.gravity = Vector3(0, -0.01, 0)
 	motes.initial_velocity_min = 0.02
 	motes.initial_velocity_max = 0.08
-	motes.position = Vector3(0, 1.7, 0)
+	motes.position = Vector3(0, 1.2, 0)
 	motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(motes)
 
 
-# Phones held upright keep the whole pool of light in view by fixing the width instead of the height
+func _aim_camera() -> void:
+	camera.position = eye + Vector3(sin(clock * 0.21) * 0.1, sin(clock * 0.17) * 0.04, 0)
+	camera.look_at(eye_on)
+
+
+# Phones held upright keep the whole room in view by fixing the width instead of the height
 func _fit() -> void:
 	var size := get_viewport().get_visible_rect().size
 	view.size = Vector2i((size * Ps1.LINES / minf(size.x, size.y)).round())
-	if size.x < size.y:
-		camera.keep_aspect = Camera3D.KEEP_WIDTH
-		camera.fov = 48.0
+	var tall := size.x < size.y
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	var room := Vector2(2.4, 2.1)
+	var lamp := Vector3(0, 2.85, 0.1)
+	if tall:
+		# Upright: a narrow, deep, tall room, as wide as the screen shows of its near end, with
+		# the lamp up by the top of the screen and the floor running down to the shelf
+		camera.fov = 62.0
+		eye = Vector3(0, 3.6, 6.4)
+		eye_on = Vector3(0, 1.28, 0)
+		room = Vector2(clampf(3.1 * size.x / size.y, 1.3, 2.4), 2.4)
+		lamp = Vector3(0, 4.9, 0.1)
 	else:
-		camera.keep_aspect = Camera3D.KEEP_HEIGHT
-		camera.fov = 42.0
-	if buttons == null:
+		camera.fov = 44.0
+		eye = Vector3(0, 3.4, 7.0)
+		eye_on = Vector3(0, 0.9, 0)
+	tall_room = tall
+	if not room.is_equal_approx(half) or lamp != lamp_at or shell == null:
+		_reshape(room, lamp)
+	if shelf == null:
 		return
 	# Thumb-sized, and bigger still on an upright phone
-	var tall := size.x < size.y
-	for b: Button in buttons.get_children():
-		b.custom_minimum_size = Vector2.ONE * (140.0 if tall else 96.0)
-	for b: Button in corner.get_children():
-		b.custom_minimum_size = Vector2.ONE * (92.0 if tall else 66.0)
-	tray.visible = false
-	buttons.size = Vector2.ZERO
-	buttons.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 30 if tall else 16)
-	corner.size = Vector2.ZERO
-	corner.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 14)
-	needs_panel.scale = Vector2.ONE * (1.4 if tall else 1.0)
-	hint.add_theme_font_size_override("font_size", 28 if tall else 20)
-	toast.position.y = 270.0 if tall else 80.0
-	# The hint sits over the empty dark: above the buttons on a phone, under the greeting on a wide screen
-	hint.size = Vector2.ZERO
-	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM if tall else Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 150 if tall else 135)
-	hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	hint.grow_vertical = Control.GROW_DIRECTION_BEGIN if tall else Control.GROW_DIRECTION_END
+	var deep := 190.0 if tall else 140.0
+	shelf.position = Vector2(0, size.y - deep)
+	shelf.size = Vector2(size.x, deep)
+	toast.position.y = 150.0 if tall else 40.0
+	dev.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 12)
+	notebook.fit(size)
 
 
-# ---------------------------------------------------------------- the buttons
+# ---------------------------------------------------------------- what is drawn over the room
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	needs_panel = Control.new()
-	needs_panel.set_script(load("res://scripts/hud.gd"))
-	needs_panel.set("pet", pet)
-	needs_panel.set("title", pet_name)
-	needs_panel.position = Vector2(18, 16)
-	needs_panel.size = Vector2(200, 160)
-	needs_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(needs_panel)
 
-	buttons = HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 12)
-	layer.add_child(buttons)
-	feed_button = _icon(buttons, "bone", open_tray.bind(true))
-	ball_button = _icon(buttons, "ball", open_tray.bind(false))
-	lamp_button = _icon(buttons, "lamp_on", toggle_lamp)
-	buttons.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 18)
+	scan_notes = Control.new()
+	scan_notes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	scan_notes.draw.connect(_paint_notes)
+	layer.add_child(scan_notes)
+	scan_notes.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	corner = HBoxContainer.new()
-	corner.add_theme_constant_override("separation", 10)
-	layer.add_child(corner)
-	help_button = _icon(corner, "help", show_help)
-	menu_button = _icon(corner, "menu", open_menu)
-
-	tray = GridContainer.new()
-	tray.add_theme_constant_override("h_separation", 10)
-	tray.add_theme_constant_override("v_separation", 10)
-	tray.visible = false
-	layer.add_child(tray)
+	shelf = Shelf.new()
+	layer.add_child(shelf)
 
 	dev = VBoxContainer.new()
 	dev.add_theme_constant_override("separation", 8)
@@ -752,120 +1210,103 @@ func _build_hud() -> void:
 	var steps := HBoxContainer.new()
 	steps.add_theme_constant_override("separation", 8)
 	dev.add_child(steps)
-	var dev_buttons: Array[Button] = [_button(steps, "<", _dev_step.bind(-1)), _button(steps, ">", _dev_step.bind(1))]
-	dev_buttons.append(_button(dev, "Look", _dev_look))
-	dev_egg = _button(dev, "Egg", _dev_egg)
+	var dev_buttons: Array[Button] = [text_button(steps, "<", _dev_step.bind(-1)), text_button(steps, ">", _dev_step.bind(1))]
+	dev_buttons.append(text_button(dev, "Look", _dev_look))
+	dev_egg = text_button(dev, "Egg", _dev_egg)
 	dev_buttons.append(dev_egg)
-	dev_buttons.append(_button(dev, "Age", _dev_age))
+	dev_buttons.append(text_button(dev, "Age", _dev_age))
+	dev_buttons.append(text_button(dev, "+1 day", _dev_day))
 	for b in dev_buttons:
-		b.custom_minimum_size = Vector2(64, 64)
+		b.custom_minimum_size = Vector2(64, 60)
 		b.add_theme_font_size_override("font_size", 22)
 	dev.custom_minimum_size.x = 136
-	dev.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 12)
 	dev.grow_vertical = Control.GROW_DIRECTION_BOTH
 	dev.visible = false
-
-	# What a finger can do, since nothing on a phone hints at it
-	hint = Label.new()
-	hint.text = EGG_HINT
-	hint.add_theme_color_override("font_color", Color(0.95, 0.92, 0.82))
-	hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	hint.add_theme_constant_override("outline_size", 8)
-	hint.add_theme_constant_override("line_spacing", 8)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint.modulate.a = 0.0
-	layer.add_child(hint)
-	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 150)
-	hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
 	toast = Label.new()
 	toast.add_theme_font_size_override("font_size", 28)
 	toast.add_theme_color_override("font_color", Color(0.95, 0.92, 0.82))
+	toast.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	toast.add_theme_constant_override("outline_size", 8)
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toast.modulate.a = 0.0
 	layer.add_child(toast)
-	toast.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 80)
+	toast.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 40)
 	toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
 
-	# Asked before a cryptlin is sent away
-	ask = PanelContainer.new()
-	var card := StyleBoxFlat.new()
+	card = StyleBoxFlat.new()
 	card.bg_color = Color(Icons.MOSS, 0.96)
 	card.border_color = Color(Icons.AMBER, 0.45)
 	card.set_border_width_all(2)
 	card.set_corner_radius_all(18)
 	card.set_content_margin_all(26)
+
+	# Asked before a cryptlin is sent away
+	ask = PanelContainer.new()
 	ask.add_theme_stylebox_override("panel", card)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 22)
 	ask.add_child(column)
-	ask_text = Label.new()
-	ask_text.add_theme_font_size_override("font_size", 28)
-	ask_text.add_theme_color_override("font_color", Color(0.95, 0.92, 0.82))
-	ask_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(ask_text)
+	ask_text = _words(column, "", 28)
 	var answers := HBoxContainer.new()
 	answers.alignment = BoxContainer.ALIGNMENT_CENTER
 	answers.add_theme_constant_override("separation", 16)
 	column.add_child(answers)
-	for b: Button in [_icon(answers, "heart", _answer.bind(false), "Keep"), _icon(answers, "egg", _answer.bind(true), "Let go")]:
+	for b: Button in [icon_button(answers, "heart", _answer.bind(false), "Keep"), icon_button(answers, "egg", _answer.bind(true), "Let go")]:
 		b.custom_minimum_size = Vector2(170, 130)
 	layer.add_child(ask)
+	_centre(ask)
 
-	# Who it is, and how its room is done up
-	menu = PanelContainer.new()
-	menu.add_theme_stylebox_override("panel", card)
+	# Asked when it hatches (and from the notebook): what it is to be called
+	namer = PanelContainer.new()
+	namer.add_theme_stylebox_override("panel", card)
 	var rows := VBoxContainer.new()
-	rows.add_theme_constant_override("separation", 16)
-	menu.add_child(rows)
-	menu_text = Label.new()
-	menu_text.add_theme_font_size_override("font_size", 24)
-	menu_text.add_theme_color_override("font_color", Color(0.95, 0.92, 0.82))
-	menu_text.add_theme_constant_override("line_spacing", 6)
-	menu_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rows.add_child(menu_text)
-	var labels: Array[Label] = []
-	for step: Callable in [_floor_step, _nest_step]:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 12)
-		rows.add_child(row)
-		var back := _icon(row, "left", step.bind(-1))
-		var label := Label.new()
-		label.custom_minimum_size.x = 280
-		label.add_theme_font_size_override("font_size", 26)
-		label.add_theme_color_override("font_color", Color(0.95, 0.92, 0.82))
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		row.add_child(label)
-		labels.append(label)
-		for b: Button in [back, _icon(row, "right", step.bind(1))]:
-			b.custom_minimum_size = Vector2(88, 80)
-	floor_label = labels[0]
-	nest_label = labels[1]
-	var last := HBoxContainer.new()
-	last.alignment = BoxContainer.ALIGNMENT_CENTER
-	last.add_theme_constant_override("separation", 12)
-	rows.add_child(last)
-	egg_button = _icon(last, "egg", ask_new_egg, "New egg")
-	sound_button = _icon(last, "sound_on", toggle_sound, "Sound")
-	for b: Button in [egg_button, sound_button, _icon(last, "check", close_menu, "Done")]:
-		b.custom_minimum_size = Vector2(130, 120)
-	layer.add_child(menu)
-	menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	menu.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	menu.grow_vertical = Control.GROW_DIRECTION_BOTH
-	menu.visible = false
-	ask.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	ask.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	ask.grow_vertical = Control.GROW_DIRECTION_BOTH
-	ask.visible = false
+	rows.add_theme_constant_override("separation", 20)
+	namer.add_child(rows)
+	_words(rows, "What will you call it?", 28)
+	name_edit = LineEdit.new()
+	name_edit.max_length = 14
+	name_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_edit.custom_minimum_size = Vector2(380, 70)
+	name_edit.add_theme_font_size_override("font_size", 34)
+	name_edit.add_theme_color_override("font_color", Icons.AMBER)
+	name_edit.select_all_on_focus = true
+	name_edit.text_submitted.connect(_name_done)
+	rows.add_child(name_edit)
+	var choices := HBoxContainer.new()
+	choices.alignment = BoxContainer.ALIGNMENT_CENTER
+	choices.add_theme_constant_override("separation", 16)
+	rows.add_child(choices)
+	for b: Button in [icon_button(choices, "dice", _name_roll, "Another"), icon_button(choices, "check", _name_done, "Done")]:
+		b.custom_minimum_size = Vector2(170, 120)
+	layer.add_child(namer)
+	_centre(namer)
+
+	notebook = Notebook.new(self)
+	layer.add_child(notebook)
+	notebook.visible = false
+
+
+func _centre(panel: Control) -> void:
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	panel.visible = false
+
+
+func _words(parent: Node, text: String, size: int) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", Color(0.95, 0.92, 0.82))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	parent.add_child(label)
+	return label
 
 
 # A button with a symbol on it (see Icons), and perhaps a word underneath
-func _icon(parent: Node, symbol: String, action: Callable, caption := "") -> IconButton:
+func icon_button(parent: Node, symbol: String, action: Callable, caption := "") -> IconButton:
 	var b := IconButton.new()
 	b.symbol = symbol
 	b.caption = caption
@@ -875,7 +1316,7 @@ func _icon(parent: Node, symbol: String, action: Callable, caption := "") -> Ico
 
 
 # A button with words on it, for the few places a symbol will not do
-func _button(parent: Node, text: String, action: Callable) -> Button:
+func text_button(parent: Node, text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_size_override("font_size", 23)
@@ -914,77 +1355,6 @@ func _say(text: String) -> void:
 	tw.tween_property(toast, "modulate:a", 0.0, 1.2)
 
 
-func show_help() -> void:
-	if ask.visible:
-		return
-	if hint_tween != null:
-		hint_tween.kill()
-	hint_tween = create_tween()
-	hint_tween.tween_property(hint, "modulate:a", 1.0, 0.4)
-	hint_tween.tween_interval(7.0)
-	hint_tween.tween_property(hint, "modulate:a", 0.0, 1.2)
-
-
-# Drops something to eat into the light: a given food, or any
-func feed(which := -1) -> void:
-	if pet == null or leaving:
-		return
-	if snacks.size() >= MAX_SNACKS:
-		sfx.play("click", 0.7)
-		return
-	var a := randf() * TAU
-	var at := light_point + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * 1.5
-	var snack := Snack.new(which if which >= 0 else randi() % Snack.NAMES.size())
-	add_child(snack)
-	snack.drop(at + Vector3(0, 5.5, 0))
-	snack.thud.connect(func(strength: float) -> void: sfx.play("thud", 1.3, clampf(strength * 2.0 - 16.0, -24.0, -4.0)))
-	snacks.append(snack)
-	sfx.play("click")
-
-
-# Throws a toy in: a given one, or whichever is out already (the ball, if none is)
-func play_ball(which := -1) -> void:
-	if pet == null or leaving:
-		return
-	if ball != null and which >= 0 and which != ball.kind:
-		_clear_ball()
-	if ball == null:
-		var toy := Ball.new(maxi(which, 0))
-		ball = toy
-		add_child(ball)
-		ball.position = Vector3(randf_range(-1.0, 1.0), 1.4, 4.4)
-		ball.vel = Vector3(randf_range(-0.8, 0.8), 2.6, -4.2) * toy.heft
-		ball.bounced.connect(func(strength: float) -> void: sfx.play(toy.sound, toy.pitch, clampf(strength * 3.0 - 16.0, -24.0, -3.0)))
-	else:
-		var a := randf() * TAU
-		ball.vel += Vector3(cos(a) * 2.5, 4.2, sin(a) * 2.5) * ball.heft
-	ball_button.set("symbol", TOY_ICONS[ball.kind])
-	pet.notice_ball()
-	sfx.play("click")
-
-
-func _clear_ball() -> void:
-	if ball != null:
-		ball.queue_free()
-		ball = null
-	if grab == Grab.BALL:
-		grab = Grab.NONE
-		finger = -1
-
-
-func toggle_lamp() -> void:
-	light_on = not light_on
-	light_dragging = false
-	lamp_button.symbol = "lamp_on" if light_on else "lamp_off"
-	sfx.play("click", 0.8)
-
-
-func toggle_sound() -> void:
-	sfx.muted = not sfx.muted
-	sound_button.symbol = "sound_off" if sfx.muted else "sound_on"
-	sound_button.caption = "Muted" if sfx.muted else "Sound"
-
-
 # ---------------------------------------------------------------- things the cryptlin asks of the room
 
 func hover_fresh() -> bool:
@@ -1021,23 +1391,38 @@ func _process(delta: float) -> void:
 	if not light_dragging and clock - release_time > 2.5:
 		light_goal = Vector3.ZERO
 	light_point = light_point.lerp(light_goal, 1.0 - exp(-delta * (9.0 if light_dragging else 1.6)))
-	spot.look_at(light_point, Vector3.FORWARD)
+	# The lamp swings on its cord to point there, and eases to however it has been set to burn
+	lamp_head.quaternion = Quaternion(Vector3.DOWN, (light_point - lamp_at).normalized())
+	var mode: Dictionary = LAMPS[lamp_mode]
+	var ease_in := 1.0 - exp(-delta * 6.0)
 	light_level = move_toward(light_level, 1.0 if light_on else 0.0, delta * 5.0)
-	spot.light_energy = 2.8 * light_level * (1.0 + sin(clock * 13.0) * sin(clock * 3.1) * 0.025)
+	if light_on:
+		spot.light_color = spot.light_color.lerp(mode["colour"], ease_in)
+		# Hung higher in a tall room, it burns harder and narrower to throw the same pool of light
+		lamp_energy = lerpf(lamp_energy, float(mode["energy"]) * (1.9 if tall_room else 1.0), ease_in)
+		lamp_angle = lerpf(lamp_angle, float(mode["angle"]) * (0.6 if tall_room else 1.0), ease_in)
+	spot.light_energy = lamp_energy * light_level * (1.0 + sin(clock * 13.0) * sin(clock * 3.1) * 0.025)
+	spot.spot_angle = lamp_angle
 	spot.visible = light_level > 0.001
-	beam.set_shader_parameter("strength", 0.2 * light_level)
+	bulb.material_override.set_shader_parameter("tint", Color(0.2, 0.17, 0.15).lerp(spot.light_color, light_level))
+	bulb.material_override.set_shader_parameter("glow", light_level)
+	beam.set_shader_parameter("tint", spot.light_color)
+	beam.set_shader_parameter("spread", tan(deg_to_rad(lamp_angle - 1.0)))
+	beam.set_shader_parameter("strength", 0.07 * light_level * float(mode["energy"]))
+	beam.set_shader_parameter("reach", lamp_at.y - LAMP_DROP + 1.3)
 	beam.set_shader_parameter("apex", spot.global_position)
 	beam.set_shader_parameter("axis", -spot.global_basis.z)
-	bounce.light_energy = 0.55 * light_level
-	bounce.position = light_point + Vector3(0, 1.1, 2.6)
+	bounce.light_color = spot.light_color
+	bounce.light_energy = 0.2 * float(mode["energy"]) * light_level
+	bounce.position = light_point + Vector3(0, 1.1, 1.8)
 	motes.visible = light_level > 0.5
-	motes.position = Vector3(light_point.x * 0.72, 1.7, light_point.z * 0.72)
+	motes.position = Vector3(light_point.x * 0.5, 1.2, light_point.z * 0.5)
 
 	# A finger left on the cryptlin lifts it
 	if grab == Grab.PET and pet != null:
 		if not carrying and clock - press_time > 0.45 and moved < 14.0:
 			carrying = true
-			hold_point = _floor_at(last_at, 0.0, 3.6) + Vector3(0, 0.8, 0)
+			hold_point = _floor_at(last_at, 0.0, 0.4) + Vector3(0, 0.8, 0)
 			pet.pick_up()
 			Input.vibrate_handheld(30)
 		if carrying:
@@ -1048,6 +1433,16 @@ func _process(delta: float) -> void:
 		ball.position = ball.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
 		if delta > 0.0:
 			hold_vel = hold_vel.lerp((ball.position - before) / delta, 0.35)
+	if grab == Grab.SNACK and held_snack != null:
+		held_snack.position = held_snack.position.lerp(hold_point, 1.0 - exp(-delta * 18.0))
+
+	if scanning:
+		scan_time += delta
+		if (pet == null and egg == null) or scan_time > SCAN_SECONDS:
+			stop_scan()
+		else:
+			_aim_scanner()
+			scan_notes.queue_redraw()
 
 	if ripple.visible:
 		var grown := ripple.scale.x + delta * 1.4
@@ -1056,8 +1451,7 @@ func _process(delta: float) -> void:
 		mat.albedo_color.a = clampf(0.6 - grown, 0.0, 0.5)
 		ripple.visible = grown < 0.6
 
-	camera.position = Vector3(sin(clock * 0.21) * 0.12, 3.0 + sin(clock * 0.17) * 0.05, 5.7)
-	camera.look_at(Vector3(0, 0.5, 0))
+	_aim_camera()
 
 	save_timer += delta
 	if save_timer > 10.0:
@@ -1066,8 +1460,13 @@ func _process(delta: float) -> void:
 
 # ---------------------------------------------------------------- touch
 
+# A card or the notebook is up: nothing in the room or on the shelf answers to a finger
+func _modal() -> bool:
+	return ask.visible or namer.visible or notebook.visible
+
+
 func _over_ui(p: Vector2) -> bool:
-	return ask.visible or menu.visible or (tray.visible and tray.get_global_rect().has_point(p)) or buttons.get_global_rect().has_point(p) or corner.get_global_rect().has_point(p) or (dev.visible and dev.get_global_rect().has_point(p))
+	return _modal() or (dev.visible and dev.get_global_rect().has_point(p))
 
 
 # The room is drawn smaller than the screen, so touches are scaled down to it and back
@@ -1080,7 +1479,9 @@ func screen_of(world: Vector3) -> Vector2:
 	return camera.unproject_position(world) * get_viewport().get_visible_rect().size / Vector2(view.size)
 
 
-func _floor_at(at: Vector2, height := 0.0, reach := 4.2) -> Vector3:
+# Where on the floor (or `height` above it) a point on the screen is, kept `margin` inside the
+# walls; a margin below zero lets it run on past them
+func _floor_at(at: Vector2, height := 0.0, margin := 0.2) -> Vector3:
 	var from := camera.project_ray_origin(_in_view(at))
 	var dir := camera.project_ray_normal(_in_view(at))
 	var t := 60.0
@@ -1088,8 +1489,7 @@ func _floor_at(at: Vector2, height := 0.0, reach := 4.2) -> Vector3:
 		t = minf((height - from.y) / dir.y, 60.0)
 	var p := from + dir * t
 	p.y = height
-	var flat := Vector2(p.x, p.z).limit_length(reach)
-	return Vector3(flat.x, height, flat.y)
+	return in_room(p, margin)
 
 
 func _ray_hits(at: Vector2, centre: Vector3, radius: float) -> bool:
@@ -1099,90 +1499,245 @@ func _ray_hits(at: Vector2, centre: Vector3, radius: float) -> bool:
 	return along > 0.0 and (from + dir * along).distance_to(centre) < radius
 
 
+# The thing standing in the room under a finger (the nest counts), or null
+func _thing_at(at: Vector2) -> Node3D:
+	for d in decors:
+		if _ray_hits(at, d.position + Vector3(0, minf(d.radius, 0.4), 0), maxf(d.radius, 0.34)):
+			return d
+	if _ray_hits(at, nest_pos + Vector3(0, 0.1, 0), 0.55):
+		return nest
+	return null
+
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_press(event)
 		elif event.index == finger:
+			last_at = event.position
 			_release()
 	elif event is InputEventScreenDrag and event.index == finger:
 		moved += event.relative.length()
+		last_at = event.position
 		match grab:
 			Grab.BALL:
-				hold_point = _floor_at(event.position, 0.75, 3.8)
+				hold_point = _floor_at(event.position, 0.75, 0.3)
+			Grab.SNACK:
+				hold_point = _floor_at(event.position, 0.9, 0.3)
 			Grab.PET:
-				last_at = event.position
 				if carrying:
-					hold_point = _floor_at(event.position, 0.0, 3.6) + Vector3(0, 0.8, 0)
+					hold_point = _floor_at(event.position, 0.0, 0.4) + Vector3(0, 0.8, 0)
 				elif moved > 14.0 and pet != null:
 					pet.stroke()
 			Grab.EGG:
 				if moved > 14.0 and egg != null:
 					egg.rub()
+			Grab.THING:
+				if moved > 14.0 and is_instance_valid(held_thing):
+					_drag_thing(event.position)
+			Grab.SHELF:
+				_drag_shelf(event)
 			Grab.FLOOR:
-				press_floor = _floor_at(event.position, 0.0, LIGHT_REACH)
+				press_floor = _floor_at(event.position).limit_length(LIGHT_REACH)
 				if light_on and (light_dragging or moved > 26.0):
 					light_dragging = true
 					light_goal = press_floor
 	elif event is InputEventMouseMotion:
 		hover_point = _floor_at(event.position)
 		hover_time = clock
+	elif event is InputEventMouseButton and event.pressed and shelf.has_point(event.position) and not _modal():
+		# A mouse wheel over the shelf slides it along
+		if event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_LEFT]:
+			shelf.drag(90.0, 0.05)
+		elif event.button_index in [MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_RIGHT]:
+			shelf.drag(-90.0, 0.05)
 	elif event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and notebook.visible:
+			notebook.close()
+		elif _modal():
+			return
 		match event.keycode:
-			KEY_F: open_tray(true)
-			KEY_B: open_tray(false)
+			KEY_F: use("bone")
+			KEY_B: use("ball")
 			KEY_L: toggle_lamp()
 			KEY_M: toggle_sound()
+			KEY_N: use("notebook")
+			KEY_X: use("scanner")
 			KEY_QUOTELEFT: dev_toggle()
 
 
 func _press(e: InputEventScreenTouch) -> void:
-	# Five quick taps on the name in the corner open the test panel
-	if Rect2(needs_panel.position, needs_panel.size * needs_panel.scale).has_point(e.position):
+	if _modal():
+		return
+	# Five quick taps in the top left corner open the test panel
+	if Rect2(0, 0, 150, 150).has_point(e.position) and not dev.visible:
 		dev_taps = dev_taps + 1 if clock - dev_tap_time < 0.6 else 1
 		dev_tap_time = clock
 		if dev_taps >= 5:
 			dev_taps = 0
 			dev_toggle()
-		return
+			return
 	if finger != -1 or _over_ui(e.position):
 		return
-	# A touch anywhere else puts the tray away
-	if tray.visible:
-		tray.visible = false
+	# A touch anywhere puts the scanner down
+	if scanning and not shelf.has_point(e.position):
+		stop_scan()
 		return
 	finger = e.index
 	press_time = clock
+	press_at = e.position
+	last_at = e.position
 	moved = 0.0
-	if ball != null and _ray_hits(e.position, ball.global_position, 0.5):
-		grab = Grab.BALL
-		ball.held = true
-		ball.vel = Vector3.ZERO
-		hold_vel = Vector3.ZERO
-		hold_point = _floor_at(e.position, 0.75, 3.8)
-		if pet != null:
-			pet.notice_ball()
+	held_thing = null
+	thing_new = false
+	if shelf.has_point(e.position):
+		grab = Grab.SHELF
+		shelf_item = shelf.item_at(e.position)
+		sliding = false
+		shelf.grab()
+	elif _ray_hits(e.position, bulb.global_position + Vector3(0, 0.1, 0), 0.42):
+		grab = Grab.LAMP
+	elif ball != null and _ray_hits(e.position, ball.global_position, 0.5):
+		_hold_ball(e.position)
 	elif egg != null and _ray_hits(e.position, egg.centre(), 0.6):
 		grab = Grab.EGG
 	elif pet != null and not leaving and _ray_hits(e.position, pet.body_centre(), 0.7 * maxf(pet.grow, 0.75)):
 		grab = Grab.PET
 		carrying = false
-		press_at = e.position
-		last_at = e.position
 	else:
-		grab = Grab.FLOOR
-		press_floor = _floor_at(e.position, 0.0, LIGHT_REACH)
+		held_thing = _thing_at(e.position)
+		if held_thing != null:
+			grab = Grab.THING
+		else:
+			grab = Grab.FLOOR
+			press_floor = _floor_at(e.position).limit_length(LIGHT_REACH)
+
+
+func _hold_ball(at: Vector2) -> void:
+	grab = Grab.BALL
+	ball.held = true
+	ball.vel = Vector3.ZERO
+	hold_vel = Vector3.ZERO
+	hold_point = _floor_at(at, 0.75, 0.3)
+	if pet != null:
+		pet.notice_ball()
+
+
+# A finger that came down on the shelf: sideways slides it, upwards pulls the thing off it
+func _drag_shelf(e: InputEventScreenDrag) -> void:
+	var gone := e.position - press_at
+	# Up over the shelf's edge, and not plainly a sideways swipe that strayed: the thing comes too
+	if e.position.y < shelf.global_position.y - 6.0 and shelf_item != "" and owns(shelf_item) and absf(gone.x) < maxf(absf(gone.y) * 2.5, 90.0):
+		shelf.let_go()
+		_pull(shelf_item, e.position)
+	elif sliding:
+		shelf.drag(e.relative.x, get_process_delta_time())
+	elif absf(gone.x) > 16.0 and absf(gone.x) > absf(gone.y):
+		sliding = true
+
+
+# Something dragged up off the shelf: it comes into the room on the end of the finger
+func _pull(id: String, at: Vector2) -> void:
+	var item := Items.find(id)
+	var n: int = item["n"]
+	match item["group"]:
+		"food":
+			if pet == null or leaving or snacks.size() >= MAX_SNACKS:
+				return
+			held_snack = Snack.new(n)
+			held_snack.set_process(false)
+			add_child(held_snack)
+			hold_point = _floor_at(at, 0.9, 0.3)
+			held_snack.position = hold_point
+			grab = Grab.SNACK
+		"toy":
+			if pet == null or leaving:
+				return
+			if ball != null and ball.kind != n:
+				_clear_ball()
+			if ball == null:
+				_new_ball(n)
+				ball.position = _floor_at(at, 0.75, 0.3)
+			_hold_ball(at)
+			_sync()
+		"decor":
+			held_thing = decor_of(n)
+			thing_new = held_thing == null
+			if thing_new:
+				held_thing = _stand(n, _floor_at(at, 0.0, 0.3), randf_range(-0.4, 0.4))
+			grab = Grab.THING
+			moved = 15.0
+			_sync()
+		"nest":
+			set_nest(n)
+			held_thing = nest
+			grab = Grab.THING
+			moved = 15.0
+		_:
+			# Grounds, the notebook and the scanner have nothing to carry: dragging one up uses it
+			shelf_item = ""
+			use(id)
+
+
+# A thing from the room following a finger across the floor
+func _drag_thing(at: Vector2) -> void:
+	if held_thing == nest:
+		move_nest(_floor_at(at, 0.0, 0.6))
+	else:
+		var d := held_thing as Decor
+		d.position = _floor_at(at, 0.0, d.radius * 0.6)
+		# Held over the shelf it is on its way back there
+		d.scale = Vector3.ONE * (0.6 if shelf.has_point(at) else 1.0)
 
 
 func _release() -> void:
 	var quick := clock - press_time < 0.3 and moved < 14.0
-	match grab:
+	# Let go of first: some of what follows opens things that let go of the finger themselves
+	var was := grab
+	grab = Grab.NONE
+	finger = -1
+	light_dragging_was = light_dragging
+	light_dragging = false
+	release_time = clock
+	match was:
+		Grab.SHELF:
+			shelf.let_go()
+			if not sliding and moved < 14.0 and shelf_item != "":
+				use(shelf_item)
+		Grab.LAMP:
+			if moved < 20.0:
+				tap_lamp()
 		Grab.BALL:
 			if ball != null:
 				ball.held = false
 				ball.vel = hold_vel.limit_length(7.5)
 			if pet != null:
 				pet.notice_ball()
+		Grab.SNACK:
+			if held_snack != null:
+				if shelf.has_point(last_at):
+					held_snack.queue_free()
+				else:
+					held_snack.set_process(true)
+					held_snack.drop(held_snack.position)
+					_serve(held_snack)
+				held_snack = null
+		Grab.THING:
+			if is_instance_valid(held_thing):
+				if held_thing == nest:
+					settle_nest()
+				else:
+					var d := held_thing as Decor
+					d.scale = Vector3.ONE
+					if shelf.has_point(last_at):
+						remove_decor(d)
+					elif thing_new:
+						place_decor(d.kind, d.position)
+					elif moved < 14.0 and quick and pet != null:
+						pet.call_to(d.position + Vector3(0, 0, d.radius + 0.3))
+					else:
+						save_game()
+			held_thing = null
 		Grab.PET:
 			if pet == null:
 				pass
@@ -1193,7 +1748,7 @@ func _release() -> void:
 				Input.vibrate_handheld(20)
 			elif clock - press_time < 0.35 and moved > 80.0:
 				# A flick: push it the way the finger went
-				var way := _floor_at(last_at, 0.0, 9.0) - _floor_at(press_at, 0.0, 9.0)
+				var way := _floor_at(last_at, 0.0, -7.0) - _floor_at(press_at, 0.0, -7.0)
 				if way.length() > 0.05:
 					pet.push(way)
 					Input.vibrate_handheld(20)
@@ -1203,15 +1758,44 @@ func _release() -> void:
 				egg.tap()
 				Input.vibrate_handheld(20)
 		Grab.FLOOR:
-			if quick and not light_dragging and pet != null:
-				pet.call_to(press_floor)
-				ripple.position = Vector3(press_floor.x, 0.02, press_floor.z)
+			if quick and not light_dragging_was and pet != null:
+				var there := _floor_at(press_at, 0.0, 0.35)
+				pet.call_to(there)
+				ripple.position = Vector3(there.x, 0.02, there.z)
 				ripple.scale = Vector3(0.08, 0.02, 0.08)
 				ripple.visible = true
-	light_dragging = false
-	release_time = clock
-	grab = Grab.NONE
-	finger = -1
+
+
+# ---------------------------------------------------------------- the site it may be played inside
+
+# Inside another page (the station's basement): tell it when the room is on the screen, so it
+# can lift whatever it was covering the load with, and take from it what has been bought.
+#   out: {type: "CRYPTLINS_READY"}, {type: "CRYPTLINS_USED", item: <id>}
+#   in:  {type: "CRYPTLINS_STOCK", items: {<id>: <how many, or -1 for no end of them>}}
+func _bridge() -> void:
+	if not OS.has_feature("web"):
+		return
+	embedded = bool(JavaScriptBridge.eval("window.parent !== window", true))
+	if not embedded:
+		return
+	_on_message = JavaScriptBridge.create_callback(_message)
+	JavaScriptBridge.get_interface("window").addEventListener("message", _on_message)
+	_sync()
+	for i in 4:
+		await get_tree().process_frame
+	_post({"type": "CRYPTLINS_READY"})
+
+
+func _post(message: Dictionary) -> void:
+	if embedded:
+		JavaScriptBridge.eval("window.parent.postMessage(%s, '*')" % JSON.stringify(message), true)
+
+
+func _message(args: Array) -> void:
+	var data: Variant = JSON.parse_string(str(JavaScriptBridge.get_interface("JSON").stringify(args[0].data)))
+	if data is Dictionary and data.get("type") == "CRYPTLINS_STOCK" and data.get("items") is Dictionary:
+		stock = data["items"]
+		_sync()
 
 
 # ---------------------------------------------------------------- the save
@@ -1221,21 +1805,30 @@ func save_game() -> void:
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
 		return
+	var things: Array = []
+	for d in decors:
+		things.append({"k": d.kind, "x": d.position.x, "z": d.position.z, "r": d.rotation.y})
 	file.store_string(JSON.stringify({
+		"v": 2,
 		"name": pet_name,
 		"kind": Cryptlin.KINDS[pet_kind]["title"],
 		"seed": pet_seed,
 		"hatched": hatched,
+		"born": born,
 		"warmth": egg.warmth if egg != null else 0.0,
 		"needs": pet.get_needs() if pet != null else {},
 		"floor": floor_style,
 		"nest": nest_style,
+		"nest_at": [nest_pos.x, nest_pos.z],
+		"decor": things,
+		"lamp": lamp_mode,
+		"muted": sfx.muted if sfx != null else false,
 		"known": known,
 		"time": Time.get_unix_time_from_system(),
 	}))
 
 
-# Reads the save and lets time pass for the hours away; false if there was none (a new cryptlin)
+# Reads the save and notes how long it has been; false if there was none (a new cryptlin)
 func _load_game() -> bool:
 	var data: Variant = null
 	if FileAccess.file_exists(save_path):
@@ -1245,6 +1838,7 @@ func _load_game() -> bool:
 		pet_kind = first_kind if first_kind >= 0 else randi() % Cryptlin.KINDS.size()
 		return false
 	var d: Dictionary = data
+	var now := Time.get_unix_time_from_system()
 	pet_name = str(d.get("name", "Grubnik"))
 	pet_seed = int(d.get("seed", 1))
 	# Saves from before there were eggs hold a hatched gremlin
@@ -1252,18 +1846,24 @@ func _load_game() -> bool:
 	hatched = bool(d.get("hatched", true))
 	saved_warmth = clampf(float(d.get("warmth", 0.0)), 0.0, 99.0)
 	saved_needs = d.get("needs", {})
-	floor_style = clampi(int(d.get("floor", 0)), 0, FLOORS.size() - 1)
-	nest_style = clampi(int(d.get("nest", 0)), 0, NESTS.size() - 1)
+	floor_style = clampi(int(d.get("floor", 0)), 0, GROUNDS.size() - 1)
+	nest_style = clampi(int(d.get("nest", 0)), 0, Decor.NESTS.size() - 1)
+	if d.get("nest_at") is Array and d["nest_at"].size() == 2:
+		nest_pos = in_room(Vector3(float(d["nest_at"][0]), 0, float(d["nest_at"][1])), 0.6)
+	if d.get("decor") is Array:
+		saved_decor = d["decor"]
+	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
 	if d.get("known") is Dictionary:
 		known = d["known"]
-	# It gets hungry and bored while you are gone, but never desperately, and it sleeps well
-	var away := clampf(Time.get_unix_time_from_system() - float(d.get("time", 0.0)), 0.0, 8.0 * 3600.0)
-	saved_needs["belly"] = maxf(float(saved_needs.get("belly", 50.0)) - away / 120.0, 12.0)
-	saved_needs["fun"] = maxf(float(saved_needs.get("fun", 50.0)) - away / 150.0, 12.0)
-	saved_needs["energy"] = minf(float(saved_needs.get("energy", 50.0)) + away / 60.0, 100.0)
+	if int(d.get("v", 1)) < 2 and saved_needs.has("age"):
+		# Saves from when a baby grew up in seven minutes: as far along now as it was then
+		saved_needs["age"] = clampf(float(saved_needs["age"]) / 420.0, 0.0, 1.0) * Cryptlin.GROW_AGE
+	born = float(d.get("born", now - float(saved_needs.get("age", Cryptlin.GROW_AGE))))
+	away = maxf(now - float(d.get("time", now)), 0.0)
+	_muted_at_start = bool(d.get("muted", false))
 	return true
 
 
 func _notification(what: int) -> void:
-	if what in [NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and needs_panel != null:
+	if what in [NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and shelf != null:
 		save_game()

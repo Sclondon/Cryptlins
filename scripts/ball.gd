@@ -11,7 +11,6 @@ const NAMES: Array[String] = ["Ball", "Stone", "Bell", "Glow orb"]
 # As in "its favourite toy is the ..."
 const PLAIN: Array[String] = ["ball", "stone", "bell", "glow orb"]
 const R := 0.16
-const LIMIT := 4.3
 
 var kind: int = Kind.BALL
 var vel := Vector3.ZERO
@@ -103,16 +102,18 @@ func _process(delta: float) -> void:
 		flat = flat.move_toward(Vector3.ZERO, delta * drag)
 		vel.x = flat.x
 		vel.z = flat.z
-	# The unseen walls of the room
-	var out := Vector2(position.x, position.z)
-	if out.length() > LIMIT:
-		var n := out.normalized()
-		var along := vel.x * n.x + vel.z * n.y
-		if along > 0.0:
-			vel.x -= n.x * along * 1.7
-			vel.z -= n.y * along * 1.7
-			bounced.emit(along)
-		position.x = n.x * LIMIT
-		position.z = n.y * LIMIT
+	# The walls of the room, and the unseen one across the front
+	var wide := Den.half.x - R
+	var deep := Den.half.y - R
+	if absf(position.x) > wide:
+		if vel.x * position.x > 0.0:
+			bounced.emit(absf(vel.x))
+			vel.x *= -0.7
+		position.x = clampf(position.x, -wide, wide)
+	if absf(position.z) > deep:
+		if vel.z * position.z > 0.0:
+			bounced.emit(absf(vel.z))
+			vel.z *= -0.7
+		position.z = clampf(position.z, -deep, deep)
 	if flat.length() > 0.02:
 		mesh.rotate(Vector3.UP.cross(flat).normalized(), flat.length() / R * delta)

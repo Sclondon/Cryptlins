@@ -1,6 +1,6 @@
 shader_type spatial;
 // The floor, laid out from world position so it needs no UVs or textures. `style` picks which:
-// 0 flagstones, 1 floorboards, 2 moss, 3 checkered tiles.
+// 0 flagstones, 1 floorboards, 2 moss, 3 checkered tiles, 4 dirt, 5 sand, 6 gravel.
 
 uniform int style = 0;
 
@@ -72,6 +72,46 @@ vec3 checkers(vec2 at) {
 	return mix(vec3(0.03, 0.03, 0.035), tile * grime * (1.0 - chip * 0.5), grout);
 }
 
+vec3 dirt(vec2 at) {
+	float clod = noise(at * 2.2) * 0.55 + noise(at * 7.0) * 0.3 + noise(at * 23.0) * 0.15;
+	vec3 earth = mix(vec3(0.13, 0.085, 0.05), vec3(0.3, 0.2, 0.12), clod);
+	// Damp patches, and the odd pebble and root
+	earth *= 1.0 - 0.35 * smoothstep(0.55, 0.75, noise(at * 1.1 + 9.0));
+	vec2 cell = floor(at * 4.0);
+	float pebble = step(0.8, hash(cell)) * step(length(fract(at * 4.0) - vec2(hash(cell + 1.0), hash(cell + 2.0))), 0.09);
+	return mix(earth, vec3(0.36, 0.34, 0.31) * (0.7 + 0.4 * hash(cell + 5.0)), pebble);
+}
+
+vec3 sand(vec2 at) {
+	// Raked into ripples that wander a little
+	float ripple = sin(at.y * 16.0 + noise(at * 1.5) * 5.0) * 0.5 + 0.5;
+	float grain = noise(at * 30.0);
+	vec3 pale = mix(vec3(0.5, 0.41, 0.25), vec3(0.68, 0.58, 0.38), ripple * 0.6 + grain * 0.4);
+	vec2 cell = floor(at * 2.5);
+	float shell = step(0.9, hash(cell)) * step(length(fract(at * 2.5) - vec2(hash(cell + 1.0), hash(cell + 2.0))), 0.06);
+	return mix(pale, vec3(0.85, 0.8, 0.72), shell);
+}
+
+vec3 gravel(vec2 at) {
+	// Small stones packed together: the nearest of a scatter of points
+	vec2 p = at * 5.5;
+	vec2 cell = floor(p);
+	float best = 9.0;
+	vec2 which = cell;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 c = cell + vec2(float(x), float(y));
+			float d = length(p - c - vec2(hash(c), hash(c + 3.0)));
+			if (d < best) {
+				best = d;
+				which = c;
+			}
+		}
+	}
+	vec3 stone = mix(vec3(0.3, 0.3, 0.33), vec3(0.47, 0.42, 0.36), hash(which + 7.0)) * (0.65 + 0.5 * hash(which + 2.0));
+	return mix(stone, vec3(0.05, 0.05, 0.06), smoothstep(0.3, 0.52, best));
+}
+
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
@@ -85,6 +125,12 @@ void fragment() {
 		ALBEDO = moss(at);
 	} else if (style == 3) {
 		ALBEDO = checkers(at);
+	} else if (style == 4) {
+		ALBEDO = dirt(at);
+	} else if (style == 5) {
+		ALBEDO = sand(at);
+	} else if (style == 6) {
+		ALBEDO = gravel(at);
 	} else {
 		ALBEDO = flagstones(at);
 	}

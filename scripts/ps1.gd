@@ -4,6 +4,8 @@ class_name Ps1
 
 const LIT: Shader = preload("res://shaders/ps1.gdshader")
 const FLAT: Shader = preload("res://shaders/ps1_flat.gdshader")
+const XRAY: Shader = preload("res://shaders/xray.gdshader")
+const ORGAN: Shader = preload("res://shaders/organ.gdshader")
 # The room is drawn this many pixels high (or wide, on an upright phone) and blown up
 const LINES := 240.0
 
@@ -33,4 +35,49 @@ static func ball() -> SphereMesh:
 	m.height = 2.0
 	m.radial_segments = 10
 	m.rings = 5
+	return m
+
+
+# What the scanner makes of a body: a ghost of its outline, brightest at the edges
+static func xray(c: Color) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = XRAY
+	m.render_priority = 1
+	m.set_shader_parameter("tint", c)
+	return m
+
+
+# Something inside a scanned body, drawn through whatever is in front of it
+static func organ(c: Color) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = ORGAN
+	m.render_priority = 2
+	m.set_shader_parameter("tint", c)
+	return m
+
+
+static func part(parent: Node, mesh: Mesh, mat: Material, at: Vector3, size := Vector3.ONE, turn := Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = at
+	mi.scale = size
+	mi.rotation = turn
+	parent.add_child(mi)
+	return mi
+
+
+# A cube one unit across
+static func box() -> BoxMesh:
+	return BoxMesh.new()
+
+
+# A drum one unit tall and two across; with `top` at 0 it is a cone
+static func drum(sides := 8, top := 1.0) -> CylinderMesh:
+	var m := CylinderMesh.new()
+	m.top_radius = top
+	m.bottom_radius = 1.0
+	m.height = 1.0
+	m.radial_segments = sides
+	m.rings = 1
 	return m
