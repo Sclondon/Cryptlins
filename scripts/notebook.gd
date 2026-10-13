@@ -25,7 +25,7 @@ Tap a thing to put it in, or drag it up off the shelf and let go where you want 
 
 Food gets eaten. Toys get thrown: pick one up and throw it again.
 
-Rocks, logs and the like stay put. Drag them about, or back down to the shelf to put them away. It will sit on them, drink from them and hide in them.
+Rocks, logs and the like stay put. Drag them about, or back down to the shelf to put them away. It will sit on them, drink from them, wade in them and hide in them.
 
 A tray of ground changes the floor. A nest changes its bed.
 
@@ -164,6 +164,7 @@ func _notes(pet: Cryptlin) -> String:
 		if open or known.get("decor+" + Decor.IDS[kind], false):
 			likes.append("the " + Decor.PLAIN[kind])
 	var hates: String = Decor.PLAIN[pet.hate_decor]
+	var water := "yes, a pool to wade in" if pet.needs_water() else "no more than a drink"
 	var grown := "Hatched %s ago, and all grown up." % _span(Time.get_unix_time_from_system() - world.born)
 	if pet.is_baby():
 		grown = "Hatched %s ago. Grown in about %s." % [_span(Time.get_unix_time_from_system() - world.born), _span(pet.growing_left())]
@@ -178,6 +179,7 @@ Happiest on: %s
 Likes the lamp: %s
 Likes having about: %s
 Can't stand: %s
+Needs water: %s
 
 What it shows you gets written down here." % [
 		pet.nature_name(), "baby " if pet.is_baby() else "", pet.kind_name(), grown, pet.feeling_name(),
@@ -188,6 +190,7 @@ What it shows you gets written down here." % [
 		Den.LAMPS[pet.fav_lamp]["title"] if open or known.get("lamp", false) else "?",
 		", ".join(likes) if not likes.is_empty() else "?",
 		"the " + hates if open or known.get("decor-" + Decor.IDS[pet.hate_decor], false) else "?",
+		water if open or known.get("water", false) else "?",
 	]
 
 

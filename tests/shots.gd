@@ -1,7 +1,9 @@
 extends SceneTree
 ## Screenshots of the cryptlin at its various doings.
-## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..8] [--egg]
+## godot --path . -s tests/shots.gd -- --shots=<dir> [--portrait] [--seed=N] [--kind=0..18] [--egg|--ui [--baby]|--faces]
 ## With --egg: the egg of that kind, cracking and hatching, and then the new-egg question.
+## With --ui: the room done up, the pool, the lamp, the scanner and the notebook. With --faces:
+## each of the faces that go up over its head.
 
 const SAVE := "user://shots_test.json"
 
@@ -12,6 +14,8 @@ var look := 0
 var kind := 0
 var ui_only := false
 var egg_only := false
+var faces_only := false
+var baby := false
 
 
 func _initialize() -> void:
@@ -24,6 +28,10 @@ func _initialize() -> void:
 			kind = int(arg.trim_prefix("--kind="))
 		if arg == "--egg":
 			egg_only = true
+		if arg == "--baby":
+			baby = true
+		if arg == "--faces":
+			faces_only = true
 		if arg == "--ui":
 			ui_only = true
 		if arg == "--portrait":
@@ -42,6 +50,8 @@ func _initialize() -> void:
 	root.add_child(main)
 	if ui_only:
 		_run_ui.call_deferred()
+	elif faces_only:
+		_run_faces.call_deferred()
 	elif egg_only:
 		_run_egg.call_deferred()
 	else:
@@ -69,7 +79,7 @@ func _until(done: Callable, seconds: float) -> void:
 func _run_ui() -> void:
 	await _wait(1.0)
 	var pet := main.pet
-	pet.set_needs({"belly": 35.0, "fun": 70.0, "energy": 80.0, "love": 55.0})
+	pet.set_needs({"belly": 35.0, "fun": 70.0, "energy": 80.0, "love": 55.0, "age": 0.0 if baby else Cryptlin.GROW_AGE})
 	pet.position = Vector3(0.3, 0, 0.6)
 	pet._enter(Cryptlin.State.STARE)
 	await _wait(1.2)
@@ -101,12 +111,31 @@ func _run_ui() -> void:
 	await _until(func() -> bool: return pet.step == 1, 9.0)
 	await _wait(1.0)
 	await _snap("u5_cave")
+	# Each of the other shelters in turn, with the cryptlin inside
+	for k in range(Decor.Kind.POOL + 1, Decor.IDS.size()):
+		var den := main.place_decor(k, Vector3(0.1, 0, 0.3))
+		den.rotation.y = 0.0
+		pet._enter(Cryptlin.State.LURK)
+		pet.visiting = den
+		pet.target = den.position
+		await _until(func() -> bool: return pet.state == Cryptlin.State.LURK and pet.step == 1, 9.0)
+		await _wait(1.2)
+		await _snap("u5_%s" % Decor.IDS[k])
+		main.remove_decor(den)
 	pet.visiting = main.decor_of(Decor.Kind.ROCK)
 	pet._enter(Cryptlin.State.VISIT)
 	pet.visiting = main.decor_of(Decor.Kind.ROCK)
 	await _until(func() -> bool: return pet.step == 1, 9.0)
 	await _wait(1.5)
 	await _snap("u6_rock")
+	var pool := main.place_decor(Decor.Kind.POOL, Vector3(0.1, 0, 0.5))
+	await _wait(0.5)
+	pet._enter(Cryptlin.State.VISIT)
+	pet.visiting = pool
+	await _until(func() -> bool: return pet.step >= 1, 9.0)
+	await _wait(2.2)
+	await _snap("u6_pool")
+	main.remove_decor(pool)
 	pet._enter(Cryptlin.State.IDLE, 20.0)
 	pet.position = Vector3(0.2, 0, 0.7)
 	await _wait(0.6)
@@ -132,6 +161,28 @@ func _run_ui() -> void:
 	main.dev_toggle()
 	await _wait(0.3)
 	await _snap("u12_dev")
+	quit()
+
+
+# Every face that goes up over its head, under the lamp, and then two of them in the dark
+func _run_faces() -> void:
+	var pet := main.pet
+	pet.set_needs({"belly": 60.0, "fun": 60.0, "energy": 90.0, "love": 40.0})
+	pet.position = Vector3(0.2, 0, 0.6)
+	pet._enter(Cryptlin.State.STARE)
+	await _wait(1.0)
+	for how in range(1, Cryptlin.FEELINGS.size()):
+		pet._enter(Cryptlin.State.STARE)
+		pet.feel(how, 3.0)
+		await _wait(0.9)
+		await _snap("f%d_%s" % [how, Cryptlin.FEELINGS[how]["title"]])
+	main.toggle_lamp()
+	pet.energy = 100.0
+	for how: int in [Cryptlin.Feeling.SCARED, Cryptlin.Feeling.LOVING]:
+		pet._enter(Cryptlin.State.STARE)
+		pet.feel(how, 3.0)
+		await _wait(1.2)
+		await _snap("f_dark_%s" % Cryptlin.FEELINGS[how]["title"])
 	quit()
 
 
@@ -174,6 +225,10 @@ func _run() -> void:
 	pet._enter(Cryptlin.State.STARE)
 	await _wait(1.6)
 	await _snap("1_stare")
+	pet.feel(Cryptlin.Feeling.GRUMPY, 3.0)
+	await _wait(1.0)
+	await _snap("1_face")
+	pet.flash_time = 0.0
 	pet.position = Vector3(-0.9, 0, 0.2)
 	pet.target = Vector3(1.3, 0, 0.9)
 	pet._enter(Cryptlin.State.WANDER)
@@ -217,4 +272,7 @@ func _run() -> void:
 	pet._enter(Cryptlin.State.STARE)
 	await _wait(1.5)
 	await _snap("9_dark")
+	pet.feel(Cryptlin.Feeling.SCARED, 3.0)
+	await _wait(1.0)
+	await _snap("9_dark_face")
 	quit()

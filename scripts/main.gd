@@ -231,15 +231,13 @@ func _spawn_pet(at: Vector3) -> void:
 	pet.comfort = comfort_of(pet)
 	pet.left.connect(_on_left)
 	if away > 0.0:
-		# It has been living its life while the game was shut
-		var was_baby := pet.is_baby()
+		# It has been living its life while the game was shut (grown, asleep, hungry, glad to see
+		# you: it shows all that itself)
 		var asleep := pet.pass_time(away, not light_on)
 		if asleep:
 			pet.position = nest_pos
 			pet._enter(Cryptlin.State.SLEEP)
-		if was_baby and not pet.is_baby():
-			_say("%s grew up while you were away!" % pet_name)
-		away = 0.0 # (asleep, hungry, glad to see you: it shows that itself)
+		away = 0.0
 	_sync()
 
 
@@ -414,7 +412,8 @@ func _clear_toys() -> void:
 # ---------------------------------------------------------------- what the cryptlin lets on
 
 # It has shown a taste for the first time: "food" (its favourite), "yuck", "toy", "ground",
-# "lamp", or a thing in its room it likes ("decor+rock") or cannot stand ("decor-rock")
+# "lamp", a thing in its room it likes ("decor+rock") or cannot stand ("decor-rock"), or
+# whether it is one that needs water ("water")
 func learned(what: String) -> void:
 	if pet == null or known.get(what, false):
 		return
@@ -430,7 +429,6 @@ func fed_up() -> void:
 
 
 func grew_up() -> void:
-	_say("%s is all grown up!" % pet_name)
 	sfx.play("coo", 0.7)
 	Input.vibrate_handheld(60)
 	_sync()
@@ -438,7 +436,8 @@ func grew_up() -> void:
 
 
 # How well the room suits a cryptlin, 0 to 100: the ground and the lamp it wants, the things
-# it likes to have about (and not the one it hates), and not being left with bare floor
+# it likes to have about (and not the one it hates), not being left with bare floor, and water
+# if it is one that needs it
 func comfort_of(who: Cryptlin) -> float:
 	var c := 35.0
 	if floor_style == who.fav_ground:
@@ -453,6 +452,9 @@ func comfort_of(who: Cryptlin) -> float:
 			c -= 18.0
 		else:
 			others += 1
+	# A kind that lives in water is never at home without a pool to get into
+	if who.needs_water():
+		c += 14.0 if decor_of(Decor.Kind.POOL) != null else -24.0
 	return clampf(c + mini(others, 3) * 4.0, 0.0, 100.0)
 
 
@@ -617,7 +619,10 @@ func _judge(d: Decor) -> void:
 		return
 	var id: String = Decor.IDS[d.kind]
 	var near := d.position + Vector3(0, 0, d.radius + 0.35)
-	if d.kind in pet.like_decor:
+	if d.kind == Decor.Kind.POOL:
+		# Whether it needs water shows the first time it sees some
+		pet.look_over(near, 1 if pet.needs_water() else 0, "water")
+	elif d.kind in pet.like_decor:
 		pet.look_over(near, 1, "decor+" + id)
 	elif d.kind == pet.hate_decor:
 		pet.look_over(near, -1, "decor-" + id)
@@ -647,7 +652,8 @@ func set_ground(style: int) -> void:
 	floor_mat.set_shader_parameter("style", floor_style)
 	sfx.play("thud", 0.7, -8.0)
 	if pet != null and not leaving:
-		pet.look_over(pet.position, 1 if floor_style == pet.fav_ground else 0, "ground")
+		var right := floor_style == pet.fav_ground
+		pet.look_over(pet.position, 1 if right else 0, "ground" if right else "")
 	_sync()
 	save_game()
 
@@ -678,12 +684,12 @@ func settle_nest() -> void:
 	save_game()
 
 
-# Where a cryptlin would sooner have its nest: in the cave if there is one, by something it
+# Where a cryptlin would sooner have its nest: in a shelter if there is one, by something it
 # likes, or tucked into a back corner
 func nest_spot(who: Cryptlin) -> Vector3:
 	var spots: Array[Vector3] = [Vector3(-9.0, 0, -9.0), Vector3(9.0, 0, -9.0)]
 	for d in decors:
-		if d.hollow:
+		if d.hollow and d.kind != who.hate_decor:
 			spots.append(d.position)
 			spots.append(d.position)
 		elif d.kind in who.like_decor:
@@ -695,16 +701,24 @@ func nest_spot(who: Cryptlin) -> Vector3:
 	return far.pick_random() if not far.is_empty() else in_room(Vector3(randf_range(-1.5, 1.5), 0, -1.2), 0.6)
 
 
-func cave() -> Decor:
+# A shelter in the room for a cryptlin to get inside (never one it cannot stand): one it likes
+# if there is one, or else the nearest; null if there is none
+func shelter(who: Cryptlin) -> Decor:
+	var best: Decor = null
+	var best_way := INF
 	for d in decors:
-		if d.hollow:
-			return d
-	return null
+		if not d.hollow or d.kind == who.hate_decor or d == held_thing:
+			continue
+		var way := d.position.distance_to(who.position) - (100.0 if d.kind in who.like_decor else 0.0)
+		if way < best_way:
+			best_way = way
+			best = d
+	return best
 
 
-# Where a cryptlin goes to watch from: inside the cave, behind something it likes, or a back corner
+# Where a cryptlin goes to watch from: inside a shelter, behind something it likes, or a back corner
 func hiding_place(who: Cryptlin) -> Vector3:
-	var hole := cave()
+	var hole := shelter(who)
 	if hole != null:
 		return hole.position + Vector3(0, 0, 0.05)
 	for d in decors:
@@ -721,6 +735,9 @@ func somewhere_to_go(who: Cryptlin) -> Decor:
 			fine.append(d)
 			if d.kind in who.like_decor:
 				fine.append(d)
+			# Water draws a water kind more than anything
+			if d.kind == Decor.Kind.POOL and who.needs_water():
+				fine.append_array([d, d, d])
 	return fine.pick_random() if not fine.is_empty() else null
 
 
@@ -731,7 +748,8 @@ func set_lamp(mode: int) -> void:
 	light_dragging = false
 	sfx.play("click", 0.8 if light_on else 0.6)
 	if pet != null and not leaving and light_on:
-		pet.look_over(pet.position, 1 if lamp_mode == pet.fav_lamp else 0, "lamp")
+		var right := lamp_mode == pet.fav_lamp
+		pet.look_over(pet.position, 1 if right else 0, "lamp" if right else "")
 	_sync()
 	save_game()
 
@@ -787,8 +805,8 @@ func stop_scan() -> void:
 
 
 func _aim_scanner() -> void:
-	var middle := egg.centre() if pet == null else pet.global_position + Vector3(0, pet.top_y * pet.grow * 0.5, 0)
-	var tall := 0.9 if pet == null else pet.top_y * pet.grow
+	var middle := egg.centre() if pet == null else pet.global_position + Vector3(0, pet.tall() * 0.5, 0)
+	var tall := 0.9 if pet == null else pet.tall()
 	var size := maxf(tall, 0.5) / 0.6
 	var toward := (camera.global_position - middle).normalized()
 	scanner.scale = Vector3.ONE * size
@@ -875,6 +893,8 @@ func _sync() -> void:
 				marks[id] = "heart"
 			elif known.get("decor-" + id, false):
 				marks[id] = "cross"
+		if known.get("water", false) and pet.needs_water():
+			marks["pool"] = "heart"
 	out[Items.id_of("ground", floor_style)] = true
 	out[Items.id_of("nest", nest_style)] = true
 	for d in decors:
@@ -1378,6 +1398,12 @@ func crumbs(at: Vector3, colour: Color) -> void:
 	crumb_puff.position = at
 	crumb_puff.color = colour
 	crumb_puff.restart()
+
+
+# Water thrown up by something wading in the pool
+func splash(at: Vector3) -> void:
+	crumbs(Vector3(at.x, Decor.WATER + 0.05, at.z), Color(0.5, 0.75, 0.9))
+	sfx.play("chomp", 0.9, -9.0)
 
 
 # ---------------------------------------------------------------- every frame

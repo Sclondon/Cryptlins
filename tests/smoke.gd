@@ -1,8 +1,9 @@
 extends SceneTree
 ## Smoke test: the egg and hatching, naming, the shelf (food, toys, things for the room, ground),
+## the pool and the kinds that need one,
 ## the lamp, petting, calling, sleep, time passing while away, the scanner, the notebook and
 ## sending it off for a new egg.
-## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..8]
+## godot --headless --fixed-fps 60 --path . -s tests/smoke.gd [-- --kind=0..18]
 ## (touches are sent as window pixels, like a real finger)
 
 const SAVE := "user://smoke_test.json"
@@ -101,12 +102,19 @@ func _tap(pos: Vector2) -> void:
 	await _frames(2)
 
 
-# A finger down at one place, slid to another in a few steps, and lifted
-func _slide(from: Vector2, to: Vector2, steps := 8) -> void:
+# A finger down at one place, slid to another in a few steps (by way of a third, if one is
+# given), and lifted
+func _slide(from: Vector2, to: Vector2, steps := 8, via := Vector2.INF) -> void:
 	_touch(from, true)
 	await _frames(2)
+	var start := from
+	if via != Vector2.INF:
+		for i in steps:
+			_drag(from.lerp(via, float(i + 1) / steps), (via - from) / steps)
+			await _frames(1)
+		start = via
 	for i in steps:
-		_drag(from.lerp(to, float(i + 1) / steps), (to - from) / steps)
+		_drag(start.lerp(to, float(i + 1) / steps), (to - start) / steps)
 		await _frames(1)
 	_touch(to, false)
 	await _frames(2)
@@ -185,7 +193,7 @@ func _run() -> void:
 	check(pet.belly > 55.0, "eating fills its belly (%.0f)" % pet.belly)
 	await _until(func() -> bool: return _settled(pet), 600)
 	pet.belly = 30.0
-	await _slide(_on_shelf(food), _screen(Vector3(-1.0, 0.9, 0.5)))
+	await _slide(_on_shelf(food), _screen(Vector3(-1.0, 0.9, 0.5)), 8, _on_shelf(food) - Vector2(0, 160))
 	check(main.snacks.size() == 1 and main.snacks[0].position.x < -0.5, "dragged up off the shelf, it drops where you let go")
 	check(await _until(func() -> bool: return main.snacks.is_empty(), 1500), "and is eaten too")
 
@@ -357,18 +365,54 @@ func _run() -> void:
 	nest_was = main.nest_pos
 	pet._enter(Cryptlin.State.MOVE_NEST)
 	check(await _until(func() -> bool: return pet.state != Cryptlin.State.MOVE_NEST, 1500) and main.nest_pos.distance_to(nest_was) > 0.5, "or where the cryptlin drags it itself")
-	# A cave to hide in, a rock to sit on
-	var hole := main.place_decor(Decor.Kind.CAVE, Vector3(-1.3, 0, -1.0))
-	await _until(func() -> bool: return _settled(pet), 900)
-	pet._enter(Cryptlin.State.LURK)
-	check(await _until(func() -> bool: return pet.state == Cryptlin.State.LURK and pet.step == 1, 900) and pet.position.distance_to(hole.position) < 0.4, "it hides in the cave")
-	main.remove_decor(hole)
+	# Shelters to hide in, and a rock to sit on
 	pet.hate_decor = Decor.Kind.DISH
+	for k in Decor.IDS.size():
+		var probe := Decor.new(k)
+		var is_shelter := probe.hollow
+		probe.free()
+		if not is_shelter:
+			continue
+		var hole := main.place_decor(k, Vector3(-1.1, 0, -0.8))
+		await _until(func() -> bool: return _settled(pet), 900)
+		pet.position = Vector3(1.2, 0, 0.9)
+		pet._enter(Cryptlin.State.LURK)
+		check(pet.visiting == hole and await _until(func() -> bool: return pet.state == Cryptlin.State.LURK and pet.step == 1, 900) and pet.position.distance_to(hole.position) < 0.4, "it hides in the %s" % Decor.PLAIN[k])
+		main.remove_decor(hole)
 	var rock := main.place_decor(Decor.Kind.ROCK, Vector3(0.8, 0, -0.6))
 	await _until(func() -> bool: return _settled(pet), 900)
 	pet._enter(Cryptlin.State.VISIT)
 	check(await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.lift > 0.3, 900), "and climbs up to sit on the rock")
 	main.remove_decor(rock)
+	# A pool: a water kind is not at home without one and wades into it; the rest take it or leave it
+	await _until(func() -> bool: return _settled(pet), 900)
+	pet._enter(Cryptlin.State.IDLE, 3.0)
+	pet.position = Vector3(0, 0, 0.9)
+	main.known.erase("water")
+	var dry := main.comfort_of(pet)
+	check(pet.dry() == pet.needs_water() and not main.notebook._notes(pet).contains("pool"), "nothing says yet whether it needs water")
+	await _tap(_on_shelf("pool"))
+	var pool := main.decor_of(Decor.Kind.POOL)
+	check(pool != null and pool.radius > Decor.RADII[Decor.Kind.DISH] * 2.0, "a tap on the pool stands it in the room, a good deal bigger than the dish")
+	check(not Decor.Kind.POOL in pet.like_decor and pet.hate_decor != Decor.Kind.POOL, "the pool is no part of its likes and dislikes")
+	check(await _until(func() -> bool: return main.known.get("water", false), 900), "the cryptlin goes to look, and whether it needs water is found out")
+	check(main.toast.text.findn("water") < 0 and main.toast.text.findn("pool") < 0, "nothing is written on the screen about it")
+	if pet.needs_water():
+		check(main.comfort_of(pet) > dry + 30.0, "a water kind is far more at home with a pool (%.0f, from %.0f)" % [main.comfort_of(pet), dry])
+		check(main.shelf.marks.get("pool") == "heart" and main.notebook._notes(pet).contains("a pool to wade in"), "the shelf marks it and the notebook says so")
+		await _until(func() -> bool: return _settled(pet), 900)
+		pet._enter(Cryptlin.State.VISIT)
+		check(pet.visiting == pool, "it goes to the pool of its own accord")
+		check(await _until(func() -> bool: return pet.state == Cryptlin.State.VISIT and pet.lift < 0.0 and pet.position.distance_to(Vector3(pool.position.x, pet.position.y, pool.position.z)) < 0.2, 900), "and wades in up to its middle")
+		check(await _until(func() -> bool: return pet.state != Cryptlin.State.VISIT, 900) and pet.lift == 0.0, "and climbs out again")
+		main.remove_decor(pool)
+		check(pet.dry() and main.comfort_of(pet) < dry + 1.0, "without one it is back to making do")
+		pet._enter(Cryptlin.State.BEG)
+		check(pet.beg_for == Cryptlin.Want.WATER, "and asks for water")
+	else:
+		check(absf(main.comfort_of(pet) - dry) < 5.0 and not main.shelf.marks.has("pool"), "its kind takes a pool as it would anything else")
+		check(main.notebook._notes(pet).contains("no more than a drink"), "and the notebook says so")
+		main.remove_decor(pool)
 	await _until(func() -> bool: return _settled(pet), 900)
 	pet._enter(Cryptlin.State.IDLE, 3.0)
 	await _tap(_on_shelf(Items.id_of("ground", pet.fav_ground)))

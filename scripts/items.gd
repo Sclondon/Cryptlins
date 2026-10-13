@@ -26,6 +26,12 @@ const LIST: Array[Dictionary] = [
 	{"id": "gravestone", "group": "decor", "n": 6, "name": "Gravestone"},
 	{"id": "dish", "group": "decor", "n": 7, "name": "Water dish"},
 	{"id": "cave", "group": "decor", "n": 8, "name": "Cave"},
+	{"id": "pool", "group": "decor", "n": 9, "name": "Pool"},
+	{"id": "barrel", "group": "decor", "n": 10, "name": "Barrel"},
+	{"id": "stump", "group": "decor", "n": 11, "name": "Hollow stump"},
+	{"id": "tent", "group": "decor", "n": 12, "name": "Rag tent"},
+	{"id": "crate", "group": "decor", "n": 13, "name": "Crate"},
+	{"id": "pot", "group": "decor", "n": 14, "name": "Flowerpot"},
 	{"id": "rags", "group": "nest", "n": 0, "name": "Rag nest"},
 	{"id": "twigs", "group": "nest", "n": 1, "name": "Twig nest"},
 	{"id": "cushion", "group": "nest", "n": 2, "name": "Cushion"},
@@ -78,7 +84,8 @@ static func model(id: String) -> Node3D:
 			holder.add_child(toy)
 		"decor":
 			var thing := Decor.new(n)
-			thing.scale = Vector3.ONE * (0.42 if n == Decor.Kind.CAVE else 0.95)
+			# (the big ones are shrunk to fit)
+			thing.scale = Vector3.ONE * minf(0.95, 0.36 / Decor.RADII[n])
 			holder.add_child(thing)
 		"nest":
 			var bed := Decor.nest(n)

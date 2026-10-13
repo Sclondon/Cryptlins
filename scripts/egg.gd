@@ -15,14 +15,20 @@ const SIZE := 1.25
 const SHELLS: Array[Color] = [
 	Color(0.42, 0.52, 0.3), Color(0.34, 0.28, 0.21), Color(0.56, 0.5, 0.4), Color(0.4, 0.4, 0.44), Color(0.3, 0.36, 0.3),
 	Color(0.26, 0.44, 0.24), Color(0.22, 0.36, 0.44), Color(0.36, 0.36, 0.38), Color(0.2, 0.2, 0.24),
+	Color(0.14, 0.2, 0.22), Color(0.18, 0.4, 0.42), Color(0.2, 0.32, 0.26), Color(0.62, 0.52, 0.4), Color(0.78, 0.6, 0.85),
+	Color(0.68, 0.14, 0.1), Color(0.55, 0.45, 0.32), Color(0.42, 0.48, 0.46), Color(0.62, 0.72, 0.82), Color(0.13, 0.11, 0.12),
 ]
 const MARKS: Array[Color] = [
 	Color(0.2, 0.3, 0.15), Color(0.2, 0.16, 0.12), Color(0.5, 0.18, 0.1), Color(0.6, 0.58, 0.56), Color(0.45, 0.14, 0.1),
 	Color(0.5, 0.6, 0.3), Color(0.5, 0.66, 0.7), Color(0.2, 0.2, 0.22), Color(0.85, 0.82, 0.72),
+	Color(0.1, 0.32, 0.2), Color(0.5, 0.75, 0.7), Color(0.4, 0.3, 0.46), Color(0.66, 0.1, 0.08), Color(1.0, 0.95, 0.7),
+	Color(0.9, 0.87, 0.78), Color(0.9, 0.87, 0.8), Color(0.4, 1.0, 0.5), Color(0.95, 0.97, 1.0), Color(0.62, 0.1, 0.08),
 ]
 const TITLES: Array[String] = [
 	"A mossy egg", "A hairy egg", "A speckled egg", "A silk-wound egg", "A spiny egg",
 	"A slimy egg", "A cold, wet egg", "A stone egg", "An antlered egg",
+	"A weed-hung egg", "A scaly egg", "A clutched egg", "A hatted egg", "A glimmering egg",
+	"A toadstool egg", "A downy egg", "A humming egg", "A frosted egg", "A collared egg",
 ]
 
 var world: Den
@@ -113,6 +119,86 @@ func _ready() -> void:
 			var frost := Ps1.mat(Color(0.5, 0.6, 0.68))
 			for i in 6:
 				_spot(frost, _on(rng.randf_range(-1.5, 1.5), rng.randf_range(-0.9, 0.2)), rng.randf_range(0.03, 0.06))
+		Cryptlin.Kind.KELPIE:
+			# Waterweed draped over it from the top, still dripping
+			var wrack := Ps1.mat(Color(0.24, 0.44, 0.16))
+			for i in 9:
+				var around := TAU * i / 9.0 + rng.randf_range(-0.2, 0.2)
+				var long := rng.randf_range(0.2, 0.34)
+				var at := _on(around, 1.25 - long * 1.6)
+				var weed := _part(point, mark if i % 2 == 0 else wrack, at + _normal(at) * 0.012)
+				weed.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, 2.75) * Basis.from_scale(Vector3(0.045, long, 0.02))
+			for i in 3:
+				_part(Ps1.ball(), Ps1.mat(Color(0.5, 0.75, 0.85), 0.3), _on(-0.6 + i * 0.6, -0.5 + (i % 2) * 0.3), Vector3(0.018, 0.03, 0.018))
+		Cryptlin.Kind.MERFOLK:
+			# Scales in rows, each lapped over the one below, and a fin on top
+			for row in 5:
+				var up := -0.75 + row * 0.42
+				for i in 8:
+					var at := _on(TAU * (i + 0.5 * (row % 2)) / 8.0, up)
+					var lap := _part(Ps1.ball(), mark if (i + row) % 2 == 0 else base, at)
+					lap.basis = Basis.looking_at(-_normal(at)).scaled_local(Vector3(0.075, 0.085, 0.014))
+			_part(point, Ps1.mat(Color(0.7, 0.34, 0.24)), CENTRE + Vector3(0, 0.4, -0.02), Vector3(0.016, 0.16, 0.09), Vector3(-0.4, 0, 0))
+		Cryptlin.Kind.SPAWN:
+			# Feelers have it by the bottom, suckers out
+			for i in 5:
+				var around := TAU * i / 5.0 + 0.3
+				var reach := 0.3 + (i % 2) * 0.4
+				for j in 5:
+					var at := _on(around + j * 0.09, -1.1 + (reach + 1.1) * j / 4.0)
+					_part(Ps1.ball(), mark, at, Vector3.ONE * (0.062 - j * 0.008))
+		Cryptlin.Kind.GNOME:
+			# It has its hat on already
+			_part(point, mark, CENTRE + Vector3(0.01, 0.5, 0), Vector3(0.2, 0.46, 0.2), Vector3(0.08, 0, -0.1))
+			var clay := Ps1.mat(Color(0.46, 0.34, 0.24))
+			for i in 6:
+				_spot(clay, _on(rng.randf_range(-1.6, 1.6), rng.randf_range(-0.9, 0.3)), rng.randf_range(0.02, 0.04))
+		Cryptlin.Kind.FAE:
+			# It gives off a light, and motes of it hang about the shell
+			base.set_shader_parameter("glow", 0.45)
+			var mote := Ps1.mat(MARKS[kind], 1.0)
+			for i in 9:
+				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.8, 1.2))
+				_part(Ps1.ball(), mote, at + _normal(at) * rng.randf_range(0.0, 0.09), Vector3.ONE * rng.randf_range(0.014, 0.026))
+		Cryptlin.Kind.FUNGUS:
+			# A toadstool's spots, and a frill of gills round the bottom
+			for i in 9:
+				_spot(mark, _on(TAU * i / 9.0 + rng.randf_range(-0.25, 0.25), rng.randf_range(-0.3, 1.15)), rng.randf_range(0.04, 0.07))
+			_part(Ps1.ball(), Ps1.mat(Color(0.8, 0.76, 0.64)), CENTRE + Vector3(0, -0.27, 0), Vector3(0.24, 0.07, 0.24))
+		Cryptlin.Kind.JACKALOPE:
+			# Down all over, and a scut of it behind
+			for i in 14:
+				var at := _on(rng.randf_range(-PI, PI), rng.randf_range(-0.9, 1.2))
+				_part(Ps1.ball(), base if i % 3 == 0 else mark, at, Vector3.ONE * rng.randf_range(0.035, 0.06))
+			_part(Ps1.ball(), mark, _on(PI, -0.5), Vector3.ONE * 0.09)
+		Cryptlin.Kind.ALIEN:
+			# Smooth as glass, with a band of lights round it that no bird put there
+			var band := _part(Ps1.ball(), Ps1.mat(Color(0.18, 0.2, 0.22)), CENTRE, Vector3(WIDTH + 0.006, 0.03, WIDTH + 0.006))
+			band.rotation.z = 0.2
+			for i in 8:
+				var around := TAU * i / 8.0
+				_part(Ps1.ball(), Ps1.mat(mark.get_shader_parameter("tint"), 1.0), CENTRE + Basis(Vector3.BACK, 0.2) * Vector3(sin(around), 0, cos(around)) * (WIDTH + 0.012), Vector3.ONE * 0.026)
+		Cryptlin.Kind.YETI:
+			# Snow on top, icicles under it, and frost the rest of the way down
+			_part(Ps1.ball(), mark, CENTRE + Vector3(0, 0.25, 0), Vector3(0.2, 0.13, 0.2))
+			for i in 7:
+				var around := TAU * i / 7.0 + rng.randf_range(-0.2, 0.2)
+				var root := _on(around, 0.75)
+				_part(point, Ps1.mat(Color(0.75, 0.88, 1.0), 0.15), root + _normal(root) * 0.01 + Vector3(0, -0.05, 0), Vector3(0.022, rng.randf_range(0.08, 0.15), 0.022), Vector3(PI, 0, 0))
+			for i in 6:
+				_spot(mark, _on(rng.randf_range(-1.5, 1.5), rng.randf_range(-0.9, 0.2)), rng.randf_range(0.03, 0.055))
+		Cryptlin.Kind.CERBERUS:
+			# A studded collar round its middle, and three coals glowing through the shell
+			var band := _part(Ps1.ball(), mark, CENTRE + Vector3(0, -0.03, 0), Vector3(WIDTH + 0.008, 0.035, WIDTH + 0.008))
+			band.rotation.x = 0.12
+			for i in 8:
+				var around := TAU * i / 8.0
+				var ring := Basis(Vector3.RIGHT, 0.12) * Vector3(sin(around), 0, cos(around))
+				var stud := _part(point, Ps1.mat(Color(0.85, 0.82, 0.72)), CENTRE + Vector3(0, -0.03, 0) + ring * (WIDTH + 0.03))
+				stud.basis = Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(0.025, 0.06, 0.025))
+			var ember := Ps1.mat(Color(1.0, 0.4, 0.1), 0.9)
+			for i in 3:
+				_spot(ember, _on(-0.5 + i * 0.5, 0.75 - absf(i - 1.0) * 0.12), 0.022)
 
 	# The cracks, made ahead of time and shown as it warms
 	var black := Ps1.flat(Color(0.02, 0.01, 0.02))

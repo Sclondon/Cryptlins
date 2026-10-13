@@ -10,31 +10,59 @@ enum State {
 	BEG, ZOOMIES, DANCE, PETTED, STARTLED, GO_SLEEP, SLEEP, LEAVE, HELD, SHOVED, INSPECT, SCANNED, VISIT, MOVE_NEST,
 }
 # The cryptids they are the young of
-enum Kind { GREMLIN, SQUATCH, COCKATRICE, MOTHMAN, CHUPACABRA, FROGMAN, NESSIE, BOLTER, WENDIGO }
+enum Kind {
+	GREMLIN, SQUATCH, COCKATRICE, MOTHMAN, CHUPACABRA, FROGMAN, NESSIE, BOLTER, WENDIGO,
+	KELPIE, MERFOLK, SPAWN, GNOME, FAE, FUNGUS, JACKALOPE, ALIEN, YETI, CERBERUS,
+}
 
 # What sets the kinds apart besides their looks: pace on the ground, appetite, how fast they tire,
-# the spring in their hop, the pitch of their voice, and what they like to do with a free moment
+# the spring in their hop, the pitch of their voice, and what they like to do with a free moment.
+# The ones marked "water" live in it, and are not at home without a pool to wade in.
 const KINDS: Array[Dictionary] = [
 	{"title": "gremlin", "pace": 1.0, "hunger": 1.0, "tire": 1.0, "spring": 1.0, "voice": 1.0, "lurk": 1.0, "zoom": 1.0, "dance": 1.0, "stare": 1.0},
 	{"title": "squatchling", "pace": 0.85, "hunger": 1.25, "tire": 1.1, "spring": 0.7, "voice": 0.55, "lurk": 2.2, "zoom": 0.5, "dance": 1.1, "stare": 1.4},
 	{"title": "cockatrice", "pace": 1.1, "hunger": 1.0, "tire": 1.0, "spring": 1.2, "voice": 1.45, "lurk": 0.5, "zoom": 1.2, "dance": 1.5, "stare": 2.4},
 	{"title": "mothman", "pace": 1.2, "hunger": 0.8, "tire": 1.2, "spring": 1.4, "voice": 1.6, "lurk": 1.2, "zoom": 2.2, "dance": 1.0, "stare": 1.5},
 	{"title": "chupacabra", "pace": 1.25, "hunger": 1.6, "tire": 1.0, "spring": 1.2, "voice": 0.85, "lurk": 1.8, "zoom": 1.6, "dance": 0.6, "stare": 1.0},
-	{"title": "Loveland frogman", "pace": 0.9, "hunger": 1.1, "tire": 0.9, "spring": 1.7, "voice": 0.75, "lurk": 0.6, "zoom": 1.0, "dance": 1.8, "stare": 1.2},
-	{"title": "Loch Ness monster", "pace": 0.75, "hunger": 1.2, "tire": 0.8, "spring": 0.6, "voice": 0.9, "lurk": 2.2, "zoom": 0.4, "dance": 1.0, "stare": 1.6},
+	{"title": "Loveland frogman", "pace": 0.9, "hunger": 1.1, "tire": 0.9, "spring": 1.7, "voice": 0.75, "lurk": 0.6, "zoom": 1.0, "dance": 1.8, "stare": 1.2, "water": true},
+	{"title": "Loch Ness monster", "pace": 0.75, "hunger": 1.2, "tire": 0.8, "spring": 0.6, "voice": 0.9, "lurk": 2.2, "zoom": 0.4, "dance": 1.0, "stare": 1.6, "water": true},
 	{"title": "slide-rock bolter", "pace": 0.8, "hunger": 1.8, "tire": 1.2, "spring": 0.6, "voice": 0.5, "lurk": 0.6, "zoom": 3.0, "dance": 0.6, "stare": 0.9},
 	{"title": "wendigo", "pace": 1.0, "hunger": 2.0, "tire": 0.7, "spring": 0.9, "voice": 0.6, "lurk": 2.6, "zoom": 0.5, "dance": 0.5, "stare": 1.8},
+	{"title": "kelpie", "pace": 1.3, "hunger": 1.1, "tire": 0.9, "spring": 1.3, "voice": 0.8, "lurk": 1.0, "zoom": 2.0, "dance": 0.9, "stare": 1.2, "water": true},
+	{"title": "merling", "pace": 0.9, "hunger": 1.1, "tire": 1.0, "spring": 1.0, "voice": 1.1, "lurk": 1.2, "zoom": 0.9, "dance": 1.4, "stare": 1.4, "water": true},
+	{"title": "Cthulhu spawn", "pace": 0.8, "hunger": 1.5, "tire": 0.9, "spring": 0.7, "voice": 0.45, "lurk": 2.4, "zoom": 0.4, "dance": 0.6, "stare": 2.2, "water": true},
+	{"title": "gnome", "pace": 0.95, "hunger": 1.2, "tire": 1.0, "spring": 0.9, "voice": 1.0, "lurk": 1.4, "zoom": 0.7, "dance": 1.5, "stare": 1.0},
+	{"title": "fae", "pace": 1.3, "hunger": 0.7, "tire": 1.3, "spring": 1.5, "voice": 1.9, "lurk": 0.8, "zoom": 2.4, "dance": 2.0, "stare": 1.0},
+	{"title": "living fungus", "pace": 0.7, "hunger": 0.8, "tire": 0.8, "spring": 0.8, "voice": 0.7, "lurk": 1.6, "zoom": 0.3, "dance": 0.8, "stare": 1.6},
+	{"title": "jackalope", "pace": 1.35, "hunger": 1.0, "tire": 1.1, "spring": 1.8, "voice": 1.3, "lurk": 1.2, "zoom": 2.4, "dance": 1.0, "stare": 0.9},
+	{"title": "alien", "pace": 0.95, "hunger": 0.9, "tire": 0.8, "spring": 1.1, "voice": 1.7, "lurk": 1.0, "zoom": 0.8, "dance": 0.8, "stare": 2.6},
+	{"title": "yeti", "pace": 0.85, "hunger": 1.4, "tire": 1.0, "spring": 0.7, "voice": 0.5, "lurk": 1.6, "zoom": 0.6, "dance": 1.0, "stare": 1.2},
+	{"title": "Cerberus", "pace": 1.15, "hunger": 1.7, "tire": 1.0, "spring": 1.1, "voice": 0.7, "lurk": 0.7, "zoom": 1.6, "dance": 0.9, "stare": 1.3},
 ]
 # What the numbers in saves from before this list stood for (gremlin, bogle, spook, flit)
 const OLD_KINDS: Array[int] = [Kind.GREMLIN, Kind.FROGMAN, Kind.WENDIGO, Kind.MOTHMAN]
 
+# What it can beg for, with a picture of it in a thought bubble
+enum Want { FOOD, BALL, WATER }
+
 # How it is feeling just now, which shows in its eyes, its ears and how it holds its head
 enum Feeling { CONTENT, HAPPY, EXCITED, LOVING, HUNGRY, BORED, SLEEPY, GRUMPY, SCARED, SAD, DISGUSTED }
-# What goes up over its head when a feeling comes over it (nothing, for content)
-const EMOTES: Array[String] = ["", "^_^", "\\(^o^)/", "<3", ":Q", "-_-", "u_u", ">:(", "D:", "T_T", ":S"]
-const EMOTE_COLOURS: Array[Color] = [
-	Color.WHITE, Color(1.0, 0.95, 0.6), Color(1.0, 0.85, 0.4), Color(1.0, 0.5, 0.65), Color(1.0, 0.75, 0.45), Color(0.75, 0.78, 0.85),
-	Color(0.7, 0.8, 1.0), Color(1.0, 0.45, 0.35), Color(0.7, 0.9, 1.0), Color(0.6, 0.75, 1.0), Color(0.7, 0.95, 0.5),
+# What goes up over its head when a feeling comes over it (nothing, for content): a round face
+# sixteen dots across, drawn one dot of the picture to one dot of the face so it stays sharp. Each
+# is its colour and the eight rows of its features: # dark, o white, r red, b blue.
+const FACE := 16
+const FACES: Array[Dictionary] = [
+	{},
+	{"tint": Color(1.0, 0.84, 0.22), "rows": ["", "..#....#", "..#....#", "", ".#......#", "..######", "", ""]},
+	{"tint": Color(1.0, 0.7, 0.16), "rows": ["..#....#", ".#.#..#.#", "", ".########", ".#rrrrrr#", "..#rrrr#", "...####", ""]},
+	{"tint": Color(1.0, 0.8, 0.84), "rows": [".r.r..r.r", ".rrr..rrr", "..r....r", "", ".#......#", "..######", "", ""]},
+	{"tint": Color(1.0, 0.66, 0.36), "rows": ["", "..#....#", "..#....#", "", "..######", "..#rrrr#", "...####b", ".......b"]},
+	{"tint": Color(0.74, 0.76, 0.82), "rows": ["", "", ".###..###", "..#....#", "", "", "..######", ""]},
+	{"tint": Color(0.66, 0.76, 1.0), "rows": ["", "", ".#.#..#.#", "..#....#", "", "....##", "....##", ""]},
+	{"tint": Color(1.0, 0.4, 0.3), "rows": [".#......#", "..#....#", "..##..##", "", "", "..######", ".#......#", ""]},
+	{"tint": Color(0.74, 0.62, 1.0), "rows": [".ooo..ooo", ".o#o..o#o", ".ooo..ooo", "", "...####", "...#rr#", "...####", ""]},
+	{"tint": Color(0.5, 0.68, 1.0), "rows": ["", "..#....#", "..#....#", ".b", ".b", "...####", "..#....#", ""]},
+	{"tint": Color(0.62, 0.84, 0.36), "rows": [".#......#", "..#....#", ".#......#", "", "..######", "....rr", "....rr", ""]},
 ]
 const FEELINGS: Array[Dictionary] = [
 	{"title": "content", "eye": 1.0, "droop": 0.0, "hang": 0.0, "shake": 0.0},
@@ -67,23 +95,39 @@ const FOOD_LIKES: Array[Array] = [
 	[Snack.Kind.CANDY, Snack.Kind.BONE], [Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.BEETLE, Snack.Kind.BERRIES],
 	[Snack.Kind.CANDY, Snack.Kind.BERRIES], [Snack.Kind.BONE, Snack.Kind.FISH], [Snack.Kind.BEETLE, Snack.Kind.FISH],
 	[Snack.Kind.FISH, Snack.Kind.TOADSTOOL], [Snack.Kind.BONE, Snack.Kind.TOADSTOOL], [Snack.Kind.BONE, Snack.Kind.FISH],
+	[Snack.Kind.FISH, Snack.Kind.BERRIES], [Snack.Kind.FISH, Snack.Kind.BEETLE], [Snack.Kind.FISH, Snack.Kind.BONE],
+	[Snack.Kind.TOADSTOOL, Snack.Kind.BERRIES], [Snack.Kind.BERRIES, Snack.Kind.CANDY], [Snack.Kind.BONE, Snack.Kind.BEETLE],
+	[Snack.Kind.BERRIES, Snack.Kind.TOADSTOOL], [Snack.Kind.CANDY, Snack.Kind.BEETLE], [Snack.Kind.BONE, Snack.Kind.BERRIES],
+	[Snack.Kind.BONE, Snack.Kind.FISH],
 ]
 const TOY_LIKES: Array[Array] = [
 	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL], [Ball.Kind.BELL, Ball.Kind.STONE],
 	[Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.BALL, Ball.Kind.GLOW], [Ball.Kind.BALL, Ball.Kind.GLOW],
 	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.STONE, Ball.Kind.BELL], [Ball.Kind.GLOW, Ball.Kind.STONE],
+	[Ball.Kind.BALL, Ball.Kind.STONE], [Ball.Kind.GLOW, Ball.Kind.BALL], [Ball.Kind.GLOW, Ball.Kind.STONE],
+	[Ball.Kind.BELL, Ball.Kind.STONE], [Ball.Kind.BELL, Ball.Kind.GLOW], [Ball.Kind.GLOW, Ball.Kind.STONE],
+	[Ball.Kind.BALL, Ball.Kind.BELL], [Ball.Kind.GLOW, Ball.Kind.BELL], [Ball.Kind.STONE, Ball.Kind.BALL],
+	[Ball.Kind.BALL, Ball.Kind.STONE],
 ]
 # Natures that will not go together (shy and bold, sleepy and restless, cuddly and grumpy)
 const OPPOSED: Array[Array] = [[2, 5], [3, 7], [4, 6]]
 # What each kind leans towards in its room: two things to have about (Decor.Kind), two grounds
-# (Den.GROUNDS) and a lamp setting (Den.Lamp)
+# (Den.GROUNDS) and a lamp setting (Den.Lamp), from the first nine things. The pool is no part of
+# this: a kind needs it or does not.
 const DECOR_LIKES: Array[Array] = [
 	[Decor.Kind.SKULL, Decor.Kind.PUMPKIN], [Decor.Kind.LOG, Decor.Kind.FERN], [Decor.Kind.ROCK, Decor.Kind.GRAVESTONE],
 	[Decor.Kind.CRYSTAL, Decor.Kind.PUMPKIN], [Decor.Kind.SKULL, Decor.Kind.ROCK], [Decor.Kind.DISH, Decor.Kind.FERN],
 	[Decor.Kind.DISH, Decor.Kind.ROCK], [Decor.Kind.ROCK, Decor.Kind.CRYSTAL], [Decor.Kind.SKULL, Decor.Kind.GRAVESTONE],
+	[Decor.Kind.FERN, Decor.Kind.ROCK], [Decor.Kind.DISH, Decor.Kind.CRYSTAL], [Decor.Kind.SKULL, Decor.Kind.CRYSTAL],
+	[Decor.Kind.PUMPKIN, Decor.Kind.LOG], [Decor.Kind.FERN, Decor.Kind.CRYSTAL], [Decor.Kind.LOG, Decor.Kind.GRAVESTONE],
+	[Decor.Kind.FERN, Decor.Kind.LOG], [Decor.Kind.CRYSTAL, Decor.Kind.SKULL], [Decor.Kind.ROCK, Decor.Kind.CAVE],
+	[Decor.Kind.SKULL, Decor.Kind.GRAVESTONE],
 ]
-const GROUND_LIKES: Array[Array] = [[1, 3], [2, 4], [4, 5], [1, 3], [5, 4], [2, 4], [6, 5], [6, 0], [2, 0]]
-const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1]
+const GROUND_LIKES: Array[Array] = [
+	[1, 3], [2, 4], [4, 5], [1, 3], [5, 4], [2, 4], [6, 5], [6, 0], [2, 0],
+	[6, 2], [5, 6], [5, 0], [2, 4], [2, 3], [2, 4], [4, 5], [3, 6], [6, 0], [0, 6],
+]
+const LAMP_LIKES: Array[int] = [1, 1, 2, 0, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 2]
 # It lives in real time, like a pet: these are hours of the clock on the wall, and they pass
 # whether or not anyone is looking. A full belly lasts most of a day, and a baby is grown in a
 # day and a half.
@@ -117,6 +161,16 @@ const FURS: Array[Array] = [
 	[Color(0.2, 0.34, 0.4), Color(0.24, 0.38, 0.3), Color(0.27, 0.3, 0.44), Color(0.32, 0.33, 0.34)],
 	[Color(0.34, 0.34, 0.37), Color(0.38, 0.34, 0.3), Color(0.3, 0.34, 0.4), Color(0.4, 0.38, 0.33)],
 	[Color(0.19, 0.18, 0.21), Color(0.24, 0.2, 0.18), Color(0.17, 0.21, 0.24), Color(0.27, 0.27, 0.3)],
+	[Color(0.16, 0.2, 0.22), Color(0.28, 0.36, 0.4), Color(0.2, 0.3, 0.26), Color(0.42, 0.46, 0.5), Color(0.52, 0.54, 0.52)],
+	[Color(0.16, 0.42, 0.42), Color(0.2, 0.44, 0.3), Color(0.62, 0.36, 0.14), Color(0.3, 0.38, 0.52), Color(0.42, 0.46, 0.44)],
+	[Color(0.24, 0.42, 0.3), Color(0.2, 0.36, 0.36), Color(0.36, 0.3, 0.44), Color(0.34, 0.4, 0.24), Color(0.4, 0.3, 0.34)],
+	[Color(0.2, 0.3, 0.55), Color(0.22, 0.42, 0.22), Color(0.55, 0.42, 0.16), Color(0.45, 0.24, 0.2), Color(0.36, 0.3, 0.44)],
+	[Color(0.85, 0.45, 0.6), Color(0.6, 0.5, 0.9), Color(0.45, 0.8, 0.6), Color(0.9, 0.75, 0.35), Color(0.45, 0.7, 0.9)],
+	[Color(0.7, 0.14, 0.1), Color(0.5, 0.32, 0.16), Color(0.45, 0.25, 0.55), Color(0.75, 0.45, 0.1), Color(0.25, 0.45, 0.5)],
+	[Color(0.5, 0.4, 0.28), Color(0.4, 0.32, 0.26), Color(0.46, 0.45, 0.44), Color(0.62, 0.58, 0.5), Color(0.3, 0.25, 0.22)],
+	[Color(0.5, 0.52, 0.5), Color(0.4, 0.6, 0.36), Color(0.45, 0.55, 0.66), Color(0.56, 0.46, 0.62)],
+	[Color(0.92, 0.94, 1.0), Color(0.82, 0.9, 1.0), Color(0.95, 0.92, 0.84), Color(0.76, 0.8, 0.88)],
+	[Color(0.16, 0.15, 0.17), Color(0.3, 0.16, 0.12), Color(0.26, 0.25, 0.28), Color(0.34, 0.26, 0.18)],
 ]
 const EYES: Array[Array] = [
 	[Color(1.0, 0.85, 0.2), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.3), Color(1.0, 0.45, 0.7), Color(0.4, 0.95, 1.0)],
@@ -128,6 +182,16 @@ const EYES: Array[Array] = [
 	[Color(1.0, 0.9, 0.4), Color(0.5, 1.0, 0.9), Color(1.0, 0.6, 0.3)],
 	[Color(1.0, 0.85, 0.3), Color(0.6, 0.9, 1.0), Color(1.0, 0.5, 0.3)],
 	[Color(0.5, 0.9, 1.0), Color(1.0, 0.3, 0.2), Color(0.8, 1.0, 0.5), Color(1.0, 1.0, 0.8)],
+	[Color(0.6, 1.0, 0.9), Color(1.0, 1.0, 0.85), Color(0.5, 0.9, 1.0)],
+	[Color(1.0, 0.9, 0.3), Color(0.6, 1.0, 0.8), Color(1.0, 0.6, 0.3)],
+	[Color(1.0, 0.85, 0.2), Color(1.0, 0.3, 0.2), Color(0.7, 1.0, 0.3)],
+	[Color(0.5, 0.9, 1.0), Color(1.0, 0.85, 0.4), Color(0.7, 1.0, 0.5)],
+	[Color(1.0, 1.0, 0.7), Color(0.7, 1.0, 1.0), Color(1.0, 0.7, 1.0)],
+	[Color(1.0, 0.9, 0.4), Color(0.6, 1.0, 0.6), Color(0.5, 0.9, 1.0)],
+	[Color(1.0, 0.6, 0.2), Color(1.0, 0.85, 0.3), Color(1.0, 0.35, 0.3)],
+	[Color(0.6, 1.0, 0.6), Color(0.7, 0.9, 1.0), Color(1.0, 1.0, 1.0), Color(1.0, 0.5, 0.9)],
+	[Color(0.5, 0.9, 1.0), Color(0.8, 1.0, 1.0), Color(1.0, 0.4, 0.3)],
+	[Color(1.0, 0.3, 0.1), Color(1.0, 0.55, 0.1), Color(1.0, 0.85, 0.2)],
 ]
 
 var world: Den
@@ -142,6 +206,7 @@ var spring := 1.0
 var voice := 1.0
 var likes := {}
 var gravity := 12.0
+# How far off the floor it floats (its body and all that hangs from it; it comes down to sleep)
 var hover := 0.0
 var neck_y := 0.64
 # How far above the neck the middle of the head is
@@ -150,6 +215,16 @@ var centre_y := 0.55
 var top_y := 1.15
 var ear_splay := 1.0
 var wings := false
+# Wings of its own that beat by themselves, how fast and how far
+var flaps: Array[Node3D] = []
+var flap_rate := 0.0
+var flap_reach := 0.0
+# More heads than the one on its neck: they follow it round, a little behind
+var heads: Array[Node3D] = []
+# How big its insides are next to the usual (a slight body has less room), and how high its
+# backbone runs when its head is not straight above it (0 for up to the neck)
+var gut := 1.0
+var back_y := 0.0
 var fur: ShaderMaterial
 var pale: ShaderMaterial
 var dark: ShaderMaterial
@@ -170,7 +245,7 @@ var nature2 := 1
 var fav_food := 0
 var yuck_food := 0
 var fav_toy := 0
-# What it wants of its room: two things it likes having about and one it cannot stand
+# What it wants of its room: two or three things it likes having about and one it cannot stand
 # (Decor.Kind), and the ground and lamp setting it is happiest with
 var like_decor: Array[int] = []
 var hate_decor := 0
@@ -193,7 +268,7 @@ var hang := 0.0
 var pokes := 0
 var poke_time := -10.0
 var carry_point := Vector3.ZERO
-# The thing in the room it is making use of (hiding in, sitting on, drinking from), and how long
+# The thing in the room it is making use of (hiding in, sitting on, drinking from, wading in), and how long
 # before it next thinks of dragging its nest somewhere else
 var visiting: Decor
 var nest_cooldown := 240.0
@@ -229,7 +304,7 @@ var ball_cooldown := 0.0
 var beg_cooldown := 6.0
 var pounce_cooldown := 0.0
 var last_stroke := -10.0
-var beg_for_ball := false
+var beg_for: int = Want.FOOD
 var glance_time := 0.0
 var glance_point := Vector3.ZERO
 
@@ -278,12 +353,16 @@ var tail: Node3D
 var bubble: Node3D
 var bubble_food: Node3D
 var bubble_ball: Node3D
+var bubble_water: Node3D
 var hearts: CPUParticles3D
 var zzz: Array[Label3D] = []
-var emote: Label3D # the little face over its head
-var emote_time := 0.0 # seconds it has been up
-var emote_for := -1 # the feeling it was last put up for
-var emote_again := 0.0 # seconds till a feeling that lasts shows again
+# The little face over its head, the picture for each feeling, how long it has been up, the
+# feeling it was last put up for, and how long till a feeling that lasts shows again
+var emote: MeshInstance3D
+var faces: Array[ImageTexture] = []
+var emote_time := 0.0
+var emote_for := -1
+var emote_again := 0.0
 
 
 func _ready() -> void:
@@ -318,11 +397,13 @@ static func profile(k: int, s: int) -> Dictionary:
 	while second == first or [mini(second, first), maxi(second, first)] in OPPOSED:
 		second = (second + 1) % NATURES.size()
 	me["nature2"] = second
-	# One of the two things its kind likes to have about, one more of its own, and one it hates
+	# One of the two things its kind likes to have about, one more of its own, and one it hates,
+	# all from the first nine things there were (so that a cryptlin keeps the tastes it has
+	# always had, whatever is added since)
 	var kin: Array = DECOR_LIKES[k]
 	var liked: Array[int] = [kin[rng.randi() % kin.size()]]
 	var rest: Array[int] = []
-	for i in Decor.IDS.size():
+	for i in Decor.Kind.POOL:
 		if i != liked[0]:
 			rest.append(i)
 	liked.append(rest.pop_at(rng.randi() % rest.size()))
@@ -331,6 +412,10 @@ static func profile(k: int, s: int) -> Dictionary:
 	var grounds: Array = GROUND_LIKES[k]
 	me["ground"] = grounds[rng.randi() % grounds.size()]
 	me["lamp"] = LAMP_LIKES[k] if rng.randf() < 0.65 else rng.randi() % 3
+	# The shelters that came after the first things get their chance last of all, so that nothing
+	# drawn above changes: now and then, one of them to like as well
+	if rng.randf() < 0.45:
+		liked.append(rng.randi_range(Decor.Kind.POOL + 1, Decor.IDS.size() - 1))
 	return me
 
 
@@ -414,6 +499,26 @@ func _build() -> void:
 			_build_bolter(chub, rng)
 		Kind.WENDIGO:
 			_build_wendigo(chub)
+		Kind.KELPIE:
+			_build_kelpie(chub)
+		Kind.MERFOLK:
+			_build_merfolk(chub)
+		Kind.SPAWN:
+			_build_spawn(chub)
+		Kind.GNOME:
+			_build_gnome(chub, rng)
+		Kind.FAE:
+			_build_fae()
+		Kind.FUNGUS:
+			_build_fungus(chub, rng)
+		Kind.JACKALOPE:
+			_build_jackalope(chub, ear_len)
+		Kind.ALIEN:
+			_build_alien(chub)
+		Kind.YETI:
+			_build_yeti(chub, rng)
+		Kind.CERBERUS:
+			_build_cerberus(chub)
 		_:
 			_build_gremlin(chub, ear_len, horns, odd_eyes)
 
@@ -432,15 +537,7 @@ func _build() -> void:
 		z.visible = false
 		add_child(z)
 		zzz.append(z)
-	emote = Label3D.new()
-	emote.font_size = 96
-	emote.pixel_size = 0.0034
-	emote.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	emote.no_depth_test = true
-	emote.outline_size = 22
-	emote.outline_modulate = Color(0.05, 0.04, 0.03, 0.9)
-	emote.visible = false
-	add_child(emote)
+	_build_emote()
 
 
 func _build_gremlin(chub: float, ear_len: float, horns: bool, odd_eyes: bool) -> void:
@@ -822,9 +919,527 @@ func _build_wendigo(chub: float) -> void:
 	_part(mouth_node, _sphere(), black, Vector3.ZERO, Vector3(0.065, 0.035, 0.11))
 
 
-# An eye on the head. Hollow ones are dark with the light in the pupil.
-func _eye(at: Vector3, size: float, hollow := false) -> void:
-	var eye := _pivot(neck, at)
+# A water horse's foal: all legs and neck, with waterweed for a mane and a tail, and never quite dry
+func _build_kelpie(chub: float) -> void:
+	neck_y = 0.54
+	head_y = 0.4
+	centre_y = 0.5
+	top_y = 1.18
+	ear_splay = 0.25
+	gut = 0.75
+	back_y = 0.62
+	brain_at = Vector3(0, 0.42, 0.1)
+	var weed := Ps1.mat(Color(0.1, 0.32, 0.2), 0.0, 0.35)
+	var wrack := Ps1.mat(Color(0.22, 0.42, 0.16), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.12 * side, 0.38, -0.2))
+		_part(leg, _capsule(0.04, 0.36), fur, Vector3(0, -0.16, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.345, 0.01), Vector3(0.055, 0.035, 0.065))
+		_part(leg, _cone(), weed, Vector3(0, -0.29, -0.035), Vector3(0.04, 0.12, 0.03), Vector3(-2.72, 0, 0))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.5, -0.02), Vector3(0.19 * chub, 0.2, 0.32 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.45, 0), Vector3(0.16 * chub, 0.17, 0.28 * chub))
+	# A tail of weed, hanging wet
+	tail = _pivot(torso, Vector3(0, 0.56, -0.31 * chub))
+	for i in 3:
+		_part(tail, _cone(), wrack if i == 1 else weed, Vector3((i - 1) * 0.035, -0.14, -0.07), Vector3(0.045, 0.34 - absf(i - 1.0) * 0.08, 0.03), Vector3(-2.72, 0, (i - 1) * 0.2))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.12 * chub * side, 0.42, 0.2 * chub))
+		_part(_foreleg(a, side, 0.42, 0.036), _cone(), weed, Vector3(0, -0.33, -0.035), Vector3(0.04, 0.12, 0.03), Vector3(-2.72, 0, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.25 * chub))
+	_part(neck, _capsule(0.07, 0.48), fur, Vector3(0, 0.17, 0.03), Vector3.ONE, Vector3(0.3, 0, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.41, 0.1), Vector3(0.135, 0.13, 0.17))
+	_part(neck, _sphere(), fur, Vector3(0, 0.34, 0.27), Vector3(0.09, 0.08, 0.14), Vector3(0.5, 0, 0))
+	_part(neck, _sphere(), pale, Vector3(0, 0.285, 0.35), Vector3(0.075, 0.062, 0.075))
+	# The mane lies down the back of its neck in wet hanks, with a lock over the brow
+	for i in 5:
+		var up := 0.5 - i * 0.1
+		var fall := 1.0 if i % 2 == 0 else -1.0
+		_part(neck, _cone(), weed if i % 2 == 0 else wrack, Vector3(0.04 * fall, up - 0.06, (up - 0.17) * 0.31 - 0.1), Vector3(0.07, 0.24, 0.03), Vector3(-2.3, 0, 0.5 * fall))
+	_part(neck, _cone(), wrack, Vector3(0, 0.5, 0.19), Vector3(0.06, 0.2, 0.03), Vector3(2.2, 0, 0))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.085 * side, 0.51, 0.04))
+		_part(ear, _cone(), fur, Vector3(0, 0.07, 0), Vector3(0.035, 0.14, 0.02))
+		ears.append(ear)
+		_eye(Vector3(0.115 * side, 0.44, 0.19), 0.055)
+		_part(neck, _sphere(), black, Vector3(0.035 * side, 0.3, 0.42), Vector3.ONE * 0.014)
+	mouth_node = _pivot(neck, Vector3(0, 0.245, 0.36))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.045))
+
+
+# A front leg for something that goes on four, hung from an arm's pivot `length` above the floor.
+# The rig holds its arms a little out from its sides; this turns the leg back to stand straight,
+# and gives back what it hangs from.
+func _foreleg(a: Node3D, side: float, length: float, thick: float) -> Node3D:
+	var fore := _pivot(a, Vector3.ZERO)
+	fore.rotation.z = -REST_ARM.z * side
+	_part(fore, _capsule(thick, length), fur, Vector3(0, 0.02 - length * 0.5, 0))
+	_part(fore, _sphere(), dark, Vector3(0, 0.035 - length, 0.02), Vector3(thick * 1.4, 0.035, thick * 1.8))
+	return fore
+
+
+# A fish that walks: a crest, gill fins for ears, webbed hands, and a tail it has not lost yet
+func _build_merfolk(chub: float) -> void:
+	neck_y = 0.52
+	centre_y = 0.42
+	top_y = 1.1
+	ear_splay = 1.2
+	# Its fins are whatever colour its scales are not
+	var scales: Color = fur.get_shader_parameter("tint")
+	var fin := Ps1.mat(Color.from_hsv(fposmod(scales.h + 0.5, 1.0), 0.6, 0.6), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.11 * side, 0.2, 0))
+		_part(leg, _capsule(0.05, 0.2), fur, Vector3(0, -0.08, 0))
+		_part(leg, _sphere(), fin, Vector3(0.02 * side, -0.18, 0.1), Vector3(0.1, 0.022, 0.17), Vector3(0, 0.35 * side, 0))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.4, 0), Vector3(0.24 * chub, 0.27, 0.21 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.37, 0.11 * chub), Vector3(0.18 * chub, 0.2, 0.12))
+	_part(torso, _cone(), fin, Vector3(0, 0.5, -0.22 * chub), Vector3(0.02, 0.22, 0.1), Vector3(-0.6, 0, 0))
+	tail = _pivot(torso, Vector3(0, 0.26, -0.18 * chub))
+	_part(tail, _cone(), fur, Vector3(0, 0.02, -0.14), Vector3(0.08, 0.3, 0.07), Vector3(-1.4, 0, 0))
+	_part(tail, _cone(), fin, Vector3(0, 0.085, -0.36), Vector3(0.012, 0.16, 0.07), Vector3(2.09, 0, 0))
+	_part(tail, _cone(), fin, Vector3(0, 0.005, -0.36), Vector3(0.012, 0.16, 0.07), Vector3(1.05, 0, 0))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.23 * chub * side, 0.5, 0.03))
+		_part(a, _capsule(0.04, 0.26), fur, Vector3(0, -0.1, 0))
+		_part(a, _sphere(), fin, Vector3(0, -0.25, 0.01), Vector3(0.025, 0.07, 0.075))
+		_part(a, _cone(), fin, Vector3(0, -0.1, -0.06), Vector3(0.012, 0.12, 0.05), Vector3(-0.5, 0, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0.02), Vector3(0.3, 0.24, 0.27))
+	_part(neck, _sphere(), pale, Vector3(0, 0.13, 0.07), Vector3(0.26, 0.15, 0.22))
+	_part(neck, _sphere(), fin, Vector3(0, 0.1, 0.245), Vector3(0.15, 0.06, 0.06))
+	for i in 3:
+		_part(neck, _cone(), fin, Vector3(0, 0.47 - i * 0.05, 0.08 - i * 0.13), Vector3(0.018, 0.2 - i * 0.03, 0.09), Vector3(-0.3 - i * 0.35, 0, 0))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.26 * side, 0.2, -0.04))
+		_part(ear, _cone(), fin, Vector3(0, 0.1, 0), Vector3(0.1, 0.2, 0.02))
+		ears.append(ear)
+		_eye(Vector3(0.16 * side, 0.27, 0.2), 0.095)
+	mouth_node = _pivot(neck, Vector3(0, 0.1, 0.275))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.12, 0.05, 0.05))
+
+
+# Something from under the sea that has not finished arriving: a great soft head, feelers where
+# a mouth should be, and wings too small to matter yet
+func _build_spawn(chub: float) -> void:
+	neck_y = 0.5
+	head_y = 0.24
+	centre_y = 0.4
+	top_y = 1.12
+	gravity = 14.0
+	flap_rate = 2.4
+	flap_reach = 0.22
+	var web := Ps1.mat(fur.get_shader_parameter("tint") * 0.6, 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.13 * side, 0.18, 0))
+		_part(leg, _sphere(), fur, Vector3(0, -0.06, 0), Vector3(0.09, 0.12, 0.09))
+		_part(leg, _sphere(), dark, Vector3(0, -0.15, 0.06), Vector3(0.1, 0.03, 0.13))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.36, 0), Vector3(0.27 * chub, 0.25, 0.24 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.33, 0.13 * chub), Vector3(0.19 * chub, 0.18, 0.12))
+	tail = _pivot(torso, Vector3(0, 0.2, -0.2 * chub))
+	_part(tail, _cone(), fur, Vector3(0, 0, -0.1), Vector3(0.05, 0.2, 0.05), Vector3(-PI * 0.5, 0, 0))
+
+	for side: float in [-1.0, 1.0]:
+		# A bat's wing in two points, on a finger of bone
+		var wing := _pivot(torso, Vector3(0.14 * side, 0.54, -0.16 * chub))
+		_part(wing, _cone(), web, Vector3(0.2 * side, 0.16, 0), Vector3(0.17, 0.4, 0.012), Vector3(0, 0, -0.9 * side))
+		_part(wing, _cone(), web, Vector3(0.2 * side, -0.02, 0), Vector3(0.11, 0.3, 0.012), Vector3(0, 0, -1.9 * side))
+		_part(wing, _capsule(0.015, 0.44), dark, Vector3(0.17 * side, 0.14, 0.01), Vector3.ONE, Vector3(0, 0, -0.9 * side))
+		flaps.append(wing)
+		var a := _pivot(torso, Vector3(0.25 * chub * side, 0.46, 0.05))
+		_part(a, _capsule(0.045, 0.22), fur, Vector3(0, -0.08, 0))
+		for claw: float in [-1.0, 1.0]:
+			_part(a, _cone(), bone, Vector3(0.02 * claw, -0.22, 0.01), Vector3(0.012, 0.06, 0.012), Vector3(PI, 0, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.03))
+	_part(neck, _sphere(), fur, Vector3(0, 0.26, -0.02), Vector3(0.31, 0.3, 0.32))
+	_part(neck, _sphere(), fur, Vector3(0, 0.36, -0.16), Vector3(0.25, 0.24, 0.25))
+	for wart: Vector3 in [Vector3(-0.15, 0.5, -0.04), Vector3(0.1, 0.55, -0.12), Vector3(0.2, 0.42, -0.2)]:
+		_part(neck, _sphere(), pale, wart, Vector3.ONE * 0.045)
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.14 * side, 0.2, 0.25), 0.062)
+		_part(neck, _sphere(), dark, Vector3(0.14 * side, 0.275, 0.26), Vector3(0.1, 0.03, 0.06), Vector3(0, 0, 0.35 * side))
+	# Five feelers hang over its mouth, the middle one longest
+	for i in 5:
+		var across := i - 2.0
+		var drop := 0.3 - absf(across) * 0.05
+		_part(neck, _capsule(0.032, drop), fur if i % 2 == 0 else pale, Vector3(across * 0.062, 0.1 - drop * 0.5, 0.27 - absf(across) * 0.03), Vector3.ONE, Vector3(-0.15, 0, across * 0.12))
+	mouth_node = _pivot(neck, Vector3(0, 0.06, 0.2))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.08, 0.05, 0.04))
+
+
+# Small, stout and sure of itself: a pointed hat as tall as it is, a nose like a berry, and the
+# first wisp of a beard
+func _build_gnome(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.5
+	head_y = 0.17
+	centre_y = 0.4
+	top_y = 1.36
+	ear_splay = 1.25
+	# Red, as often as not
+	var hats: Array[Color] = [Color(0.66, 0.1, 0.08), Color(0.66, 0.1, 0.08), Color(0.14, 0.26, 0.56), Color(0.5, 0.14, 0.4), Color(0.7, 0.5, 0.1)]
+	var hat := Ps1.mat(hats[rng.randi() % hats.size()], 0.0, 0.35)
+	var flesh := Ps1.mat(Color(0.74, 0.52, 0.4), 0.0, 0.35)
+	var rosy := Ps1.mat(Color(0.78, 0.36, 0.3), 0.0, 0.35)
+	var leather := Ps1.mat(Color(0.2, 0.13, 0.08), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.1 * side, 0.16, 0))
+		_part(leg, _capsule(0.055, 0.16), dark, Vector3(0, -0.05, 0))
+		_part(leg, _sphere(), leather, Vector3(0, -0.115, 0.05), Vector3(0.08, 0.045, 0.13))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.36, 0), Vector3(0.25 * chub, 0.24, 0.22 * chub))
+	_part(torso, _sphere(), leather, Vector3(0, 0.3, 0), Vector3(0.252 * chub, 0.03, 0.224 * chub))
+	_part(torso, BoxMesh.new(), bone, Vector3(0, 0.3, 0.215 * chub), Vector3(0.055, 0.05, 0.03))
+	tail = _pivot(torso, Vector3(0, 0.3, -0.2))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.24 * chub * side, 0.47, 0.02))
+		_part(a, _capsule(0.045, 0.22), fur, Vector3(0, -0.08, 0))
+		_part(a, _sphere(), flesh, Vector3(0, -0.2, 0), Vector3.ONE * 0.055)
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.02))
+	_part(neck, _sphere(), flesh, Vector3(0, 0.17, 0), Vector3(0.24, 0.2, 0.22))
+	_part(neck, _sphere(), rosy, Vector3(0, 0.15, 0.22), Vector3.ONE * 0.062)
+	_part(neck, _sphere(), bone, Vector3(0, 0.05, 0.13), Vector3(0.16, 0.11, 0.1))
+	_part(neck, _cone(), bone, Vector3(0, -0.06, 0.16), Vector3(0.1, 0.18, 0.06), Vector3(PI, 0, 0))
+	_part(neck, _cone(), hat, Vector3(0, 0.55, -0.02), Vector3(0.27, 0.6, 0.27), Vector3(-0.1, 0, 0.05))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.22 * side, 0.16, -0.02))
+		_part(ear, _cone(), flesh, Vector3(0, 0.07, 0), Vector3(0.05, 0.14, 0.03))
+		ears.append(ear)
+		_eye(Vector3(0.09 * side, 0.2, 0.185), 0.048)
+		_part(neck, _sphere(), rosy, Vector3(0.13 * side, 0.12, 0.16), Vector3(0.05, 0.04, 0.03))
+	mouth_node = _pivot(neck, Vector3(0, 0.075, 0.235))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.02))
+
+
+# Hardly there at all: a slip of a thing in a skirt of petals, held up on four wings and giving
+# off a little light of its own
+func _build_fae() -> void:
+	neck_y = 0.42
+	head_y = 0.18
+	centre_y = 0.32
+	top_y = 0.88
+	hover = 0.26
+	gravity = 6.0
+	gut = 0.5
+	flap_rate = 38.0
+	flap_reach = 0.45
+	fur.set_shader_parameter("glow", 0.1)
+	pale.set_shader_parameter("glow", 0.16)
+	var petals: Color = fur.get_shader_parameter("tint")
+	var gauze := Ps1.mat(petals.lerp(Color.WHITE, 0.6), 0.45)
+	torso = _pivot(self, Vector3.ZERO)
+	# Its feet never touch the floor, so they hang from its body
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(torso, Vector3(0.045 * side, 0.2, 0))
+		_part(leg, _capsule(0.022, 0.2), pale, Vector3(0, -0.09, 0))
+		_part(leg, _cone(), fur, Vector3(0, -0.2, 0.02), Vector3(0.03, 0.07, 0.035), Vector3(PI - 0.5, 0, 0))
+		legs.append(leg)
+	_part(torso, _sphere(), pale, Vector3(0, 0.32, 0), Vector3(0.1, 0.13, 0.085))
+	for i in 6:
+		var lie := Basis(Vector3.UP, TAU * (i + 0.5) / 6.0) * Basis(Vector3.RIGHT, PI - 0.6)
+		var petal := _part(torso, _cone(), fur, Vector3.ZERO)
+		petal.basis = lie * Basis.from_scale(Vector3(0.07, 0.2, 0.02))
+		petal.position = Vector3(0, 0.3, 0) + lie * Vector3(0, 0.1, 0)
+	tail = _pivot(torso, Vector3(0, 0.26, -0.07))
+
+	for side: float in [-1.0, 1.0]:
+		var wing := _pivot(torso, Vector3(0.02 * side, 0.42, -0.07))
+		_part(wing, _sphere(), gauze, Vector3(0.2 * side, 0.12, 0), Vector3(0.2, 0.1, 0.008), Vector3(0, 0, 0.55 * side))
+		_part(wing, _sphere(), gauze, Vector3(0.14 * side, -0.1, 0), Vector3(0.13, 0.07, 0.008), Vector3(0, 0, -0.5 * side))
+		flaps.append(wing)
+		var a := _pivot(torso, Vector3(0.11 * side, 0.4, 0))
+		_part(a, _capsule(0.02, 0.2), pale, Vector3(0, -0.08, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.01))
+	_part(neck, _sphere(), pale, Vector3(0, 0.18, 0), Vector3(0.19, 0.18, 0.18))
+	_part(neck, _sphere(), fur, Vector3(0, 0.24, -0.04), Vector3(0.2, 0.16, 0.19))
+	_part(neck, _cone(), fur, Vector3(0.02, 0.42, 0.02), Vector3(0.06, 0.16, 0.05), Vector3(0.5, 0, -0.3))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.16 * side, 0.17, -0.02))
+		_part(ear, _cone(), pale, Vector3(0, 0.1, 0), Vector3(0.04, 0.2, 0.02))
+		ears.append(ear)
+		_eye(Vector3(0.085 * side, 0.16, 0.135), 0.07)
+	mouth_node = _pivot(neck, Vector3(0, 0.06, 0.165))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.035, 0.025, 0.02))
+
+
+# A toadstool that got up and walked: a wide spotted cap on a pale stalk, and two eyes in the
+# shade of the brim
+func _build_fungus(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.4
+	head_y = 0.16
+	centre_y = 0.34
+	top_y = 1.06
+	gravity = 14.0
+	var stalk := Ps1.mat(Color(0.8, 0.76, 0.64), 0.0, 0.35)
+	var gills := Ps1.mat(Color(0.42, 0.36, 0.28), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.12 * side, 0.14, 0))
+		_part(leg, _sphere(), stalk, Vector3(0, -0.07, 0.02), Vector3(0.09, 0.07, 0.11))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), stalk, Vector3(0, 0.3, 0), Vector3(0.23 * chub, 0.24, 0.21 * chub))
+	_part(torso, _sphere(), gills, Vector3(0, 0.43, 0), Vector3(0.2 * chub, 0.03, 0.18 * chub))
+	tail = _pivot(torso, Vector3(0, 0.2, -0.2))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.22 * chub * side, 0.36, 0.04))
+		_part(a, _capsule(0.04, 0.2), stalk, Vector3(0, -0.07, 0))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0))
+	_part(neck, _sphere(), stalk, Vector3(0, 0.16, 0), Vector3(0.2, 0.2, 0.19))
+	_part(neck, _sphere(), gills, Vector3(0, 0.34, 0), Vector3(0.4, 0.04, 0.4))
+	var dome: Array[Vector2] = [
+		Vector2(0.42, 0.33), Vector2(0.44, 0.37), Vector2(0.4, 0.46), Vector2(0.32, 0.54), Vector2(0.2, 0.61), Vector2(0.0, 0.64),
+	]
+	_part(neck, _lathe(dome, 10), fur, Vector3.ZERO)
+	# Spots, lying on the cap
+	var middle := Vector3(0, 0.34, 0)
+	var radii := Vector3(0.44, 0.3, 0.44)
+	for i in 7:
+		var around := TAU * i / 7.0 + rng.randf_range(-0.3, 0.3)
+		var up := rng.randf_range(0.3, 1.05)
+		var at := middle + Vector3(sin(around) * cos(up), sin(up), cos(around) * cos(up)) * radii
+		var spot := _part(neck, _sphere(), bone, at)
+		var size := rng.randf_range(0.04, 0.075)
+		spot.basis = Basis.looking_at(-((at - middle) / (radii * radii)).normalized()).scaled_local(Vector3(size, size, 0.012))
+	_part(neck, _sphere(), bone, Vector3(0.02, 0.64, 0), Vector3(0.07, 0.012, 0.06))
+	# And a small one of its own, coming up on the side
+	_part(neck, _capsule(0.022, 0.14), stalk, Vector3(-0.3, 0.52, -0.08), Vector3.ONE, Vector3(0, 0, 0.6))
+	_part(neck, _sphere(), fur, Vector3(-0.345, 0.585, -0.08), Vector3(0.065, 0.04, 0.065), Vector3(0, 0, 0.6))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(0.085 * side, 0.15, 0.155), 0.06)
+	mouth_node = _pivot(neck, Vector3(0, 0.05, 0.175))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.03))
+
+
+# A hare with a buck's antlers coming in: long ears, long feet, a scut, and a great deal of spring
+func _build_jackalope(chub: float, ear_len: float) -> void:
+	neck_y = 0.46
+	head_y = 0.18
+	centre_y = 0.36
+	top_y = 1.3
+	ear_splay = 0.45
+	gravity = 9.0
+	var horn := Ps1.mat(Color(0.66, 0.56, 0.4), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.15 * side, 0.18, -0.06))
+		_part(leg, _sphere(), fur, Vector3(0, 0, -0.02), Vector3(0.1, 0.13, 0.14))
+		_part(leg, _sphere(), pale, Vector3(0, -0.145, 0.1), Vector3(0.065, 0.035, 0.2))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.34, -0.02), Vector3(0.23 * chub, 0.23, 0.27 * chub), Vector3(0.25, 0, 0))
+	_part(torso, _sphere(), pale, Vector3(0, 0.34, 0.14 * chub), Vector3(0.15 * chub, 0.16, 0.11))
+	tail = _pivot(torso, Vector3(0, 0.26, -0.27 * chub))
+	_part(tail, _sphere(), bone, Vector3(0, 0.02, -0.03), Vector3.ONE * 0.08)
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.15 * chub * side, 0.36, 0.17))
+		_part(a, _capsule(0.035, 0.22), fur, Vector3(0, -0.09, 0))
+		_part(a, _sphere(), pale, Vector3(0, -0.2, 0.02), Vector3(0.045, 0.03, 0.06))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.1))
+	_part(neck, _sphere(), fur, Vector3(0, 0.18, 0), Vector3(0.21, 0.19, 0.22))
+	_part(neck, _sphere(), pale, Vector3(0, 0.12, 0.16), Vector3(0.11, 0.08, 0.1))
+	_part(neck, _sphere(), maw, Vector3(0, 0.155, 0.255), Vector3(0.03, 0.02, 0.02))
+	_part(neck, BoxMesh.new(), bone, Vector3(0, 0.055, 0.235), Vector3(0.045, 0.05, 0.015))
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(neck, Vector3(0.09 * side, 0.33, -0.05))
+		_part(ear, _cone(), fur, Vector3(0, ear_len * 0.6, 0), Vector3(0.06, ear_len * 1.2, 0.03))
+		_part(ear, _cone(), pale, Vector3(0, ear_len * 0.55, 0.02), Vector3(0.035, ear_len * 0.9, 0.012))
+		ears.append(ear)
+		_eye(Vector3(0.13 * side, 0.22, 0.14), 0.07)
+		_part(neck, _sphere(), pale, Vector3(0.15 * side, 0.1, 0.06), Vector3.ONE * 0.07)
+		# Antlers, in front of the ears: a beam and a tine
+		_part(neck, _cone(), horn, Vector3(0.09 * side, 0.45, 0.08), Vector3(0.032, 0.3, 0.032), Vector3(0.25, 0, -0.5 * side))
+		_part(neck, _cone(), horn, Vector3(0.17 * side, 0.47, 0.1), Vector3(0.022, 0.15, 0.022), Vector3(0.3, 0, -1.25 * side))
+		_part(neck, _cone(), horn, Vector3(0.08 * side, 0.46, 0.15), Vector3(0.02, 0.13, 0.02), Vector3(0.95, 0, -0.2 * side))
+	mouth_node = _pivot(neck, Vector3(0, 0.075, 0.2))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.05, 0.03, 0.03))
+
+
+# From a long way off: a head too big for its body, long thin hands, and two black eyes with a
+# light far down in each
+func _build_alien(chub: float) -> void:
+	neck_y = 0.52
+	head_y = 0.26
+	centre_y = 0.4
+	top_y = 1.1
+	gravity = 7.0
+	gut = 0.6
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.07 * side, 0.24, 0))
+		_part(leg, _capsule(0.03, 0.24), fur, Vector3(0, -0.1, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.215, 0.03), Vector3(0.045, 0.025, 0.08))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.4, 0), Vector3(0.13 * chub, 0.19, 0.11 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.34, 0.04), Vector3(0.12 * chub, 0.11, 0.1))
+	tail = _pivot(torso, Vector3(0, 0.3, -0.1))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.14 * chub * side, 0.5, 0))
+		_part(a, _capsule(0.022, 0.36), fur, Vector3(0, -0.16, 0))
+		for finger: float in [-1.0, 0.0, 1.0]:
+			_part(a, _cone(), dark, Vector3(0.02 * finger, -0.37, 0), Vector3(0.008, 0.09, 0.008), Vector3(PI, 0, 0.2 * finger))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.01))
+	_part(neck, _capsule(0.035, 0.12), fur, Vector3(0, 0.03, 0))
+	_part(neck, _sphere(), fur, Vector3(0, 0.3, -0.02), Vector3(0.3, 0.26, 0.3))
+	_part(neck, _sphere(), fur, Vector3(0, 0.15, 0.05), Vector3(0.19, 0.17, 0.2))
+	# Great slanted eyes, all dark but for the light in them
+	for side: float in [-1.0, 1.0]:
+		var eye := _pivot(neck, Vector3(0.115 * side, 0.2, 0.225))
+		eye.rotation = Vector3(-0.1, 0.45 * side, 0.45 * side)
+		_part(eye, _sphere(), black, Vector3.ZERO, Vector3(0.1, 0.062, 0.03))
+		var pupil := _part(eye, _sphere(), eye_mat, Vector3(0, 0, 0.03), Vector3(0.026, 0.026, 0.02))
+		eyes.append(eye)
+		pupils.append(pupil)
+	mouth_node = _pivot(neck, Vector3(0, 0.05, 0.215))
+	_part(mouth_node, _sphere(), black, Vector3.ZERO, Vector3(0.04, 0.025, 0.02))
+
+
+# A snow-ape's cub: white and shaggy, with a blue face, blue hands and feet, two nubs of horn,
+# and arms it could trip over
+func _build_yeti(chub: float, rng: RandomNumberGenerator) -> void:
+	neck_y = 0.6
+	centre_y = 0.46
+	top_y = 1.16
+	gravity = 14.0
+	var blue := Ps1.mat(Color(0.3, 0.46, 0.66), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.16 * side, 0.2, 0))
+		_part(leg, _sphere(), fur, Vector3(0, -0.03, 0), Vector3(0.12, 0.15, 0.12))
+		_part(leg, _sphere(), blue, Vector3(0, -0.155, 0.07), Vector3(0.11, 0.045, 0.17))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.42, 0), Vector3(0.34 * chub, 0.32, 0.3 * chub))
+	# Shag hangs off it all round in two rows, light and lighter
+	for i in 18:
+		var around := TAU * (i + 0.5 * (i % 2)) / 18.0
+		var high := 0.5 if i % 2 == 0 else 0.32
+		var wide := 0.27 if i % 2 == 0 else 0.31
+		var lie := Basis(Vector3.UP, around) * Basis(Vector3.RIGHT, PI - 0.3)
+		var hank := _part(torso, _cone(), pale if i % 3 == 0 else fur, Vector3.ZERO)
+		var long := rng.randf_range(0.14, 0.22)
+		hank.basis = lie * Basis.from_scale(Vector3(0.075, long, 0.04))
+		hank.position = Vector3(sin(around) * wide * chub, high, cos(around) * wide * 0.88 * chub) + lie * Vector3(0, long * 0.5, 0)
+	tail = _pivot(torso, Vector3(0, 0.3, -0.26 * chub))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.33 * chub * side, 0.62, 0.02))
+		_part(a, _capsule(0.075, 0.42), fur, Vector3(0, -0.17, 0))
+		_part(a, _cone(), pale, Vector3(0, -0.3, -0.03), Vector3(0.08, 0.16, 0.05), Vector3(PI, 0, 0))
+		_part(a, _sphere(), blue, Vector3(0, -0.4, 0.01), Vector3(0.09, 0.08, 0.09))
+		arms.append(a)
+
+	neck = _pivot(torso, Vector3(0, neck_y, 0.04))
+	_part(neck, _sphere(), fur, Vector3(0, 0.2, 0), Vector3(0.28, 0.25, 0.26))
+	_part(neck, _sphere(), blue, Vector3(0, 0.17, 0.12), Vector3(0.19, 0.16, 0.16))
+	_part(neck, _sphere(), fur, Vector3(0, 0.3, 0.16), Vector3(0.2, 0.06, 0.1))
+	_part(neck, _sphere(), dark, Vector3(0, 0.16, 0.285), Vector3(0.03, 0.022, 0.02))
+	for i in 3:
+		_part(neck, _cone(), pale, Vector3((i - 1) * 0.07, 0.47, 0.02), Vector3(0.05, 0.14, 0.04), Vector3(0.3, 0, (i - 1) * -0.4))
+	for side: float in [-1.0, 1.0]:
+		_part(neck, _cone(), blue, Vector3(0.21 * side, 0.4, 0), Vector3(0.045, 0.14, 0.045), Vector3(0, 0, -0.6 * side))
+		_eye(Vector3(0.085 * side, 0.21, 0.245), 0.055)
+		_part(neck, _cone(), bone, Vector3(0.05 * side, 0.1, 0.265), Vector3(0.018, 0.05, 0.018))
+	mouth_node = _pivot(neck, Vector3(0, 0.07, 0.265))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.09, 0.045, 0.04))
+
+
+# Three heads on one pup, each with a mind of its own and all of them hungry
+func _build_cerberus(chub: float) -> void:
+	neck_y = 0.5
+	head_y = 0.19
+	centre_y = 0.38
+	top_y = 1.0
+	ear_splay = 1.5
+	gut = 0.8
+	back_y = 0.5
+	var collar := Ps1.mat(Color(0.62, 0.1, 0.08), 0.0, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var leg := _pivot(self, Vector3(0.14 * side, 0.24, -0.2))
+		_part(leg, _capsule(0.055, 0.24), fur, Vector3(0, -0.1, 0))
+		_part(leg, _sphere(), dark, Vector3(0, -0.205, 0.03), Vector3(0.07, 0.035, 0.1))
+		legs.append(leg)
+
+	torso = _pivot(self, Vector3.ZERO)
+	_part(torso, _sphere(), fur, Vector3(0, 0.38, -0.02), Vector3(0.25 * chub, 0.21, 0.33 * chub))
+	_part(torso, _sphere(), pale, Vector3(0, 0.36, 0.2 * chub), Vector3(0.2 * chub, 0.17, 0.14))
+	# A whip of a tail with a barb on the end
+	tail = _pivot(torso, Vector3(0, 0.46, -0.32 * chub))
+	_part(tail, _capsule(0.022, 0.3), fur, Vector3(0, 0.09, -0.1), Vector3.ONE, Vector3(-0.85, 0, 0))
+	_part(tail, _cone(), collar, Vector3(0, 0.23, -0.26), Vector3(0.05, 0.1, 0.02), Vector3(-0.85, 0, 0))
+
+	for side: float in [-1.0, 1.0]:
+		var a := _pivot(torso, Vector3(0.15 * chub * side, 0.3, 0.2 * chub))
+		_foreleg(a, side, 0.3, 0.05)
+		arms.append(a)
+
+	# The middle head is the one on the neck; the other two sit either side and follow it round
+	neck = _pivot(torso, Vector3(0, neck_y, 0.27 * chub))
+	ears = _hound_head(neck, collar)
+	mouth_node = _pivot(neck, Vector3(0, 0.095, 0.215))
+	_part(mouth_node, _sphere(), maw, Vector3.ZERO, Vector3(0.06, 0.035, 0.05))
+	for side: float in [-1.0, 1.0]:
+		var head := _pivot(torso, Vector3(0.21 * chub * side, 0.46, 0.2 * chub))
+		head.rotation.y = 0.6 * side
+		var flops := _hound_head(head, collar)
+		flops[0].rotation.z = 1.4
+		flops[1].rotation.z = -1.4
+		_part(head, _sphere(), maw, Vector3(0, 0.095, 0.215), Vector3(0.05, 0.012, 0.04))
+		heads.append(head)
+
+
+# One of a hound's heads, on a pivot: collar, skull, muzzle, nose, fangs and eyes. Gives back
+# its two ears, for the rig to work or not.
+func _hound_head(on: Node3D, collar: Material) -> Array[Node3D]:
+	_part(on, _sphere(), fur, Vector3(0, 0.03, -0.03), Vector3.ONE * 0.115)
+	_part(on, _sphere(), collar, Vector3(0, 0.05, -0.02), Vector3(0.125, 0.03, 0.125), Vector3(0.3, 0, 0))
+	_part(on, _sphere(), fur, Vector3(0, 0.19, 0.03), Vector3(0.165, 0.15, 0.165))
+	_part(on, _sphere(), pale, Vector3(0, 0.14, 0.17), Vector3(0.085, 0.07, 0.105))
+	_part(on, _sphere(), black, Vector3(0, 0.165, 0.27), Vector3(0.03, 0.022, 0.02))
+	var flops: Array[Node3D] = []
+	for side: float in [-1.0, 1.0]:
+		var ear := _pivot(on, Vector3(0.12 * side, 0.29, -0.02))
+		_part(ear, _cone(), dark, Vector3(0, 0.07, 0), Vector3(0.055, 0.15, 0.03))
+		flops.append(ear)
+		_eye(Vector3(0.075 * side, 0.225, 0.155), 0.05, false, on)
+		_part(on, _cone(), bone, Vector3(0.04 * side, 0.08, 0.235), Vector3(0.014, 0.05, 0.014), Vector3(PI, 0, 0))
+	return flops
+
+
+# An eye on the head (or on another one). Hollow ones are dark with the light in the pupil.
+func _eye(at: Vector3, size: float, hollow := false, on: Node3D = null) -> void:
+	var eye := _pivot(neck if on == null else on, at)
 	_part(eye, _sphere(), black if hollow else eye_mat, Vector3.ZERO, Vector3.ONE * size)
 	var pupil := _part(eye, _sphere(), eye_mat if hollow else black, Vector3(0, 0, size * 0.68), Vector3.ONE * size * 0.5)
 	eyes.append(eye)
@@ -907,7 +1522,7 @@ func _part(parent: Node3D, mesh: Mesh, mat: Material, at: Vector3, size := Vecto
 
 # A thought bubble that shows what it is asking for
 func _build_bubble() -> void:
-	bubble = _pivot(self, Vector3(0.35, top_y + 0.35, 0))
+	bubble = _pivot(self, Vector3(0.35, top_y + hover + 0.35, 0))
 	var white := Ps1.flat(Color(0.95, 0.95, 0.9))
 	for p: MeshInstance3D in [
 		_part(bubble, _sphere(), white, Vector3.ZERO, Vector3(0.24, 0.2, 0.01)),
@@ -925,6 +1540,11 @@ func _build_bubble() -> void:
 	bubble_ball = _pivot(bubble, Vector3(0, 0, 0.02))
 	_part(bubble_ball, _sphere(), Ps1.flat(Color(0.95, 0.45, 0.08)), Vector3.ZERO, Vector3(0.11, 0.11, 0.01))
 	_part(bubble_ball, _sphere(), Ps1.flat(Color(0.36, 0.16, 0.5)), Vector3(0, 0, 0.004), Vector3(0.035, 0.11, 0.01))
+	bubble_water = _pivot(bubble, Vector3(0, 0, 0.02))
+	var wet := Ps1.flat(Color(0.2, 0.55, 0.95))
+	_part(bubble_water, _sphere(), wet, Vector3(0, -0.04, 0), Vector3(0.085, 0.085, 0.01))
+	_part(bubble_water, _cone(), wet, Vector3(0, 0.07, 0), Vector3(0.07, 0.14, 0.01))
+	_part(bubble_water, _sphere(), Ps1.flat(Color(0.8, 0.92, 1.0)), Vector3(-0.03, -0.05, 0.004), Vector3(0.022, 0.035, 0.01))
 	bubble.visible = false
 
 
@@ -962,10 +1582,43 @@ func _build_hearts() -> void:
 	hearts.scale_amount_min = 0.6
 	hearts.scale_amount_max = 1.1
 	hearts.color_ramp = fade
-	hearts.position = Vector3(0, top_y - 0.1, 0)
+	hearts.position = Vector3(0, top_y + hover - 0.1, 0)
 	hearts.emitting = false
 	hearts.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(hearts)
+
+
+# The faces that go up over its head, a picture for each feeling, and the card they are shown on
+func _build_emote() -> void:
+	var inks := {"#": Color(0.1, 0.07, 0.12), "o": Color.WHITE, "r": Color(0.86, 0.12, 0.22), "b": Color(0.25, 0.55, 1.0)}
+	for face in FACES:
+		if face.is_empty():
+			faces.append(null)
+			continue
+		var img := Image.create(FACE, FACE, false, Image.FORMAT_RGBA8)
+		var tint: Color = face["tint"]
+		for py in FACE:
+			for px in FACE:
+				var away := Vector2(px - 7.5, py - 7.5).length()
+				if away < 7.9:
+					img.set_pixel(px, py, tint if away < 6.9 else inks["#"])
+		var rows: Array = face["rows"]
+		for y in rows.size():
+			var row: String = rows[y]
+			for x in row.length():
+				if inks.has(row[x]):
+					img.set_pixel(x + 3, y + 4, inks[row[x]])
+		faces.append(ImageTexture.create_from_image(img))
+	# Lit by nothing and hidden by nothing: it shows as well in the dark as under the lamp
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.no_depth_test = true
+	mat.render_priority = 4
+	emote = _part(self, QuadMesh.new(), mat, Vector3.ZERO)
+	emote.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	emote.visible = false
 
 
 # ---------------------------------------------------------------- needs
@@ -1044,7 +1697,28 @@ func pass_time(seconds: float, dark: bool) -> bool:
 # ---------------------------------------------------------------- what you can do to it
 
 func body_centre() -> Vector3:
-	return global_position + Vector3(0, (centre_y - curl * 0.2) * grow, 0)
+	return global_position + Vector3(0, (centre_y + hover * (1.0 - curl) - curl * 0.2) * grow, 0)
+
+
+# How tall it stands (to the top of whatever is on its head), off the floor if it floats
+func tall() -> float:
+	return (top_y + hover * (1.0 - curl)) * grow
+
+
+# How far above its feet the top of its head is just now: lower sat down or curled up, and
+# higher on a baby, whose head is big for it
+func top() -> float:
+	return (neck_y + (top_y - neck_y) * neck.scale.y + hover * (1.0 - curl) - sit * 0.1 - curl * 0.3) * grow
+
+
+# One of the kinds that live in water
+func needs_water() -> bool:
+	return KINDS[kind].get("water", false)
+
+
+# A water kind with no pool in its room
+func dry() -> bool:
+	return needs_water() and world.decor_of(Decor.Kind.POOL) == null
 
 
 func is_baby() -> bool:
@@ -1077,31 +1751,35 @@ func feel(how: int, seconds: float) -> void:
 
 
 # The face over its head: up with a little bounce whenever its feeling changes, gone after a
-# moment; a feeling that goes on (hungry, bored, sad) comes up again every so often. Never
-# while it sleeps (it has its z's).
+# moment; a feeling that goes on (hungry, bored, sad, grumpy) comes up again every so often.
+# Never while it sleeps (it has its z's), begs (it has its bubble) or is under the scanner.
 func _show_emote(delta: float) -> void:
 	emote_again -= delta
-	if feeling != emote_for or (emote_again <= 0.0 and not emote.visible and feeling in [Feeling.HUNGRY, Feeling.BORED, Feeling.SAD, Feeling.GRUMPY]):
+	var lasting := feeling in [Feeling.HUNGRY, Feeling.BORED, Feeling.SAD, Feeling.GRUMPY]
+	if feeling != emote_for or (lasting and emote_again <= 0.0 and not emote.visible):
+		# Settling back to plain happiness after something else is not news
+		var news := feeling != Feeling.HAPPY or emote_again <= 0.0
 		emote_for = feeling
-		emote_again = randf_range(9.0, 14.0)
-		if EMOTES[feeling] != "" and state != State.SLEEP:
-			emote.text = EMOTES[feeling]
-			emote.modulate = EMOTE_COLOURS[feeling]
-			emote.visible = true
+		emote.visible = faces[feeling] != null and news
+		if emote.visible:
+			emote.material_override.albedo_texture = faces[feeling]
 			emote_time = 0.0
-		else:
-			emote.visible = false
+			emote_again = randf_range(10.0, 16.0)
+	if state == State.SLEEP or bubble.visible or xrayed or emote_time > 3.0:
+		emote.visible = false
 	if not emote.visible:
 		return
 	emote_time += delta
-	var up := 1.0 - exp(-emote_time * 9.0) * cos(emote_time * 16.0) # (pops up and settles)
-	var fade := 1.0 - smoothstep(2.2, 2.8, emote_time)
-	emote.global_position = global_position + Vector3(0.0, (top_y + 0.28) * grow + 0.12 * up, 0.0)
-	emote.scale = Vector3.ONE * maxf(up, 0.01) * (0.8 + 0.2 * grow)
-	emote.modulate.a = fade
-	emote.outline_modulate.a = fade * 0.9
-	if emote_time > 2.8 or state == State.SLEEP:
-		emote.visible = false
+	# One dot of the face to one dot of the picture however far off it is, and set square on the
+	# picture's dots, so that it is as sharp as it can be
+	var cam := world.camera
+	var above := global_position + Vector3(0, top(), 0)
+	var deep := -(cam.global_transform.affine_inverse() * above).z
+	var dot := 2.0 * deep * tan(deg_to_rad(cam.fov) * 0.5) / world.view.size.y
+	var pop := 1.0 - exp(-emote_time * 9.0) * cos(emote_time * 16.0)
+	var at := (cam.unproject_position(above) - Vector2(0, FACE * 0.5 + 1.0 + 4.0 * pop)).round()
+	emote.global_transform = Transform3D(cam.global_basis * Basis.from_scale(Vector3.ONE * dot * FACE), cam.project_position(at, deep))
+	emote.material_override.albedo_color.a = 1.0 - smoothstep(2.5, 3.0, emote_time)
 
 
 func _feel(delta: float) -> void:
@@ -1220,7 +1898,8 @@ func call_to(point: Vector3) -> void:
 
 # Something in its room has changed (a thing put in at `point`, new ground, the lamp):
 # it goes over to see, and shows what it makes of it. `liking` is 1 if this is what it
-# wants, -1 if it cannot stand it and 0 if it does not mind; `key` is what Den.learned() is told.
+# wants, -1 if it cannot stand it and 0 if it does not mind; `key` is what Den.learned() is told
+# once it has looked (nothing, if there is nothing in that to learn).
 func look_over(point: Vector3, liking: int, key: String) -> void:
 	if not state in INTERRUPTIBLE:
 		return
@@ -1335,7 +2014,7 @@ func _enter(s: int, length := 0.0) -> void:
 			roll_goal = randf_range(0.2, 0.35) * (1.0 if randf() < 0.5 else -1.0)
 			wag = 5.0
 		State.LURK:
-			visiting = world.cave()
+			visiting = world.shelter(self)
 			target = world.hiding_place(self)
 		State.COME:
 			_cry("chirp")
@@ -1350,8 +2029,13 @@ func _enter(s: int, length := 0.0) -> void:
 			wag = 9.0
 		State.BEG:
 			state_len = 5.5
-			beg_cooldown = 30.0
-			beg_for_ball = belly >= 25.0
+			# Food before anything; then water, if it is bored of nothing in particular
+			beg_for = Want.BALL
+			if belly < 25.0:
+				beg_for = Want.FOOD
+			elif dry() and (fun >= 22.0 or world.ball != null):
+				beg_for = Want.WATER
+			beg_cooldown = 90.0 if beg_for == Want.WATER else 30.0
 			target = Den.in_room(world.light_point + Vector3(randf_range(-0.6, 0.6), 0, 1.5), 0.4)
 		State.ZOOMIES:
 			state_len = randf_range(0.0, TAU)
@@ -1427,7 +2111,8 @@ func _interrupt() -> bool:
 func _decide() -> void:
 	if _interrupt():
 		return
-	if beg_cooldown <= 0.0 and world.light_on and (belly < 25.0 or (fun < 22.0 and world.ball == null)):
+	# Hungry, bored, or (now and then) a water kind with nowhere to get wet: it asks
+	if beg_cooldown <= 0.0 and world.light_on and (belly < 25.0 or (fun < 22.0 and world.ball == null) or (dry() and randf() < 0.3)):
 		_enter(State.BEG)
 		return
 	if world.ball != null and fun < 35.0 and energy > 20.0:
@@ -1497,7 +2182,7 @@ func _think(delta: float) -> void:
 					state_len = randf_range(3.0, 5.0)
 					eye_goal = 1.2
 					if is_instance_valid(visiting):
-						# Tucked into the cave, looking out
+						# Tucked into a shelter, looking out
 						state_len += 3.0
 						sit_goal = 1.0
 			else:
@@ -1541,9 +2226,10 @@ func _think(delta: float) -> void:
 				droop_goal = 0.85
 				eye_goal = 0.85
 				bubble.visible = true
-				bubble_food.visible = not beg_for_ball
-				bubble_ball.visible = beg_for_ball
-				if not beg_for_ball:
+				bubble_food.visible = beg_for == Want.FOOD
+				bubble_ball.visible = beg_for == Want.BALL
+				bubble_water.visible = beg_for == Want.WATER
+				if beg_for == Want.FOOD:
 					arm_goal = BELLY_ARM
 					arm_wave = 0.25
 				if state_time > state_len:
@@ -1628,7 +2314,7 @@ func _think(delta: float) -> void:
 						feel(Feeling.DISGUSTED, 6.0)
 					else:
 						_cry("chirp", 0.9)
-					if inspect_liking != 0:
+					if inspect_key != "":
 						world.learned(inspect_key)
 			else:
 				_halt(delta)
@@ -1642,14 +2328,24 @@ func _think(delta: float) -> void:
 				return
 			var at := visiting.position
 			gaze = at + Vector3(0, 0.3, 0)
+			# A water kind does not stop at the edge of the pool
+			var wading := visiting.kind == Decor.Kind.POOL and needs_water()
 			if step == 0:
 				var near := 0.2 if visiting.hollow else visiting.radius + 0.28 * grow
+				if wading:
+					near = visiting.radius * 0.45
 				if _steer(at, WALK * 1.2, delta, near) or state_time > 7.0:
 					step = 1
 					state_time = 0.0
-					state_len = randf_range(4.0, 7.5)
+					state_len = randf_range(4.0, 7.5) + (4.0 if wading else 0.0)
 					if visiting.kind == Decor.Kind.ROCK:
 						hop(2.6)
+					if wading:
+						hop(2.2)
+						world.splash(at)
+						hearts.emitting = true
+						feel(Feeling.LOVING, 4.0)
+						world.learned("water")
 			else:
 				_halt(delta)
 				match visiting.kind:
@@ -1670,12 +2366,27 @@ func _think(delta: float) -> void:
 						sit_goal = 1.0
 						gaze = world.camera.global_position
 						_face(gaze, delta)
-					Decor.Kind.CAVE:
+					_ when visiting.hollow:
 						# Sits inside, looking out
 						sit_goal = 1.0
 						eye_goal = 1.2
 						gaze = world.camera.global_position
 						_face(gaze, delta)
+					Decor.Kind.POOL when wading:
+						# Wades in up to its middle and paddles about
+						var down := 1.0 - exp(-delta * 5.0)
+						position.x = lerpf(position.x, at.x, down)
+						position.z = lerpf(position.z, at.z, down)
+						if not airborne:
+							lift = lerpf(lift, minf(Decor.WATER - centre_y * 0.75 * grow, 0.0), down)
+						arm_wave = 0.2
+						wag = 8.0
+						wiggle = sin(anim_t * 3.0) * 0.06
+						gaze = world.camera.global_position
+						_face(gaze, delta)
+						if int(state_time / 1.4) + 1 > step:
+							step = int(state_time / 1.4) + 1
+							world.splash(position)
 					_:
 						# Has a sniff at it, then settles down beside it
 						_face(at, delta)
@@ -1686,10 +2397,13 @@ func _think(delta: float) -> void:
 							sit_goal = 1.0
 							gaze = world.camera.global_position
 				if state_time > state_len:
-					fun = minf(fun + 1.5, 100.0)
+					fun = minf(fun + (5.0 if wading else 1.5), 100.0)
 					if visiting.kind in like_decor:
 						love = minf(love + 0.3, 100.0)
 					_enter(State.IDLE, 1.0)
+					if wading:
+						# Out over the stones
+						hop(2.2)
 		State.MOVE_NEST:
 			if step == 0:
 				gaze = world.nest_pos + Vector3(0, 0.1, 0)
@@ -1910,7 +2624,7 @@ func _move(delta: float) -> void:
 			for thing in world.decors:
 				var off := Vector2(position.x - thing.position.x, position.z - thing.position.z)
 				var room := thing.radius + 0.2 * grow
-				# Not the cave it is tucked into, nor the rock it is sat on
+				# Not the shelter it is tucked into, nor the rock it is sat on
 				if (thing.hollow and state in [State.SLEEP, State.GO_SLEEP, State.MOVE_NEST]) or (thing == visiting and state in [State.LURK, State.VISIT]):
 					continue
 				if off.length() < room:
@@ -1993,10 +2707,10 @@ func _animate(delta: float) -> void:
 	if blink < -0.12:
 		blink = randf_range(1.5, 5.0)
 	eye_open = lerpf(eye_open, eye_goal * float(FEELINGS[feeling]["eye"]) if blink > 0.0 else 0.0, 1.0 - exp(-delta * 30.0))
-	var to_head := neck.global_transform.affine_inverse()
 	for i in eyes.size():
 		eyes[i].scale = Vector3(1.0, maxf(eye_open, 0.07), 1.0)
-		var d := (to_head * gaze - eyes[i].position).normalized()
+		var socket: Node3D = eyes[i].get_parent()
+		var d := (socket.global_transform.affine_inverse() * gaze - eyes[i].position).normalized()
 		var off := Vector2(d.x, d.y).limit_length(0.55)
 		if d.z < 0.0:
 			off = Vector2(d.x, d.y).normalized() * 0.55
@@ -2022,11 +2736,22 @@ func _animate(delta: float) -> void:
 	tail.rotation.x = sin(anim_t * 1.3) * 0.12 - curl * 0.4 - hover * minf(speed, 2.0) * 1.2
 	tail.rotation.z = sin(anim_t * wag * 0.5) * hover
 
+	# Wings of its own beat by themselves, harder off the ground; spare heads follow the one on
+	# the neck round, a little behind it
+	for i in flaps.size():
+		var side := -1.0 if i == 0 else 1.0
+		flaps[i].rotation.y = side * (0.2 + sin(anim_t * flap_rate * (1.6 if airborne else 1.0)) * flap_reach)
+	for i in heads.size():
+		var side := -1.0 if i == 0 else 1.0
+		var turn := Vector3(head_pitch * 0.8 + nod * 0.7 + hang, head_yaw * 0.6 + 0.6 * side, head_roll - 0.15 * side)
+		heads[i].rotation = heads[i].rotation.lerp(turn, ease_slow * 0.5)
+		heads[i].scale = neck.scale * 0.9
+
 	if xrayed:
 		_show_insides()
 	if bubble.visible:
 		bubble.global_basis = world.camera.global_basis
-		bubble.position.y = top_y + 0.35 + sin(anim_t * 2.0) * 0.03
+		bubble.position.y = top_y + hover + 0.35 + sin(anim_t * 2.0) * 0.03
 	if zzz[0].visible:
 		var cam_right := world.camera.global_basis.x
 		for i in 3:
@@ -2056,7 +2781,7 @@ func xray(on: bool) -> void:
 
 
 func _ghost(node: Node, ghost: Material) -> void:
-	if node == bubble or node in insides:
+	if node == bubble or node == emote or node in insides:
 		return
 	if node is MeshInstance3D:
 		skin[node] = node.material_override
@@ -2083,26 +2808,29 @@ func _build_insides() -> void:
 	var white := Ps1.organ(Color(0.75, 0.85, 0.9))
 	var chest := _pivot(torso, Vector3.ZERO)
 	insides.append(chest)
-	var top: float = neck_y + brain_at.y * 0.5
+	var top: float = back_y if back_y > 0.0 else neck_y + brain_at.y * 0.5
 	_part(chest, _capsule(0.014, maxf(top - centre_y + 0.22, 0.1)), white, Vector3(0, (top + centre_y - 0.22) * 0.5, -0.06))
+	# The rest sits about the middle of its body, smaller in a slight one
+	var organs := _pivot(chest, Vector3(0, centre_y, 0))
+	organs.scale = Vector3.ONE * gut
 	var hoop := TorusMesh.new()
 	hoop.inner_radius = 0.82
 	hoop.outer_radius = 1.0
 	hoop.rings = 8
 	hoop.ring_segments = 3
 	for i in 3:
-		_part(chest, hoop, white, Vector3(0, centre_y + 0.14 - i * 0.07, 0), Vector3(0.14 - i * 0.012, 0.02, 0.11))
+		_part(organs, hoop, white, Vector3(0, 0.14 - i * 0.07, 0), Vector3(0.14 - i * 0.012, 0.02, 0.11))
 	for limb in legs + arms:
 		insides.append(_part(limb, _capsule(0.012, 0.16), white, Vector3(0, -0.09, 0)))
 
-	stomach = _pivot(chest, Vector3(0, centre_y - 0.11, 0.03))
+	stomach = _pivot(organs, Vector3(0, -0.11, 0.03))
 	_part(stomach, _sphere(), Ps1.organ(Color(0.32, 0.2, 0.1)), Vector3.ZERO, Vector3(0.125, 0.105, 0.1))
 	stomach_fill = _part(stomach, _sphere(), Ps1.organ(Color(1.0, 0.72, 0.2)), Vector3.ZERO, Vector3(0.11, 0.09, 0.085))
 	stomach_fill.material_override.render_priority = 3
-	heart = _part(chest, _sphere(), Ps1.organ(Color(1.0, 0.25, 0.35)), Vector3(0.06, centre_y + 0.08, 0.06), Vector3.ONE * 0.04)
+	heart = _part(organs, _sphere(), Ps1.organ(Color(1.0, 0.25, 0.35)), Vector3(0.06, 0.08, 0.06), Vector3.ONE * 0.04)
 	heart.material_override.render_priority = 3
 	for side: float in [-1.0, 1.0]:
-		lungs.append(_part(chest, _sphere(), Ps1.organ(Color(0.3, 0.6, 0.9)), Vector3(0.075 * side - 0.02, centre_y + 0.1, -0.005), Vector3(0.045, 0.07, 0.04)))
+		lungs.append(_part(organs, _sphere(), Ps1.organ(Color(0.3, 0.6, 0.9)), Vector3(0.075 * side - 0.02, 0.1, -0.005), Vector3(0.045, 0.07, 0.04)))
 	var head := _pivot(neck, brain_at)
 	insides.append(head)
 	brain = _part(head, _sphere(), Ps1.organ(Color(0.9, 0.6, 0.75)), Vector3.ZERO, Vector3(0.075, 0.06, 0.07))
