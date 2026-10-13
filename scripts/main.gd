@@ -196,6 +196,11 @@ var floor_mat: ShaderMaterial
 var embedded := false
 # The save was written inside the station since eggs there came by post (see _load_game)
 var posted := false
+# The account the save is kept on, once the page has named it (see _ask_account): "" for none,
+# and then the save is only this browser's
+var keeper := ""
+var _account: Variant = null
+const ACCOUNT_WAIT_MS := 12000
 var stock := {}
 var _on_message: JavaScriptObject
 # What the page is told (see _post), for the tests to hear
@@ -285,6 +290,14 @@ var dev_tap_time := -10.0
 func _ready() -> void:
 	randomize()
 	shore = Shore.NONE
+	_listen()
+	if _on_message != null:
+		# (nothing is built yet: nothing runs until the page has answered)
+		set_process(false)
+		set_process_input(false)
+		await _ask_account()
+		set_process(true)
+		set_process_input(true)
 	_load_game()
 	_build_room()
 	_build_lamp()
@@ -3382,17 +3395,21 @@ func _release() -> void:
 
 # Inside another page (the station's basement): tell it when the room is on the screen, so it
 # can lift whatever it was covering the load with, and take from it what has been bought.
-#   out: {type: "CRYPTLINS_READY"}, {type: "CRYPTLINS_USED", item: <id>}
+#   out: {type: "CRYPTLINS_HELLO"}: before anything is built, asking whose room this is
+#        {type: "CRYPTLINS_SAVE", save: <the save>}: the room as it stands, every time it is
+#        saved, for the page to keep on the keeper's account
+#        {type: "CRYPTLINS_READY"}, {type: "CRYPTLINS_USED", item: <id>}
 #        {type: "CRYPTLINS_SHOP"}: the keeper has asked for the ticket counter (the handbook's
 #        Shop button); the game has saved, and expects to be hidden
 #        {type: "CRYPTLINS_KEPT", name: <its name>, kind: <its kind, as "phantom kangaroo">,
 #        score: <0 to 100>}: the best kept of those living in the room (see tend), for the
 #        station's Friday show; sent once the first stock has come, whenever the game rests,
 #        and every five minutes while it is shown, and never with nobody living there
-#   in:  {type: "CRYPTLINS_STOCK", items: {<id>: <how many, or -1 for no end of them>}}
+#   in:  {type: "CRYPTLINS_ACCOUNT", who: <the keeper's id, or "">, save: <their save, or null>}
+#        {type: "CRYPTLINS_STOCK", items: {<id>: <how many, or -1 for no end of them>}}
 #        {type: "CRYPTLINS_SHOW"} and {type: "CRYPTLINS_HIDE"}: in front, or covered and left
 # The page loads the game out of sight, so it rests (see rest) until it is first shown.
-func _bridge() -> void:
+func _listen() -> void:
 	if not OS.has_feature("web"):
 		return
 	embedded = bool(JavaScriptBridge.eval("window.parent !== window", true))
@@ -3400,16 +3417,50 @@ func _bridge() -> void:
 		return
 	_on_message = JavaScriptBridge.create_callback(_message)
 	JavaScriptBridge.get_interface("window").addEventListener("message", _on_message)
+
+
+# The room belongs to an account, not to a browser. Before anything is read the page is asked
+# whose it is and what that keeper's save holds, and waited on a while; with no answer in time
+# the game goes by this browser's own save and sends nothing up, so that a room that could not
+# be fetched is never written over with an empty one.
+func _ask_account() -> void:
+	_post({"type": "CRYPTLINS_HELLO"})
+	var until := Time.get_ticks_msec() + ACCOUNT_WAIT_MS
+	while _account == null and Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+	if _account is Dictionary:
+		_take_account(_account)
+	_account = {}
+
+
+# The keeper's save is put where this browser's was, unless this browser's is theirs and newer
+# (it was played here and the page never got it). A save here with no name on it is taken to
+# be theirs; one with somebody else's name is not, and is left out of it.
+func _take_account(said: Dictionary) -> void:
+	var who := str(said.get("who", ""))
+	if who == "":
+		return
+	keeper = who
+	var here: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path)) if FileAccess.file_exists(save_path) else null
+	var theirs: Variant = said.get("save")
+	var mine: bool = here is Dictionary and str(here.get("who", "")) in ["", who]
+	if theirs is Dictionary and (not mine or float(theirs.get("time", 0.0)) >= float(here.get("time", 0.0))):
+		var file := FileAccess.open(save_path, FileAccess.WRITE)
+		if file != null:
+			file.store_string(JSON.stringify(theirs))
+	elif here != null and not mine:
+		DirAccess.remove_absolute(save_path)
+
+
+func _bridge() -> void:
+	if not embedded or not OS.has_feature("web"):
+		return
 	_sync()
 	for i in 4:
 		await get_tree().process_frame
 	_post({"type": "CRYPTLINS_READY"})
 	if not shown:
 		rest(true)
-
-
-func _inside_a_page() -> bool:
-	return OS.has_feature("web") and bool(JavaScriptBridge.eval("window.parent !== window", true))
 
 
 # The Shop button in the handbook: the keeper wants the ticket counter. The game is saved, the
@@ -3437,6 +3488,9 @@ func _message(args: Array) -> void:
 # What the page has said
 func _heard(data: Dictionary) -> void:
 	match data.get("type"):
+		"CRYPTLINS_ACCOUNT":
+			if _account == null:
+				_account = data
 		"CRYPTLINS_STOCK":
 			if data.get("items") is Dictionary:
 				stock = data["items"]
@@ -3491,8 +3545,9 @@ func save_game() -> void:
 	var living: Array = []
 	for r in residents:
 		living.append(r.to_save())
-	file.store_string(JSON.stringify({
+	var data := {
 		"v": 3,
+		"who": keeper,
 		"post": posted or embedded,
 		"residents": living,
 		"gone": departed.map(func(r: Resident) -> Dictionary: return r.to_save()),
@@ -3512,7 +3567,10 @@ func save_game() -> void:
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
 		"time": Time.get_unix_time_from_system(),
-	}))
+	}
+	file.store_string(JSON.stringify(data))
+	if keeper != "":
+		_post({"type": "CRYPTLINS_SAVE", "save": data})
 
 
 # Reads the save and notes how long it has been. With no save the room is left empty, and
@@ -3525,13 +3583,9 @@ func _load_game() -> void:
 		return
 	var d: Dictionary = data
 	var now := Time.get_unix_time_from_system()
-	# Inside the station nobody is given an egg for nothing any more: theirs comes in the post.
-	# A save from when the room gave one loses who was in it, once; the room is left as it was.
+	# (A save from when the room gave an egg for nothing used to lose who was in it here. It took
+	# those that came by post with it, so nobody is turned out any more.)
 	posted = bool(d.get("post", false))
-	if _inside_a_page() and not posted:
-		for key: String in ["residents", "gone", "markers"]:
-			d.erase(key)
-		d["v"] = 3
 	if d.get("residents") is Array:
 		for saved: Variant in d["residents"]:
 			if saved is Dictionary and residents.size() < MAX_RESIDENTS:

@@ -3478,6 +3478,31 @@ func _run() -> void:
 	main.embedded = false
 	main._sync()
 
+	# The room is the account's: what the page hands over is put where this browser's save was
+	var theirs := {"v": 3, "post": true, "who": "ada", "time": 2000.0, "residents": [], "floor": 2}
+	main.save_path = save
+	main._take_account({"who": "ada", "save": theirs})
+	var on_disk: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(save))
+	check(main.keeper == "ada" and int(on_disk.get("floor", 0)) == 2, "the account's save is the one that is read")
+	theirs["time"] = 1000.0
+	theirs["floor"] = 1
+	main._take_account({"who": "ada", "save": theirs})
+	on_disk = JSON.parse_string(FileAccess.get_file_as_string(save))
+	check(int(on_disk.get("floor", 0)) == 2, "unless this browser's is theirs and newer")
+	main._take_account({"who": "bo", "save": theirs})
+	on_disk = JSON.parse_string(FileAccess.get_file_as_string(save))
+	check(int(on_disk.get("floor", 0)) == 1, "somebody else's save here gives way to the keeper's")
+	main._take_account({"who": "cy", "save": null})
+	check(not FileAccess.file_exists(save), "and is not handed to a keeper who has none")
+	var sent: Array = []
+	main.told.connect(func(message: Dictionary) -> void: sent.append(message))
+	main.embedded = true
+	main.save_game()
+	main.embedded = false
+	check(sent.size() == 1 and sent[0].get("type") == "CRYPTLINS_SAVE" and str(sent[0]["save"].get("who")) == "cy", "every save goes up to the page with the keeper's name on it")
+	main.keeper = ""
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(save))
+
 	# The test panel: five taps in the corner open it, and it can put any kind in the room
 	var corner_tap := root.get_final_transform() * Vector2(40, 40)
 	for i in 5:
