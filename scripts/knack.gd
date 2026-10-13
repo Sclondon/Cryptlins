@@ -1270,7 +1270,10 @@ func _pass(delta: float) -> void:
 			pet.blink = 1.0
 			if _beat(0.45, delta):
 				world.sfx.play("click", 0.6, -16.0)
-			if Vector2(pet.position.x - thing.position.x, pet.position.z - thing.position.z).length() < thing.radius * 0.8:
+			# (it has done it once it is past the middle of the thing, on its line through it)
+			var off := Vector3(pet.position.x - thing.position.x, 0, pet.position.z - thing.position.z)
+			var onward := Vector3(far.x - thing.position.x, 0, far.z - thing.position.z).normalized()
+			if off.dot(onward) > 0.0 and off.cross(onward).length() < thing.radius + 0.15:
 				done = true
 			if pet._steer(far, Cryptlin.WALK * 0.9, delta, 0.1) or pet.state_time > 9.0:
 				_next()

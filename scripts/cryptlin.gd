@@ -4690,6 +4690,10 @@ func _keep_off(centre: Vector3, room: float, delta: float) -> void:
 # two ever stand in one another. One that is asleep is not shifted by one that is up and about;
 # sleepers in the one nest lie close.
 func _keep_off_others(delta: float) -> void:
+	# (the nightcrawler on its way through a thing goes through whoever is in its line as well,
+	# and is not turned aside)
+	if kind == Kind.NIGHTCRAWLER and state == State.TRICK and step >= 2:
+		return
 	for r in world.residents:
 		if r.egg != null and r.egg.landed:
 			_keep_off(r.egg.position, 0.3 + 0.2 * grow, delta)
