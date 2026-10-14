@@ -154,6 +154,8 @@ var broken := {}
 # the bones that have been fed, the ball that has been brought out (and is the room's from then on,
 # like one that was bought, until it breaks)
 var used := {}
+# Every kind that has ever hatched here (the album shows the rest out of focus)
+var met := {}
 var saved_toy := {}
 # Whether the save had the wheel tucked away (see tuck)
 var saved_tucked := false
@@ -878,6 +880,7 @@ func _on_hatched(r: Resident) -> void:
 	r.egg.burst()
 	r.egg = null
 	r.hatched = true
+	met[r.kind] = true
 	r.born = Time.get_unix_time_from_system()
 	r.needs = {"belly": 55.0, "fun": 50.0, "energy": 85.0, "love": 10.0, "age": 0.0}
 	r.known = {}
@@ -3563,6 +3566,7 @@ func save_game() -> void:
 		"scuffs": scuffs,
 		"broken": broken,
 		"used": used,
+		"met": met.keys(),
 		"tucked": shelf.tucked if shelf != null else saved_tucked,
 		"lamp": lamp_mode,
 		"muted": sfx.muted if sfx != null else false,
@@ -3637,6 +3641,13 @@ func _load_game() -> void:
 	if d.get("used") is Dictionary:
 		for id: String in d["used"]:
 			used[id] = int(d["used"][id])
+	if d.get("met") is Array:
+		for k: Variant in d["met"]:
+			met[int(k)] = true
+	# (and those from before this was kept: whoever is in the room hatched, or lies buried)
+	for r in residents + departed:
+		if r.hatched or r.died > 0.0:
+			met[r.kind] = true
 	saved_tucked = bool(d.get("tucked", false))
 	lamp_mode = clampi(int(d.get("lamp", Lamp.BRIGHT)), 0, LAMPS.size() - 1)
 	away = maxf(now - float(d.get("time", now)), 0.0)

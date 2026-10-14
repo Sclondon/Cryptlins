@@ -517,7 +517,7 @@ func _stick_in(owned: Dictionary) -> void:
 		cell.visible = place >= 0 and place < held
 		cell.position = from + Vector2(place % set_in.x, place / set_in.x) * step
 		cell.size = Vector2(set_in.z, set_in.z)
-		cell.show_kind(kind, owned.has(kind))
+		cell.show_kind(kind, owned.has(kind), not owned.has(kind), not world.met.has(kind))
 
 
 # A leaf of lore: the name of the kind, its photograph as big as there is room for over the
@@ -534,7 +534,7 @@ func _turn_up(owned: Dictionary) -> void:
 	if big.visible:
 		big.position = Vector2(floorf((room.x - across) * 0.5), 0.0)
 		big.size = Vector2(across, across)
-		big.show_kind(lore, owned.has(lore), false)
+		big.show_kind(lore, owned.has(lore), false, not world.met.has(lore))
 		body.offset_top = across + GAP
 	body.add_theme_font_size_override("font_size", letters)
 	body.text = words

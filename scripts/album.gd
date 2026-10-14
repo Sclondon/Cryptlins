@@ -131,6 +131,7 @@ class Print:
 	var kind := -1
 	var mine := false
 	var faint := false
+	var blurred := false
 	var picture: TextureRect
 	var tone: ShaderMaterial
 
@@ -152,19 +153,21 @@ class Print:
 		album.taken.connect(_taken)
 
 	# Which kind it is of, whether the keeper has one, and whether it is faded (as it is, in the
-	# album, if he has none)
-	func show_kind(which: int, owned: bool, pale := not owned) -> void:
+	# album, if he has none), and whether it is out of focus (a kind that has never hatched here)
+	func show_kind(which: int, owned: bool, pale := not owned, hazy := false) -> void:
 		kind = which
 		mine = owned
 		picture.texture = album.prints[kind]
 		picture.visible = picture.texture != null
 		faint = pale
 		tone.set_shader_parameter("faded", 1.0 if faint else 0.0)
+		blurred = hazy
+		tone.set_shader_parameter("blurred", 1.0 if blurred else 0.0)
 		queue_redraw()
 
 	func _taken(which: int) -> void:
 		if which == kind:
-			show_kind(kind, mine, faint)
+			show_kind(kind, mine, faint, blurred)
 
 	func _draw() -> void:
 		var whole := Rect2(Vector2.ZERO, size)
