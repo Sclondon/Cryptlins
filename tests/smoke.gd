@@ -1859,6 +1859,103 @@ func _tucking(pet: Cryptlin, shape: String) -> void:
 	pet._enter(Cryptlin.State.IDLE, 0.2)
 
 
+# The album at the back of the handbook, on a wide screen, an upright phone and one too small
+# for it: a photograph of every kind, all of them inside the leaf, those of the kinds that live
+# in the room ringed and the rest not; a tap on one turns up what is written of that kind, whole
+# and inside the leaf, the arrows go on to the next kind's, and the tick is back at the album;
+# and the small photograph at the head of a cryptlin's own chapter turns up its kind's
+func _album() -> void:
+	var book := main.notebook
+	var was := root.size
+	var kinds := Cryptlin.KINDS.size()
+	var mine := main.who().kind
+	var other := (mine + 7) % kinds
+	var longest := 0
+	var fewest := 99
+	var most := 0
+	for words: String in Notebook.LORE:
+		longest = maxi(longest, words.split(" ").size())
+		var sentences := words.split(". ").size()
+		fewest = mini(fewest, sentences)
+		most = maxi(most, sentences)
+	check(Notebook.LORE.size() == kinds and fewest >= 2 and most <= 6 and longest <= 80, "there is something written of the cryptid each kind comes of, and it is short (%d words at most)" % longest)
+	for shape: Vector2i in [Vector2i(1280, 720), Vector2i(540, 1170), Vector2i(460, 520)]:
+		# (no screen is as small as the last: the handbook is made that size by hand)
+		var small := shape.x < 500
+		root.size = was if small else shape
+		await _frames(5)
+		if small:
+			book.fit(Vector2(shape))
+		book.open_at(book.chapters() - 1)
+		await _frames(3)
+		var first := book.page
+		var seen := {}
+		var inside := true
+		var ringed := true
+		var big_enough := true
+		while book.chapter == book.chapters() - 1 and seen.size() < kinds:
+			var frame := book.leaf.get_global_rect().grow(0.5)
+			for k in kinds:
+				var cell := book.cells[k]
+				if not cell.is_visible_in_tree():
+					continue
+				seen[k] = true
+				inside = inside and frame.encloses(cell.get_global_rect())
+				ringed = ringed and cell.kind == k and cell.mine == book.kept().has(k) and cell.faint != cell.mine
+				big_enough = big_enough and cell.size.x >= Notebook.CELL_LEAST and cell.size.x == cell.size.y
+			if seen.size() < kinds:
+				book.turn(1)
+				await _frames(2)
+		var leaves := book.page - first + 1
+		check(book.cells.size() == kinds and seen.size() == kinds and inside and big_enough and (leaves == 1) != small, "%d by %d: the album has a photograph of every kind, each inside its leaf and big enough to make out (%d to a leaf of it, over %d)" % [shape.x, shape.y, ceili(float(kinds) / leaves), leaves])
+		check(ringed and book.kept().has(mine) and book.cells[mine].mine and not book.kept().has(other) and not book.cells[other].mine and book.kept().size() <= main.pets().size(), "  those of the kinds that live in the room are ringed, and the rest are faded")
+		# (to the leaf of it that has one of another kind on it)
+		for i in book.pages():
+			if book.cells[other].is_visible_in_tree():
+				break
+			book.turn(1)
+			await _frames(2)
+		var under := book.page
+		await _tap(_px(book.cells[other].get_global_rect().get_center()))
+		await _frames(2)
+		var title: String = Cryptlin.KINDS[other]["title"]
+		var whole := book.body.get_visible_line_count() == book.body.get_line_count() and book.leaf.get_global_rect().grow(0.5).encloses(book.body.get_global_rect()) and book.body.get_minimum_size().y <= book.body.size.y + 0.5
+		check(book.lore == other and book.visible and book.body.text == Notebook.LORE[other] and book.heading.text.to_lower() == title and not book.grid.visible and not book.rename.visible, "  a tap on one turns up what is written of that kind (%s)" % title)
+		var spilt: Array[String] = []
+		for i in kinds:
+			var frame := book.leaf.get_global_rect().grow(0.5)
+			var fits := book.body.get_visible_line_count() == book.body.get_line_count() and book.body.get_minimum_size().y <= book.body.size.y + 0.5 and frame.encloses(book.body.get_global_rect())
+			if book.big.visible:
+				fits = fits and frame.encloses(book.big.get_global_rect()) and book.big.get_global_rect().end.y <= book.body.get_global_rect().position.y and book.big.kind == book.lore and not book.big.faint
+			if not fits or book.body.text != Notebook.LORE[book.lore]:
+				spilt.append(str(Cryptlin.KINDS[book.lore]["title"]))
+			book.turn(1)
+			await _frames(2)
+		check(whole and spilt.is_empty() and book.lore == other, "  every kind's fits its leaf whole, and the arrows go round them all %s" % [spilt])
+		book.done()
+		await _frames(2)
+		check(book.visible and book.lore == -1 and book.page == under and book.grid.visible and book.body.text == "", "  and the tick puts it away and is back at the album")
+		if small:
+			continue
+		book.open_at(main.residents.find(main.who()))
+		await _frames(2)
+		var stamp := book.stamp
+		var on_leaf := stamp.is_visible_in_tree() and stamp.kind == mine and stamp.mine and book.get_global_rect().encloses(stamp.get_global_rect())
+		await _tap(_px(stamp.get_global_rect().get_center()))
+		await _frames(2)
+		check(on_leaf and book.lore == mine and book.body.text == Notebook.LORE[mine], "  the small photograph at the head of its own chapter turns up its kind's")
+		book.done()
+		check(book.visible and book.lore == -1 and book.heading.text == main.who().name, "  and the tick is back at its chapter")
+	book.fit(main.get_viewport().get_visible_rect().size)
+	root.size = was
+	await _frames(5)
+	book.open_at(0)
+	book.read(mine)
+	book.close()
+	check(not book.visible and book.lore == -1, "shutting the handbook puts the lore away with it")
+	book.open_at(0)
+
+
 # The handbook's way to the ticket counter, which is there inside the station only: a Shop button
 # at the foot of every leaf, and a line on the keeper's leaf
 func _counter() -> void:
@@ -1866,7 +1963,7 @@ func _counter() -> void:
 	var was := root.size
 	book.open_at(0)
 	await _frames(2)
-	check(not book.shop.is_visible_in_tree() and not book.said(book.chapters() - 1).contains("counter"), "played by itself the handbook has no Shop button, and says nothing of a counter")
+	check(not book.shop.is_visible_in_tree() and not book.said(book.chapters() - 2).contains("counter"), "played by itself the handbook has no Shop button, and says nothing of a counter")
 	main.embedded = true
 	for shape: Vector2i in [Vector2i(540, 1170), Vector2i(1280, 720)]:
 		root.size = shape
@@ -1885,11 +1982,11 @@ func _counter() -> void:
 				fits = fits and part.get_global_rect().position.x >= along
 				along = part.get_global_rect().end.x
 		check(fits, "%d by %d: inside the station a cryptlin's leaf has a Shop button, and the row at its foot still fits" % [shape.x, shape.y])
-		book.open_at(book.chapters() - 1)
+		book.open_at(book.chapters() - 2)
 		await _frames(3)
 		var helps := 0
 		for l in book.leaves:
-			if l["chapter"] == book.chapters() - 1:
+			if l["chapter"] == book.chapters() - 2:
 				helps += 1
 		check(book.shop.is_visible_in_tree() and book.sound.is_visible_in_tree() and book.said().contains("counter") and helps == 1 and book.body.get_visible_line_count() == book.body.get_line_count(), "%d by %d: the keeper's leaf has it too, says where things are to be had, and is still one leaf" % [shape.x, shape.y])
 	var said: Array = []
@@ -1989,7 +2086,7 @@ func _show() -> void:
 			check(r.rosette == 1 and main.left_of(place) == 0 and said.size() == 2, "and a better one takes its place")
 	main.notebook.open_at(main.residents.find(r))
 	check(main.notebook.said().contains("First at the Friday show.") and " ".join(main.notebook._remembrance(r)).contains("First at the Friday show."), "its leaf of the handbook says so, and would if it were gone")
-	main.notebook.open_at(main.notebook.chapters() - 1)
+	main.notebook.open_at(main.notebook.chapters() - 2)
 	check(main.notebook.said().contains("Fridays") and main.notebook.said().contains("rosette"), "and the keeper's leaf tells of the show")
 	main.notebook.close()
 	# The cup
@@ -2756,14 +2853,17 @@ func _run() -> void:
 	for i in main.notebook.pages() - 1:
 		main.notebook.turn(1)
 		turned[main.notebook.heading.text] = true
-		check(main.notebook.body.text.length() > 60, "page %d: %s" % [i + 2, main.notebook.heading.text])
-	var help := main.notebook.said(main.notebook.chapters() - 1)
-	check(Notebook.TITLES.size() == 1 and turned.has(Notebook.TITLES[0]) and help.split(" ").size() < 70 and not RegEx.create_from_string("[0-9!]").search(help), "after them comes one short leaf to start the keeper off, with no numbers in it (%d words)" % help.split(" ").size())
+		# (the album, which is the last of them, has photographs on it and no words)
+		check(main.notebook.body.text.length() > 60 or main.notebook.grid.visible, "page %d: %s" % [i + 2, main.notebook.heading.text])
+	var help := main.notebook.said(main.notebook.chapters() - 2)
+	check(Notebook.TITLES.size() == 2 and main.notebook.heading.text == Notebook.TITLES[Notebook.ALBUM] and main.notebook.page == main.notebook.pages() - 1, "the last leaf of all is the album")
+	check(turned.has(Notebook.TITLES[0]) and help.split(" ").size() < 70 and not RegEx.create_from_string("[0-9!]").search(help), "after them comes one short leaf to start the keeper off, with no numbers in it (%d words)" % help.split(" ").size())
 	var longest := 0
 	for note: String in Notebook.KIND_NOTES + Knack.NOTES:
 		longest = maxi(longest, note.split(" ").size())
 	check(Notebook.KIND_NOTES.size() == Cryptlin.KINDS.size() and longest <= 22, "and a kind is a line or two, and its knack one (%d words at most)" % longest)
 	await _pages()
+	await _album()
 	main.notebook.close()
 	await _counter()
 	await _show()

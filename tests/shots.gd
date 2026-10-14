@@ -13,6 +13,7 @@ extends SceneTree
 ## With --toys: the foods and toys that came later, on the wheel and on the floor, and each of those toys being played with.
 ## With --room: the things for the room and the grounds that came later: the six things under each lamp, each of the four grounds, and the one in the room making use of the things.
 ## With --walk [--baby]: the kind walking across the room, four moments of it, and going away up it, three (with the squatchling's look back over its shoulder).
+## With --book [--fresh] [--station] [--album]: the handbook leaf by leaf with four in the room, and the lore of the first of them (or the album alone and the lore of every kind).
 ## With --knack [--step=N] [--at=SECONDS] [--then=SECONDS]: the kind taking a turn at the one thing only it does, with another beside it: two moments of it side by side (so long after it gets to part N of it, and so long after that).
 ## With --pool (and no other of those): four in a room with the pool in it, in each place it fits and under each lamp.
 
@@ -57,6 +58,8 @@ var tidy := false
 var toys := false
 var room := false
 var book := false
+# With --book --album: the album at the back of it alone, and the leaf of lore of every kind
+var album := false
 var from_step := 1
 var first_wait := 0.8
 var second_wait := 1.8
@@ -103,6 +106,8 @@ func _initialize() -> void:
 		if arg.begins_with("--size="):
 			var across := arg.trim_prefix("--size=").split("x")
 			window = Vector2i(int(across[0]), int(across[1]))
+		if arg == "--album":
+			album = true
 		if arg == "--book":
 			book = true
 		if arg == "--pool":
@@ -612,10 +617,25 @@ func _run_book() -> void:
 		main.stock = {"fish": 2}
 		main._sync()
 	main.notebook.open()
+	if album:
+		main.notebook.open_at(main.notebook.chapters() - 1)
+		await _wait(1.5)
+		await _snap("album")
+		for k in Cryptlin.KINDS.size():
+			main.notebook.read(k)
+			await _wait(0.1)
+			await _snap("lore%02d" % k)
+		quit()
+		return
 	for i in main.notebook.pages():
 		await _wait(0.25)
 		await _snap("b%s%02d" % ["_fresh" if fresh else "", i])
 		main.notebook.turn(1)
+	# The lore of the first of them, turned up from its own chapter
+	main.notebook.open_at(0)
+	main.notebook.stamp.pressed.emit()
+	await _wait(0.25)
+	await _snap("b%s_lore" % ("_fresh" if fresh else ""))
 	quit()
 
 
