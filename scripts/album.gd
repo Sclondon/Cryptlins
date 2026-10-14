@@ -91,6 +91,8 @@ func _sit(view: SubViewport, kind: int) -> Cryptlin:
 	sitter.rotation.y = TURNED
 	sitter.emote.visible = false
 	sitter.gaze = Vector3(0, 0.6, 5.0)
+	# (and it is not to blink as the picture is taken)
+	sitter.blink = 99.0
 	for i in 40:
 		sitter._animate(0.05)
 	return sitter
